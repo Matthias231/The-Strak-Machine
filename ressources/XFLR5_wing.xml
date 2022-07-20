@@ -9,8 +9,8 @@
         <Inertia>
             <Point_Mass>
                 <Tag />
-                <Mass>  0.850</Mass>
-                <coordinates>      0.005,           0,           0</coordinates>
+                <Mass>  0.410</Mass>
+                <coordinates>      -0.100,           0,           0</coordinates>
             </Point_Mass>
         </Inertia>
         <has_body>false</has_body>
@@ -31,156 +31,756 @@
             <isDoubleFin>false</isDoubleFin>
             <isSymFin>false</isSymFin>
             <Inertia>
-                <Volume_Mass>  1.400</Volume_Mass>
+                <Volume_Mass>  1.700</Volume_Mass>
             </Inertia>
             <Sections>
                 <Section>
                     <y_position>0</y_position>
-                    <Chord>0.219</Chord>
+                    <Chord>0.23</Chord>
                     <xOffset>0.0</xOffset>
                     <Dihedral>3.0</Dihedral>
                     <Twist>  0.000</Twist>
                     <x_number_of_panels>13</x_number_of_panels>
                     <x_panel_distribution>COSINE</x_panel_distribution>
-                    <y_number_of_panels>5</y_number_of_panels>
+                    <y_number_of_panels>2</y_number_of_panels>
                     <y_panel_distribution>UNIFORM</y_panel_distribution>
-                    <Left_Side_FoilName>JX-GS-139k.dat</Left_Side_FoilName>
-                    <Right_Side_FoilName>JX-GS-139k.dat</Right_Side_FoilName>
+                    <Left_Side_FoilName>airfoil-150k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-150k</Right_Side_FoilName>
                 </Section>
             </Sections>
         <Sections>
                 <Section>
                     <y_position>0.0175</y_position>
-                    <Chord>0.219</Chord>
+                    <Chord>0.23</Chord>
                     <xOffset>0.0</xOffset>
                     <Dihedral>3.0</Dihedral>
                     <Twist>  0.000</Twist>
                     <x_number_of_panels>13</x_number_of_panels>
                     <x_panel_distribution>COSINE</x_panel_distribution>
-                    <y_number_of_panels>5</y_number_of_panels>
+                    <y_number_of_panels>2</y_number_of_panels>
                     <y_panel_distribution>UNIFORM</y_panel_distribution>
-                    <Left_Side_FoilName>JX-GS-139k.dat</Left_Side_FoilName>
-                    <Right_Side_FoilName>JX-GS-139k.dat</Right_Side_FoilName>
+                    <Left_Side_FoilName>airfoil-150k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-150k</Right_Side_FoilName>
                 </Section>
             </Sections>
         <Sections>
                 <Section>
-                    <y_position>0.27215445889031314</y_position>
-                    <Chord>0.21536056578441076</Chord>
-                    <xOffset>0.00029387895781116113</xOffset>
+                    <y_position>0.06432750412012453</y_position>
+                    <Chord>0.22972516532319412</Chord>
+                    <xOffset>-0.0007642147925031872</xOffset>
                     <Dihedral>3.0</Dihedral>
                     <Twist>  0.000</Twist>
                     <x_number_of_panels>13</x_number_of_panels>
                     <x_panel_distribution>COSINE</x_panel_distribution>
-                    <y_number_of_panels>5</y_number_of_panels>
+                    <y_number_of_panels>2</y_number_of_panels>
                     <y_panel_distribution>UNIFORM</y_panel_distribution>
-                    <Left_Side_FoilName>JX-GS-137k.dat</Left_Side_FoilName>
-                    <Right_Side_FoilName>JX-GS-137k.dat</Right_Side_FoilName>
+                    <Left_Side_FoilName>airfoil-150k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-150k</Right_Side_FoilName>
                 </Section>
             </Sections>
         <Sections>
                 <Section>
-                    <y_position>0.5241099615455045</y_position>
-                    <Chord>0.2041489885531083</Chord>
-                    <xOffset>0.0046427568044316025</xOffset>
+                    <y_position>0.11106665445889032</y_position>
+                    <Chord>0.22922983449421758</Chord>
+                    <xOffset>-0.001362460672131638</xOffset>
                     <Dihedral>3.0</Dihedral>
                     <Twist>  0.000</Twist>
                     <x_number_of_panels>13</x_number_of_panels>
                     <x_panel_distribution>COSINE</x_panel_distribution>
-                    <y_number_of_panels>5</y_number_of_panels>
+                    <y_number_of_panels>2</y_number_of_panels>
                     <y_panel_distribution>UNIFORM</y_panel_distribution>
-                    <Left_Side_FoilName>JX-GS-130k.dat</Left_Side_FoilName>
-                    <Right_Side_FoilName>JX-GS-130k.dat</Right_Side_FoilName>
+                    <Left_Side_FoilName>airfoil-150k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-150k</Right_Side_FoilName>
                 </Section>
             </Sections>
         <Sections>
                 <Section>
-                    <y_position>0.7700325032045413</y_position>
-                    <Chord>0.18432847090152868</Chord>
-                    <xOffset>0.013247316148330107</xOffset>
+                    <y_position>0.15789415857901484</y_position>
+                    <Chord>0.22851274479804115</Chord>
+                    <xOffset>-0.0017960556280143813</xOffset>
                     <Dihedral>3.0</Dihedral>
                     <Twist>  0.000</Twist>
                     <x_number_of_panels>13</x_number_of_panels>
                     <x_panel_distribution>COSINE</x_panel_distribution>
-                    <y_number_of_panels>5</y_number_of_panels>
+                    <y_number_of_panels>2</y_number_of_panels>
                     <y_panel_distribution>UNIFORM</y_panel_distribution>
-                    <Left_Side_FoilName>JX-GS-117k.dat</Left_Side_FoilName>
-                    <Right_Side_FoilName>JX-GS-117k.dat</Right_Side_FoilName>
+                    <Left_Side_FoilName>airfoil-150k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-150k</Right_Side_FoilName>
                 </Section>
             </Sections>
         <Sections>
                 <Section>
-                    <y_position>0.9792809924922176</y_position>
-                    <Chord>0.15754370626483288</Chord>
-                    <xOffset>0.026812898555396397</xOffset>
+                    <y_position>0.20463330891778064</y_position>
+                    <Chord>0.22757645583821115</Chord>
+                    <xOffset>-0.0020618659695418873</xOffset>
                     <Dihedral>3.0</Dihedral>
                     <Twist>  0.000</Twist>
                     <x_number_of_panels>13</x_number_of_panels>
                     <x_panel_distribution>COSINE</x_panel_distribution>
-                    <y_number_of_panels>5</y_number_of_panels>
+                    <y_number_of_panels>2</y_number_of_panels>
                     <y_panel_distribution>UNIFORM</y_panel_distribution>
-                    <Left_Side_FoilName>JX-GS-100k.dat</Left_Side_FoilName>
-                    <Right_Side_FoilName>JX-GS-100k.dat</Right_Side_FoilName>
+                    <Left_Side_FoilName>airfoil-150k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-150k</Right_Side_FoilName>
                 </Section>
             </Sections>
         <Sections>
                 <Section>
-                    <y_position>1.1396307452847465</y_position>
-                    <Chord>0.1260278938363935</Chord>
-                    <xOffset>0.04593018402543905</xOffset>
+                    <y_position>0.25146081303790513</y_position>
+                    <Chord>0.22641647879672255</Chord>
+                    <xOffset>-0.002158796107209149</xOffset>
                     <Dihedral>3.0</Dihedral>
                     <Twist>  0.000</Twist>
                     <x_number_of_panels>13</x_number_of_panels>
                     <x_panel_distribution>COSINE</x_panel_distribution>
-                    <y_number_of_panels>5</y_number_of_panels>
+                    <y_number_of_panels>2</y_number_of_panels>
                     <y_panel_distribution>UNIFORM</y_panel_distribution>
-                    <Left_Side_FoilName>JX-GS-080k.dat</Left_Side_FoilName>
-                    <Right_Side_FoilName>JX-GS-080k.dat</Right_Side_FoilName>
+                    <Left_Side_FoilName>airfoil-150k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-150k</Right_Side_FoilName>
                 </Section>
             </Sections>
         <Sections>
                 <Section>
-                    <y_position>1.2415560336934628</y_position>
-                    <Chord>0.09450553896433662</Chord>
-                    <xOffset>0.06810145418309464</xOffset>
+                    <y_position>0.29828831715802967</y_position>
+                    <Chord>0.2250325628497288</Chord>
+                    <xOffset>-0.0020834291730212062</xOffset>
                     <Dihedral>3.0</Dihedral>
                     <Twist>  0.000</Twist>
                     <x_number_of_panels>13</x_number_of_panels>
                     <x_panel_distribution>COSINE</x_panel_distribution>
-                    <y_number_of_panels>5</y_number_of_panels>
+                    <y_number_of_panels>2</y_number_of_panels>
                     <y_panel_distribution>UNIFORM</y_panel_distribution>
-                    <Left_Side_FoilName>JX-GS-060k.dat</Left_Side_FoilName>
-                    <Right_Side_FoilName>JX-GS-060k.dat</Right_Side_FoilName>
+                    <Left_Side_FoilName>airfoil-147k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-147k</Right_Side_FoilName>
                 </Section>
             </Sections>
         <Sections>
                 <Section>
-                    <y_position>1.2990279252884087</y_position>
-                    <Chord>0.06300688956115992</Chord>
-                    <xOffset>0.09271545376400432</xOffset>
+                    <y_position>0.3445856985900019</y_position>
+                    <Chord>0.22344147660313424</Chord>
+                    <xOffset>-0.0018361353601616948</xOffset>
                     <Dihedral>3.0</Dihedral>
                     <Twist>  0.000</Twist>
                     <x_number_of_panels>13</x_number_of_panels>
                     <x_panel_distribution>COSINE</x_panel_distribution>
-                    <y_number_of_panels>5</y_number_of_panels>
+                    <y_number_of_panels>2</y_number_of_panels>
                     <y_panel_distribution>UNIFORM</y_panel_distribution>
-                    <Left_Side_FoilName>JX-GS-040k.dat</Left_Side_FoilName>
-                    <Right_Side_FoilName>JX-GS-040k.dat</Right_Side_FoilName>
+                    <Left_Side_FoilName>airfoil-147k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-147k</Right_Side_FoilName>
                 </Section>
             </Sections>
         <Sections>
                 <Section>
-                    <y_position>1.3158567112250505</y_position>
-                    <Chord>0.030490768348275105</Chord>
-                    <xOffset>0.12024454319525271</xOffset>
+                    <y_position>0.390883080021974</y_position>
+                    <Chord>0.2216251747161221</Chord>
+                    <xOffset>-0.001412916225959876</xOffset>
                     <Dihedral>3.0</Dihedral>
                     <Twist>  0.000</Twist>
                     <x_number_of_panels>13</x_number_of_panels>
                     <x_panel_distribution>COSINE</x_panel_distribution>
-                    <y_number_of_panels>5</y_number_of_panels>
+                    <y_number_of_panels>2</y_number_of_panels>
                     <y_panel_distribution>UNIFORM</y_panel_distribution>
-                    <Left_Side_FoilName>JX-GS-040k.dat</Left_Side_FoilName>
-                    <Right_Side_FoilName>JX-GS-040k.dat</Right_Side_FoilName>
+                    <Left_Side_FoilName>airfoil-147k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-147k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>0.4371804614539462</y_position>
+                    <Chord>0.21957894332794992</Chord>
+                    <xOffset>-0.0008088135871562319</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-147k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-147k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>0.48347784288591833</y_position>
+                    <Chord>0.21729686779947663</Chord>
+                    <xOffset>-1.792236222331045e-05</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-147k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-147k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>0.5298635780992492</y_position>
+                    <Chord>0.21476662637990562</Chord>
+                    <xOffset>0.0009688046256786098</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-147k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-147k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>0.5761609595312214</y_position>
+                    <Chord>0.21198904409220318</Chord>
+                    <xOffset>0.0021558265198699245</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-138k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-138k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>0.6210446804614539</y_position>
+                    <Chord>0.20904580277113632</Chord>
+                    <xOffset>0.003508513259252166</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-138k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-138k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>0.6659284013916865</y_position>
+                    <Chord>0.20584441701520842</Chord>
+                    <xOffset>0.005070316954651571</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-138k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-138k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>0.7107237685405603</y_position>
+                    <Chord>0.20237844143668376</Chord>
+                    <xOffset>0.006849451059325967</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-138k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-138k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>0.7556074894707928</y_position>
+                    <Chord>0.1986181801898837</Chord>
+                    <xOffset>0.00886688221578405</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-138k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-138k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>0.8004912104010254</y_position>
+                    <Chord>0.19455116158331687</Chord>
+                    <xOffset>0.011135723332328984</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-138k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-138k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>0.845374931331258</y_position>
+                    <Chord>0.1901547127758875</Chord>
+                    <xOffset>0.013675336638549196</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-124k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-124k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>0.8917606665445889</y_position>
+                    <Chord>0.1852360692964352</Chord>
+                    <xOffset>0.016608959393811268</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-124k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-124k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>0.9381464017579197</y_position>
+                    <Chord>0.1799001363289821</Chord>
+                    <xOffset>0.019887031947272954</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-124k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-124k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>0.9844437831898919</y_position>
+                    <Chord>0.1741136380232015</Chord>
+                    <xOffset>0.023539667033789763</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-124k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-124k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.030829518403223</y_position>
+                    <Chord>0.16779860120077528</Chord>
+                    <xOffset>0.02762730894323559</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-124k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-124k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.0772152536165538</y_position>
+                    <Chord>0.16089429129194638</Chord>
+                    <xOffset>0.03220241586338177</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-124k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-124k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.123512635048526</y_position>
+                    <Chord>0.1533227191399028</Chord>
+                    <xOffset>0.03733138571186276</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-100k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-100k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.148251693828969</y_position>
+                    <Chord>0.14895665461969226</Chord>
+                    <xOffset>0.04033655735781186</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-100k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-100k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.1729907526094123</y_position>
+                    <Chord>0.14433742558125526</Chord>
+                    <xOffset>0.04355064154252622</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-100k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-100k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.1977298113898553</y_position>
+                    <Chord>0.13943563364379163</Chord>
+                    <xOffset>0.04699764786523607</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-100k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-100k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.2223805163889399</y_position>
+                    <Chord>0.1342342790602</Chord>
+                    <xOffset>0.050693376876230364</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-100k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-100k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.247119575169383</y_position>
+                    <Chord>0.12865060451276797</Chord>
+                    <xOffset>0.05470131289145495</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-100k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-100k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.2717702801684674</y_position>
+                    <Chord>0.12266619205747066</Chord>
+                    <xOffset>0.05904016781467879</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-080k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-080k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.2943004944149423</y_position>
+                    <Chord>0.11676414357566522</Chord>
+                    <xOffset>0.06336000088840896</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-080k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-080k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.3167423548800588</y_position>
+                    <Chord>0.11039364032541027</Chord>
+                    <xOffset>0.06806477292975124</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-080k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-080k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.3392725691265337</y_position>
+                    <Chord>0.10339392671975729</Chord>
+                    <xOffset>0.07328087631188307</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-080k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-080k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.36171442959165</y_position>
+                    <Chord>0.09565834551963998</Chord>
+                    <xOffset>0.07909771833884348</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-080k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-080k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.384244643838125</y_position>
+                    <Chord>0.08686925264979908</Chord>
+                    <xOffset>0.08576787997661318</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-080k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-080k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.4066865043032413</y_position>
+                    <Chord>0.07664500043737588</Chord>
+                    <xOffset>0.09360141661641369</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-050k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-050k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.4111925471525362</y_position>
+                    <Chord>0.07434747044800949</Chord>
+                    <xOffset>0.09537188837573062</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-050k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-050k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.4155218824391138</y_position>
+                    <Chord>0.07204136169093661</Chord>
+                    <xOffset>0.09715252881629413</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-050k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-050k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.4199395715070502</y_position>
+                    <Chord>0.06957507317733291</Chord>
+                    <xOffset>0.09906069731496564</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-050k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-050k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.4243572605749864</y_position>
+                    <Chord>0.06697766169260223</Chord>
+                    <xOffset>0.10107450338961718</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-050k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-050k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.4287749496429227</y_position>
+                    <Chord>0.0642274240144367</Chord>
+                    <xOffset>0.10321135234885823</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-050k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-050k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.433192638710859</y_position>
+                    <Chord>0.06129581182626291</Chord>
+                    <xOffset>0.10549413302142079</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-040k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-040k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.4384938655923825</y_position>
+                    <Chord>0.05748268015199012</Chord>
+                    <xOffset>0.10847081143175051</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-040k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-040k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.443795092473906</y_position>
+                    <Chord>0.053251055729541766</Chord>
+                    <xOffset>0.1117837009935712</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-040k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-040k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.4490963193554296</y_position>
+                    <Chord>0.04843192257182999</Chord>
+                    <xOffset>0.11556819266160862</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-040k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-040k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.454397546236953</y_position>
+                    <Chord>0.04269542869370041</Chord>
+                    <xOffset>0.12008843055262684</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-040k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-040k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.4596987731184765</y_position>
+                    <Chord>0.03307069764922615</Chord>
+                    <xOffset>0.1277210637390294</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-040k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-040k</Right_Side_FoilName>
+                </Section>
+            </Sections>
+        <Sections>
+                <Section>
+                    <y_position>1.4638514008423367</y_position>
+                    <Chord>0.016514517774371844</Chord>
+                    <xOffset>0.14091614110150963</xOffset>
+                    <Dihedral>3.0</Dihedral>
+                    <Twist>  0.000</Twist>
+                    <x_number_of_panels>13</x_number_of_panels>
+                    <x_panel_distribution>COSINE</x_panel_distribution>
+                    <y_number_of_panels>2</y_number_of_panels>
+                    <y_panel_distribution>UNIFORM</y_panel_distribution>
+                    <Left_Side_FoilName>airfoil-040k</Left_Side_FoilName>
+                    <Right_Side_FoilName>airfoil-040k</Right_Side_FoilName>
                 </Section>
             </Sections>
         </wing>
@@ -194,7 +794,7 @@
                 <alpha>255</alpha>
             </Color>
             <Description />
-            <Position>      0.885,           0,           0</Position>
+            <Position>      1.095,           0,           0</Position>
             <Tilt_angle>  0.000</Tilt_angle>
             <Symetric>true</Symetric>
             <isFin>true</isFin>
@@ -212,7 +812,7 @@
                     <Twist>  0.000</Twist>
                     <x_number_of_panels>13</x_number_of_panels>
                     <x_panel_distribution>COSINE</x_panel_distribution>
-                    <y_number_of_panels>5</y_number_of_panels>
+                    <y_number_of_panels>2</y_number_of_panels>
                     <y_panel_distribution>UNIFORM</y_panel_distribution>
                     <Left_Side_FoilName>Fin_1</Left_Side_FoilName>
                     <Right_Side_FoilName>Fin_1</Right_Side_FoilName>
