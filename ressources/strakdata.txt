@@ -4,11 +4,11 @@
     "NCrit": 7.0, 
     "reynolds": [
         50000, 
-        40000
+        37000
     ], 
     "airfoilNames": [
         "JX-GT-050k", 
-        "JX-GT-040k"
+        "JX-GT-037k"
     ], 
     "additionalOpPoints": [
         0.014, 

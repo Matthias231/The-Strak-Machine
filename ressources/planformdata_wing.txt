@@ -21,7 +21,7 @@
  "interpolationSegments" : 5,
  "airfoilBasicName": "JX-GT",
  "airfoilPositions": [    null,      0.206,    0.398,     0.584,    null,     null,    null,  null  ],
- "airfoilReynolds":  [  150000,      null,     null,      null,  100000,    80000,   50000,  40000  ],
+ "airfoilReynolds":  [  150000,      null,     null,      null,  100000,    80000,   50000,  37000  ],
  "airfoilTypes":     [  "user",   "blend",   "blend",  "blend",  "user",   "blend",   "user", "opt" ],
  "flapGroup":        [        1,         1,        2,        2,       2,        2,       2,       2 ],
  "smoothUserAirfoils" : "False",
