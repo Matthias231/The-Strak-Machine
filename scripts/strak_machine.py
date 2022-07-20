@@ -1629,6 +1629,7 @@ class strak_machineParams:
         self.targets["CD0"].clear()
         self.targets["alpha0"].clear()
 
+
     def calculate_MainTargetValues(self):
         # get root-polar
         rootPolar = self.merged_polars[0]
@@ -1643,107 +1644,57 @@ class strak_machineParams:
             else:
                 polar = self.seedfoil_polars[idx-1]
 
-            # Get root-polar for this operation
-            rootPolar = self.merged_polars[0]
-
-            # get gain and loss values
-            minCLGain = 0.0
-            CL0Gain = 0.0
-            maxSpeedGain = 0.0
-            maxSpeedShift = 0.0
-            preMaxSpeedGain = 0.0
-            maxGlideGain = 0.0
-            maxGlideShift = 0.0
-            maxLiftGain = 0.0
-
             #---------------------- CL_min-targets ----------------------------
-            target_CL_min = rootPolar.CL_min
             target_alpha_min = rootPolar.alpha[rootPolar.min_idx]
-            #polar_CD_min = polar.find_CD_From_CL(target_CL_min)
             polar_CD_min = polar.find_CD_From_alpha(target_alpha_min)
 
-            # now calculate CD-target-value
-            target_CD_min = self.calculate_CD_TargetValue(
-            rootPolar.CD_min, polar_CD_min, minCLGain)
-
             # append the targets
-            self.targets["CL_min"].append(target_CL_min)
-            self.targets["CD_min"].append(target_CD_min)
+            self.targets["CL_min"].append(rootPolar.CL_min)
+            self.targets["CD_min"].append(polar_CD_min)
             self.targets["alpha_min"].append(target_alpha_min)
 
             #---------------------- maxSpeed-targets --------------------------
-            target_CL_maxSpeed = rootPolar.CL_maxSpeed + maxSpeedShift
+            target_CL_maxSpeed = rootPolar.CL_maxSpeed
             maxSpeedIdx = polar.find_index_From_CL(target_CL_maxSpeed)
-            target_alpha_maxSpeed = polar.alpha[maxSpeedIdx]
-            CD_maxSpeed = polar.CD[maxSpeedIdx]
-
-            # now calculate CD-target-value
-            target_CD_maxSpeed = self.calculate_CD_TargetValue(
-            rootPolar.CD_maxSpeed, CD_maxSpeed, maxSpeedGain)
 
             # append the targets
             self.targets["CL_maxSpeed"].append(target_CL_maxSpeed)
-            self.targets["CD_maxSpeed"].append(target_CD_maxSpeed)
-            self.targets["alpha_maxSpeed"].append(target_alpha_maxSpeed)
+            self.targets["CD_maxSpeed"].append(polar.CD[maxSpeedIdx])
+            self.targets["alpha_maxSpeed"].append(polar.alpha[maxSpeedIdx])
 
-#---------------------- preMaxSpeed-targets --------------------------
-            target_CL_preMaxSpeed = rootPolar.CL_preMaxSpeed
-            target_alpha_preMaxSpeed = rootPolar.alpha[rootPolar.preMaxSpeed_idx]
-
-            # now calculate CD-target-value
-            target_CD_preMaxSpeed = self.calculate_CD_TargetValue(
-            rootPolar.CD_preMaxSpeed, polar.CD_preMaxSpeed, preMaxSpeedGain)
-
+           #---------------------- preMaxSpeed-targets --------------------------
             # append the targets
-            self.targets["CL_preMaxSpeed"].append(target_CL_preMaxSpeed)
-            self.targets["CD_preMaxSpeed"].append(target_CD_preMaxSpeed)
-            self.targets["alpha_preMaxSpeed"].append(target_alpha_preMaxSpeed)
+            self.targets["CL_preMaxSpeed"].append(rootPolar.CL_preMaxSpeed)
+            self.targets["CD_preMaxSpeed"].append(polar.CD_preMaxSpeed)
+            self.targets["alpha_preMaxSpeed"].append(rootPolar.alpha[rootPolar.preMaxSpeed_idx])
 
             #---------------------- maxGlide-targets --------------------------
-            # Caution: use CL-target from shifted root-polar
             target_CL_maxGlide = rootPolar.CL_maxGlide
             target_alpha_maxGlide = rootPolar.alpha[rootPolar.maxGlide_idx]
-            #polar_CD_maxGlide = polar.find_CD_From_CL(target_CL_maxGlide)
             polar_CD_maxGlide = polar.find_CD_From_alpha(target_alpha_maxGlide)
-
-            # now calculate CD-target-value
-            target_CD_maxGlide = self.calculate_CD_TargetValue(
-            rootPolar.CD_maxGlide, polar_CD_maxGlide, maxGlideGain)
 
             # append the targets
             self.targets["CL_maxGlide"].append(target_CL_maxGlide)
-            self.targets["CD_maxGlide"].append(target_CD_maxGlide)
-            self.targets["CL_CD_maxGlide"].append(target_CL_maxGlide/target_CD_maxGlide)
+            self.targets["CD_maxGlide"].append(polar_CD_maxGlide)
+            self.targets["CL_CD_maxGlide"].append(target_CL_maxGlide/polar_CD_maxGlide)
             self.targets["alpha_maxGlide"].append(target_alpha_maxGlide)
 
             #---------------------- maxLift-targets --------------------------
-            target_CL_pre_maxLift = polar.CL_pre_maxLift
             target_alpha_pre_maxLift = rootPolar.alpha[polar.pre_maxLift_idx]
-            #rootPolar_CD_pre_maxLift = rootPolar.find_CD_From_CL(polar.CL_pre_maxLift)
             rootPolar_CD_pre_maxLift = rootPolar.find_CD_From_alpha(target_alpha_pre_maxLift)
 
-            # now calculate CD-target-value
-            target_CD_pre_maxLift = self.calculate_CD_TargetValue(
-            rootPolar_CD_pre_maxLift, polar.CD_pre_maxLift, maxLiftGain)
-
             # append the targets
-            self.targets["CL_pre_maxLift"].append(target_CL_pre_maxLift)
-            self.targets["CD_pre_maxLift"].append(target_CD_pre_maxLift)
+            self.targets["CL_pre_maxLift"].append(polar.CL_pre_maxLift)
+            self.targets["CD_pre_maxLift"].append(polar.CD_pre_maxLift)
             self.targets["alpha_pre_maxLift"].append(target_alpha_pre_maxLift)
 
             #---------------------- CL0-targets ----------------------------
-            target_CL0 = 0.0001#rootPolar.find_CL_From_alpha(rootPolar.alpha_CL0)
-            rootPolar_CD0 = rootPolar.find_CD_From_alpha(rootPolar.alpha_CL0)
+            target_CL0 = 0.0001
             polar_CD0 = polar.find_CD_From_alpha(rootPolar.alpha_CL0)
-
-            # now calculate CD-target-value
-            target_CD0 = self.calculate_CD_TargetValue(
-            rootPolar_CD0, polar_CD0, CL0Gain)
-            target_CD0 = rootPolar_CD0/(1+CL0Gain) #Test
 
             # append the targets
             self.targets["CL0"].append(target_CL0)
-            self.targets["CD0"].append(target_CD0)
+            self.targets["CD0"].append(polar_CD0)
             self.targets["alpha0"].append(rootPolar.alpha_CL0)
 
             idx = idx + 1
@@ -2551,9 +2502,9 @@ class polarData:
     def analyze(self, params):
         my_print("analysing polar \'%s\'..." % self.polarName)
 
-        self.determine_MaxSpeed()
+        maxGlideIdx = self.determine_MaxGlide()
+        self.determine_MaxSpeed(maxGlideIdx)
         self.determine_CLmin(params)
-        self.determine_MaxGlide()
         self.determine_preMaxSpeed(params)
         self.determine_MaxLift(params)
         self.determine_alpha_CL0(params)
@@ -2698,13 +2649,14 @@ class polarData:
 
     # determines the first minimum CD-value of a given polar, starting at
     # the point of highest lift coefficent, descending
-    def determine_MaxSpeed(self):
+    def determine_MaxSpeed(self, startIdx):
         # initialize minimum
-        minimum = self.CD[-1]
+        minimum = self.CD[startIdx]
+        num = len(self.CD)-startIdx-1
 
         # find the first minimum CD starting from the highest lift coefficient
-        for idx in reversed(range(len(self.CD)-1)):
-            if (self.CD[idx] <= minimum):
+        for idx in reversed(range(num)):
+            if (self.CD[idx] < minimum):
                 # found new minimum
                 minimum = self.CD[idx]
             else:
@@ -2716,6 +2668,7 @@ class polarData:
         self.CL_maxSpeed = self.CL[self.maxSpeed_idx]
         self.alpha_maxSpeed = self.alpha[self.maxSpeed_idx]
         self.CL_CD_maxSpeed = self.CL_maxSpeed / self.CD_maxSpeed
+        return self.maxSpeed_idx
 
         #my_print("max Speed, CD = %f @ CL = %f" %\
         #                         (self.CD_maxSpeed, self.CL_maxSpeed))
@@ -2727,8 +2680,7 @@ class polarData:
         self.CD_preMaxSpeed = self.CD[self.preMaxSpeed_idx]
         self.alpha_preMaxSpeed = self.alpha[self.preMaxSpeed_idx]
         self.CL_CD_preMaxSpeed = self.CL_preMaxSpeed / self.CD_preMaxSpeed
-        #my_print("pre max Speed, CD = %f @ CL = %f" %\
-        #                          (self.CD_preMaxSpeed, self.CL_preMaxSpeed))
+        return self.preMaxSpeed_idx
 
 
     # determines the overall max-value for Cl/Cd (max glide) of a given polar
@@ -2739,6 +2691,7 @@ class polarData:
         self.CL_maxGlide = self.CL[self.maxGlide_idx]
         self.CD_maxGlide = self.CD[self.maxGlide_idx]
         self.alpha_maxGlide = self.alpha[self.maxGlide_idx]
+        return self.maxGlide_idx
 
         #my_print("max Glide, CL/CD = %f @ CL = %f" %
         #                          (self.CL_CD_maxGlide, self.CL_maxGlide))
@@ -2748,6 +2701,7 @@ class polarData:
         self.min_idx = self.find_index_From_CL(params.CL_min)
         self.CD_min = self.CD[self.min_idx]#self.find_CD_From_CL(params.CL_min)
         self.alpha_min = self.alpha[self.min_idx]
+        return self.min_idx
 
 
     # determines the max-value for Cl (max lift) of a given polar and some
@@ -2764,6 +2718,7 @@ class polarData:
         self.pre_maxLift_idx = self.find_index_From_CL(self.CL_pre_maxLift)
         self.CD_pre_maxLift = self.CD[self.pre_maxLift_idx]
         self.alpha_pre_maxLift = self.alpha[self.pre_maxLift_idx]
+        return self.maxLift_idx
 
         #my_print("max Lift, CL = %f @ alpha = %f" %
         #                          (self.CL_maxLift, self.alpha_maxLift))
