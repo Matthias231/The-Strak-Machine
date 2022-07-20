@@ -2137,6 +2137,12 @@ def update_strakdata(wingData):
     update_airfoilNames(wingData, strakdata, seedfoilIdx)
     update_reynolds(wingData, strakdata, seedfoilIdx)
 
+    # if there are any geo parameters, remove them now
+    try:
+        del(strakdata['geoParams'])
+    except:
+        pass
+
     # write json-File
     with open(strakDataFileName, "w") as write_file:
         json.dump(strakdata, write_file, indent=4, separators=(", ", ": "), sort_keys=False)
