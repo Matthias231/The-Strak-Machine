@@ -1935,20 +1935,41 @@ def create_blendedArifoils(wingData):
 
 
 def update_seedfoilName(wingData, strakdata):
-    seedFoilName = wingData.airfoilNames[0]
+    seedfoilIdx = 0
+    firstOptfoilIdx = 0
+
+    # get number of airfoils
+    num = len(wingData.airfoilTypes)
+
+    # search for 'opt' airfoils, starting at the root of the wing
+    for idx in range(num):
+        if (wingData.airfoilTypes[idx] == "opt"):
+            # we have found an optfoil
+            firstOptfoilIdx = idx
+            break
+
+    # search for 'user' airfoils, starting from the optfoil, but search
+    # backwards up to the root of the wing
+    for idx in reversed(range(0, firstOptfoilIdx)):
+        if (wingData.airfoilTypes[idx] == "user"):
+            # we have found a user airfoil, this wiil be our seedfoil
+            seedfoilIdx = idx
+            break
 
     # set the new seedfoilname
+    seedFoilName = wingData.airfoilNames[seedfoilIdx]
     strakdata["seedFoilName"] = airfoilPath + bs + remove_suffix(seedFoilName, ".dat")
+    return seedfoilIdx
 
 
-def update_airfoilNames(wingData, strakdata):
+def update_airfoilNames(wingData, strakdata, seedfoilIdx):
     # all airfoil without tip-airfoil
     num = len(wingData.airfoilTypes) - 1
 
     airfoilNames = []
 
     # first append name of the seedfoil
-    foilName = remove_suffix(wingData.airfoilNames[0], ".dat")
+    foilName = remove_suffix(wingData.airfoilNames[seedfoilIdx], ".dat")
     airfoilNames.append(foilName)
 
     # create list of airfoilnames that shall be created by the strak-machine
@@ -1961,13 +1982,13 @@ def update_airfoilNames(wingData, strakdata):
     strakdata["airfoilNames"] = airfoilNames
 
 
-def update_reynolds(wingData, strakdata):
+def update_reynolds(wingData, strakdata, seedfoilIdx):
     # all airfoil without tip-airfoil
     num = len(wingData.airfoilTypes) -1
     reynolds = []
 
     # first append reynolds-number of the seedfoil
-    reynolds.append(wingData.airfoilReynolds[0])
+    reynolds.append(wingData.airfoilReynolds[seedfoilIdx])
 
     # create list of reynolds-numbers for the airfoils that shall be created by
     # the strak-machine
@@ -2082,6 +2103,17 @@ def set_NCrit(NCrit, filename):
 
 # write Re-numbers and seedfoil to strakdata.txt
 def update_strakdata(wingData):
+    foundOptFoil = False
+
+    # first check if there are any 'opt' airfoils in the wing
+    for airfoilType in wingData.airfoilTypes:
+        if (airfoilType == "opt"):
+            foundOptFoil = True
+
+    if not foundOptFoil:
+        # we have nothing to do
+        return
+
     # try to open .json-file
     try:
         strakDataFile = open(strakDataFileName, "r")
@@ -2101,9 +2133,9 @@ def update_strakdata(wingData):
         return
 
     # update data coming from planform-creator
-    update_seedfoilName(wingData, strakdata)
-    update_airfoilNames(wingData, strakdata)
-    update_reynolds(wingData, strakdata)
+    seedfoilIdx = update_seedfoilName(wingData, strakdata)
+    update_airfoilNames(wingData, strakdata, seedfoilIdx)
+    update_reynolds(wingData, strakdata, seedfoilIdx)
 
     # write json-File
     with open(strakDataFileName, "w") as write_file:
