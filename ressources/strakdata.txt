@@ -1,35 +1,17 @@
 {
     "quality": "default", 
-    "seedFoilName": "airfoils\\airfoil-150k", 
+    "seedFoilName": "airfoils\\JX-GT-050k", 
     "NCrit": 7.0, 
     "reynolds": [
-        150000, 
+        50000, 
         40000
     ], 
     "airfoilNames": [
-        "airfoil-150k", 
-        "airfoil-040k"
+        "JX-GT-050k", 
+        "JX-GT-040k"
     ], 
     "additionalOpPoints": [
         0.014, 
         0.042
-    ], 
-    "geoParams": {
-        "thickness": [
-            7.65, 
-            6.95
-        ], 
-        "thicknessPosition": [
-            28.92, 
-            24.13
-        ], 
-        "camber": [
-            1.7, 
-            1.73
-        ], 
-        "camberPosition": [
-            41.59, 
-            29.74
-        ]
-    }
+    ]
 }

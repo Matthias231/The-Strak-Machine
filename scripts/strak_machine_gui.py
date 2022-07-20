@@ -1266,6 +1266,7 @@ if __name__ == "__main__":
         myStrakmachine = strak_machine("ressources//strakdata.txt")
     except:
         ErrorMsg("Strak Machine could not be started")
+        input("Press any key to quit")
         exit(-1)
 
     NoteMsg("Starting Graphical User Interface...")
