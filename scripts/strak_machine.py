@@ -41,7 +41,7 @@ visualizer = importlib.import_module("xoptfoil_visualizer-jx")
 bs = "\\"
 ressourcesPath = 'ressources'
 buildPath = 'build'
-airfoilPath = 'airfoils'
+airfoilPath = '01_airfoils'
 scriptPath = 'scripts'
 exePath = 'bin'
 

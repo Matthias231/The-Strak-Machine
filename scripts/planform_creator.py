@@ -57,8 +57,11 @@ from FLZ_Vortex_export import export_toFLZ
 ################################################################################
 # some global variables
 
+# folder where the generated planforms can be found
+planformsPath = '02_planforms'
+
 # folder containing the output / result-files
-outputFolder = buildPath + bs +'planforms'
+outputFolder = buildPath + bs + planformsPath
 
 # fonts
 csfont = {'fontname':'DejaVu Sans'}
