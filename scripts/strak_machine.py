@@ -1835,10 +1835,13 @@ class polarGraph:
             if (self.check_polarVisibility(params, polarIdx) == False):
                 # do not plot this polar
                 continue
-
-            #  get polar and target-polar to plot
-            polar = polars[polarIdx]
-            targetPolar = targetPolars[polarIdx]
+            try:
+                #  get polar and target-polar to plot
+                polar = polars[polarIdx]
+                targetPolar = targetPolars[polarIdx]
+            except:
+                ErrorMsg("Unable to get polars for polarIdx %d" & polarIdx)
+                return
 
             # determine idx for changing colors
             switchIdx = polar.T2_T1_switchIdx
@@ -2008,7 +2011,12 @@ class polarGraph:
                 continue
 
             #  get polar to plot
-            polar = polars[polarIdx]
+            try:
+                polar = polars[polarIdx]
+
+            except:
+                ErrorMsg("Unable to get polars for polarIdx %d" & polarIdx)
+                return
 
             # get inputfile. We can only determine the alpha targets
             # from the inputfile, not the target polar. Also get weightings from here
@@ -2141,9 +2149,13 @@ class polarGraph:
                 # do not plot this polar
                 continue
 
-            #  get polar and target-polar to plot
-            polar = polars[polarIdx]
-            targetPolar = targetPolars[polarIdx]
+            try:
+                #  get polar and target-polar to plot
+                polar = polars[polarIdx]
+                targetPolar = targetPolars[polarIdx]
+            except:
+                ErrorMsg("Unable to get polars for polarIdx %d" & polarIdx)
+                return
 
             # set label only once
             if (T1T2_labelOk == False):
