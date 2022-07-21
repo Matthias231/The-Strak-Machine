@@ -30,7 +30,6 @@ from matplotlib import rcParams
 import numpy as np
 from scipy.interpolate import make_interp_spline
 from scipy import interpolate as scipy_interpolate
-from scipy.ndimage import gaussian_filter1d
 from scipy.optimize import curve_fit
 from math import log10, floor, tan, atan, sin, cos, pi, sqrt
 import json
@@ -556,7 +555,7 @@ class wing:
            (self.planformShape == 'trapezoidal'):
             self.tipchord =  get_MandatoryParameterFromDict(dictData, "tipchord")
 
-        self.rootTipSweep =  get_MandatoryParameterFromDict(dictData, "rootTipSweep")
+        self.hingeLineAngle = get_MandatoryParameterFromDict(dictData, "hingeLineAngle")
         self.hingeDepthRoot = get_MandatoryParameterFromDict(dictData, "hingeDepthRoot")
         self.hingeDepthTip = get_MandatoryParameterFromDict(dictData, "hingeDepthTip")
         self.dihedral = get_MandatoryParameterFromDict(dictData, "dihedral")
@@ -824,28 +823,13 @@ class wing:
         rootQuarterChord = self.rootchord/4
         tipQuarterChord = self.tipDepth/4
 
-        # calculate the tip offset according to the sweep-angle
-        tipOffsetSweep = tan((self.rootTipSweep*pi)/180)*(self.halfwingspan)
+        # hinge line angle: convert radian measure --> degree
+        hingeLineAngle_radian = (self.hingeLineAngle/180) * pi
 
-        # calculate hinge-offset at the tip (without the tip-offset)
-        tipHingeOffset = self.tipDepth - tipQuarterChord - tipHingeDepth
-
-        # calculate offset of the middle of the tip
-        tipMiddleOffset = self.tipDepth/2 - tipQuarterChord
-
-        # calculate hinge outer-point
-        self.hingeOuterPoint = rootQuarterChord + tipOffsetSweep + tipHingeOffset
-
-        # calculate the outer point of the middle of the tip
-        tippMiddleOuterPoint = rootQuarterChord + tipOffsetSweep + tipMiddleOffset
-
-        # calculate hinge line angle
+        # calculate hingeOuterPoint from hinge line angle
         AK = self.halfwingspan
-        GK = self.hingeOuterPoint - self.hingeInnerPoint
-        hingeLineAngle_radian = atan(GK/AK)
-
-        # convert radian measure --> degree
-        self.hingeLineAngle = (hingeLineAngle_radian / pi) * 180.0
+        GK = tan(hingeLineAngle_radian)*AK
+        self.hingeOuterPoint = self.hingeInnerPoint + GK
 
         # calculate interval for setting up the grid
         grid_delta_y = (self.halfwingspan / (self.numberOfGridChords-1))
@@ -1669,9 +1653,9 @@ class wing:
         proj_area = self.area * cos(self.dihedral*pi/180.0)
 
         text = "\"%s\"\n wingspan: %d mm, rootchord: %d mm, area: %.2f dm², proj. area: %.2f dm²\n"\
-         "aspect ratio: %.2f, root-tip sweep: %.2f°, hinge line angle: %.2f°\n"\
+         "aspect ratio: %.2f, hinge line angle: %.2f°\n"\
          % (self.planformName, wingspan_mm, rootchord_mm, self.area, proj_area,
-         self.aspectRatio, self.rootTipSweep, self.hingeLineAngle)
+         self.aspectRatio, self.hingeLineAngle)
 
         fig.suptitle(text, fontsize = 12, color="darkgrey", **csfont)
 
