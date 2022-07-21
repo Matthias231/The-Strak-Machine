@@ -1,0 +1,1 @@
+The well known original "MH43" airfoil by Martin Hepperle
