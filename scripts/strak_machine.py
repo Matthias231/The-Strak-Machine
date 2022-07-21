@@ -1840,7 +1840,7 @@ class polarGraph:
                 polar = polars[polarIdx]
                 targetPolar = targetPolars[polarIdx]
             except:
-                ErrorMsg("Unable to get polars for polarIdx %d" & polarIdx)
+                ErrorMsg("Unable to get polars for polarIdx %d" % polarIdx)
                 return
 
             # determine idx for changing colors
@@ -2010,12 +2010,11 @@ class polarGraph:
                 # do not plot this polar
                 continue
 
-            #  get polar to plot
             try:
+                #  get polar to plot
                 polar = polars[polarIdx]
-
             except:
-                ErrorMsg("Unable to get polars for polarIdx %d" & polarIdx)
+                ErrorMsg("Unable to get polars for polarIdx %d" % polarIdx)
                 return
 
             # get inputfile. We can only determine the alpha targets
@@ -2154,7 +2153,7 @@ class polarGraph:
                 polar = polars[polarIdx]
                 targetPolar = targetPolars[polarIdx]
             except:
-                ErrorMsg("Unable to get polars for polarIdx %d" & polarIdx)
+                ErrorMsg("Unable to get polars for polarIdx %d" % polarIdx)
                 return
 
             # set label only once
