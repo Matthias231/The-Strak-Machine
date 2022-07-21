@@ -3533,12 +3533,57 @@ class polar_worker:
 
 
     def set_alphaMinMax(self, alphaMin_T1, alphaMax_T1, alphaMin_T2, alphaMax_T2):
+        # store min/max in internal data structure
         self.alphaMin_T1 = alphaMin_T1
         self.alphaMax_T1 = alphaMax_T1
         self.alphaMin_T2 = alphaMin_T2
         self.alphaMax_T2 = alphaMax_T2
 
+        # also perform an update on the template files for polar generation
+        self.update_polarInputFiles()
 
+
+    # performms an update of the input file for polar generation with the given
+    # name
+    def update_polarInputFile(self, inputFilename, alphaMin, alphaMax):
+        # read template file
+        fileContent = f90nml.read(inputFilename)
+
+        # get polar generation options from dictionary
+        polarGenerationOptions = fileContent['polar_generation']
+
+        # get oppoint range, example: op_point_range = -4, 12, 0.1
+        op_point_range = polarGenerationOptions['op_point_range']
+
+        # set alpha min/max
+        op_point_range[0] = alphaMin
+        op_point_range[1] = alphaMax
+
+        # writeback
+        polarGenerationOptions['op_point_range'] = op_point_range
+
+        # write new file
+        f90nml.write(fileContent, inputFilename, True)
+
+
+    # performms an update of the input file for T1 polar generation
+    def update_polarInputFiles(self):
+        inputFilename = get_PresetInputFileName(T1_polarInputFile)
+
+        # update T1 file: caution: we will set alphaMax to alphaMax_T2!
+        # At the moment we need this for polar generation with the planform
+        # creator
+        self.update_polarInputFile(inputFilename, self.alphaMin_T1,
+                                   self.alphaMax_T2)
+
+        # At the moment we perform no update of T2 input file
+##        # update T2 file
+##        inputFilename = get_PresetInputFileName(T2_polarInputFile)
+##        self.update_polarInputFile(inputFilename, self.alphaMin_T2,
+##                                   self.alphaMax_T2)
+
+
+    # generates an input file for T1/T2 polar generation
     def generate_PolarCreationFile(self, fileName, polarType, ReList):
         if polarType == 'T1':
             inputFilename = get_PresetInputFileName(T1_polarInputFile)
