@@ -27,7 +27,7 @@
  "flapGroup":        [       1,       1,        1,       1,       1,     1  ],
  "smoothUserAirfoils" : "True",
  "userAirfoils":     [".\\airfoil_library\\Tail\\JX\\\\JX-E\\JX-E-250.dat",
-                      ".\\airfoil_library\\Tail\\JX\\\\JX-E\\JX-E-250.dat"],
+                      ".\\airfoil_library\\Tail\\JX\\\\JX-E\\JX-E-150.dat"],
  "polar_Reynolds":   [20000, 40000, 70000, 100000, 150000, 200000, 250000, 300000, 350000, 400000, 600000, 700000],
  "polar_Ncrit": 7.0
 }
