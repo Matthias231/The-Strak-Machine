@@ -407,7 +407,7 @@ class wing:
         self.valueList = []
         self.chords = []
         self.isFin = False
-        self.showQuarterChordLine = False
+        self.showQuarterChordLine = True
         self.showTipLine = False
         self.showHingeLine = True
         self.smoothUserAirfoils = True
