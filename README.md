@@ -3,6 +3,8 @@
 
 Create airfoils of a wing using the airfoil optimizer Xoptfoil-JX, also create a wingplan and a model of the wing that can be imported by XFRL5 / FLZ Vortex for simulation purposes
 
+Find an article about the first prototype on:
+https://www.rc-network.de/threads/the-strak-machine.11818595/
 
 1. Create a wing and position the airfoils by simply putting some parameters in a textfile
 
