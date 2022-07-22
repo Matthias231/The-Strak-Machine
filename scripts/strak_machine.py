@@ -4383,6 +4383,11 @@ class strak_machine:
         operatingConditions = inputFile.get_OperatingConditions()
         num = len(operatingConditions['op_point'])
 
+##        print(operatingConditions['op_mode'])
+##        print(operatingConditions['op_point'])
+##        print(operatingConditions['target_value'])
+##        print(operatingConditions['weighting'])
+
         for idx in range(num):
             target = targetValues[idx]
             # type of op-point
@@ -4391,16 +4396,6 @@ class strak_machine:
             operatingConditions['op_point'][idx] = target["oppoint"]
             # target value of op-point
             operatingConditions['target_value'][idx] = target["target"]
-            # weighting of op-point
-            try:
-                weighting = operatingConditions['weighting']
-            except:
-                # init weighting
-                emptyList = []
-                for i in range(num):
-                    emptyList.append(None)
-                    operatingConditions['weighting'] = emptyList
-
             # weighting of op-point
             operatingConditions['weighting'][idx] = target["weighting"]
 

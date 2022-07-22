@@ -436,7 +436,7 @@ class control_frame():
 
             # unpack tuple
             oppoint_entry = oppoint_entry.get()
-            target_entry = target_entry.get()
+            target_entry = str(float(target_entry.get())) # having some trouble with something like this: -9e-5 and -9e-05
             weighting_entry = weighting_entry.get()
 
             # get dictionary containing oppoint / type / target value
@@ -446,15 +446,26 @@ class control_frame():
             (mode, oppoint, target, weighting) = self.get_valuesFromDict(targetValue)
 
             # conversion of None to empty string
-            try:
-                str_weighting = str(weighting)
-            except:
+            if weighting == None:
                 str_weighting = ''
+            else:
+                str_weighting = str(weighting)
 
+            str_oppoint = str(oppoint)
+            str_target = str(target)
+
+##            if (oppoint_entry   != str_oppoint):
+##                print("oppoint differs: %s %s\n" % (oppoint_entry, str_oppoint))
+##
+##            if (target_entry != str_target):
+##                print("target differs: %s %s\n" % (target_entry, str_target))
+##
+##            if(weighting_entry != str_weighting):
+##                print("weighting differs: %s %s\n" % (weighting_entry, str_weighting))
 
             # compare if something has changed
-            if ((oppoint_entry   != str(oppoint)) or
-                (target_entry    != str(target))  or
+            if ((oppoint_entry   != str_oppoint) or
+                (target_entry    != str_target)  or
                 (weighting_entry != str_weighting)):
 
                 # coversion of empty string to None
