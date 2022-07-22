@@ -973,7 +973,7 @@ class strak_machineParams:
     def __init__(self, fileName):
         self.buildDir = ''
         self.workingDir = ''
-        self.quality = 'medium'
+        self.quality = 'default'
         self.batchfileName = 'make_strak.bat'
         self.xoptfoilTemplate = "iOpt"
         self.operatingMode = 'default'
@@ -1001,7 +1001,7 @@ class strak_machineParams:
         self.showReferencePolars = True
         self.geoParams = None
         self.rootGeoParams = None
-        self.additionalOpPoints = [[]]
+        self.additionalOpPoints = [0.014, 0.042]
         self.ReNumbers = []         # T2 Re numbers (ReSqrt(Cl)
         self.maxReNumbers = []      # T1 Re numbers
         self.polarFileNames = []
@@ -1294,12 +1294,13 @@ class strak_machineParams:
         NoteMsg("getting parameters..")
 
         # get mandatory parameters first
-        self.quality = self.get_MandatoryParameterFromDict(fileContent, 'quality')
         self.seedFoilName = self.get_MandatoryParameterFromDict(fileContent, 'seedFoilName')
         self.ReNumbers = self.get_MandatoryParameterFromDict(fileContent, 'reynolds')
         self.airfoilNames = self.get_MandatoryParameterFromDict(fileContent, "airfoilNames")
 
         # get optional parameters
+        self.quality = self.get_ParameterFromDict(fileContent, 'quality', self.quality)
+
         self.maxReFactor = self.get_ParameterFromDict(fileContent, "maxReynoldsFactor",
                                                             self.maxReFactor)
 

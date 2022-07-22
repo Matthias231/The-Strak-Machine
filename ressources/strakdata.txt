@@ -1,17 +1,12 @@
 {
-    "quality": "default", 
-    "seedFoilName": "airfoils\\JX-GT-050k", 
-    "NCrit": 7.0, 
-    "reynolds": [
-        50000, 
-        37000
-    ], 
-    "airfoilNames": [
-        "JX-GT-050k", 
-        "JX-GT-037k"
-    ], 
-    "additionalOpPoints": [
-        0.014, 
-        0.042
-    ]
+  "seedFoilName":"airfoils\\JX-GT-050k",
+  "NCrit":7.0,
+  "reynolds":[
+    50000,
+    37000
+  ],
+  "airfoilNames":[
+    "JX-GT-050k",
+    "JX-GT-037k"
+  ]
 }
