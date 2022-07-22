@@ -25,11 +25,11 @@ copy .\scripts\FLZ_Vortex_export.py .\Strakmachine_pure\scripts\
 rem copy xoptfoil and xfoil-worker to bin-folder
 copy .\bin\*.exe .\Strakmachine_pure\bin\
 
-rem copy short instruction
-copy ..\doc\Strak_Machine_Short_instruction.pdf .\Strakmachine_pure\
+rem copy Xoptfoil-JX instruction
+echo V | xcopy .\doc\Xoptfoil-JX\*.* .\Strakmachine_pure\doc\Xoptfoil-JX
 
-rem copy full reference
-copy ..\doc\Strak_Machine_Reference.pdf .\Strakmachine_pure\doc
+rem copy troubleshooting guide
+copy .\doc\Troubleshooting.docx .\Strakmachine_pure\doc
 
 rem copy all ressource-files
 xcopy .\ressources\*.* .\Strakmachine_pure\ressources\ /Y /E /H /C /I
