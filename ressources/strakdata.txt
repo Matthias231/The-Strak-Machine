@@ -1,5 +1,5 @@
 {
-  "seedFoilName":"airfoils\\JX-GT-050k",
+  "seedFoilName":"01_airfoils\\JX-GT-050k",
   "NCrit":7.0,
   "reynolds":[
     50000,
