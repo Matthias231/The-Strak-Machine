@@ -124,6 +124,10 @@ def my_print(message):
 # helper functions to put colored messages
 #
 ################################################################################
+
+def InfoMsg(message):
+    my_print("- %s" % message)
+
 def ErrorMsg(message):
     my_print(colored('Error: ', 'red') + message)
 
@@ -243,7 +247,7 @@ class inputFile:
         self.values["operating_conditions"] = operatingConditions
 
         # write to file
-        my_print("writing input-file %s..." % fileName)
+        InfoMsg("writing input-file %s..." % fileName)
         f90nml.write(self.values, fileName, True)
 
         # restore 'name'
@@ -253,7 +257,7 @@ class inputFile:
 
     # reads contents to file, using f90nnml-parser
     def read_FromFile(self, fileName):
-        my_print("reading input-file %s..." % fileName)
+        InfoMsg("reading input-file %s..." % fileName)
         currentDir = getcwd()#FIXME Debug
         self.values = f90nml.read(fileName)
 
@@ -598,7 +602,7 @@ class inputFile:
                 if (CL <= polarData.CL_merge):
                     # yes, adapt maxRe --> Type 1 oppoint
                     reynolds[idx] = int(polarData.maxRe)
-                    my_print("adapted oppoint @ Cl = %0.3f, Type 1, Re = %d\n" % \
+                    InfoMsg("adapted oppoint @ Cl = %0.3f, Type 1, Re = %d\n" % \
                           (CL, int(polarData.maxRe)))
 
 
@@ -995,19 +999,18 @@ class strak_machineParams:
         self.smoothSeedfoil = True
         self.smoothStrakFoils = True
         self.showReferencePolars = True
-        self.ReNumbers = []
         self.geoParams = None
         self.rootGeoParams = None
         self.additionalOpPoints = [[]]
-        self.maxReNumbers = []
+        self.ReNumbers = []         # T2 Re numbers (ReSqrt(Cl)
+        self.maxReNumbers = []      # T1 Re numbers
         self.polarFileNames = []
         self.polarFileNames_T1 = []
         self.polarFileNames_T2 = []
         self.inputFileNames = []
-        self.merged_polars = []
-        self.seedfoil_polars = []
-        self.target_polars = []
-        self.strak_polars = []
+        self.merged_polars = []     # polars of the root-airfoil for all Re-numbers
+        self.seedfoil_polars = []   # polars of the seed-airfoils for only one Re-number each
+        self.strak_polars = []      # polars of the previous strak airfoil
         self.inputFiles = []
         self.airfoilNames = []
         self.visibleFlags = [True, True, True, True, True, True, True, True, True, True, True, True]
@@ -1203,7 +1206,7 @@ class strak_machineParams:
                  "parameters for %d airfoils were found" % (num, len(thickness)))
                 return None
 
-        my_print("geo parameters for %d airfoils were successfully read" % num)
+        InfoMsg("geo parameters for %d airfoils were successfully read" % num)
         return (thickness, thicknessPosition, camber, camberPosition)
 
 
@@ -1315,7 +1318,7 @@ class strak_machineParams:
                                  "smoothStrakFoils", self.smoothStrakFoils)
 
         # perform parameter-checks now
-        my_print("checking validity of all parameters..")
+        InfoMsg("checking validity of all parameters..")
         self.check_NumOpPoints()
         self.check_quality()
         DoneMsg()
@@ -1329,7 +1332,7 @@ class strak_machineParams:
        # get geoParameters from dictionary
         self.geoParams = self.get_geoParamsFromDict(self.fileContent)
         if (self.geoParams == None):
-            my_print("Setting default values for geo parameters.")
+            InfoMsg("Setting default values for geo parameters.")
             # set geoParameters to default values
             self.set_defaultGeoParams(self.fileContent)
             result = self.write_paramsToFile('..' + bs + self.fileName, self.fileContent)
@@ -1534,7 +1537,7 @@ class strak_machineParams:
             ErrorMsg("number of reversals could not be determined")
             return (0, 0, smoothingNecessary)
 
-        my_print("airfoil has %d reversals on top and %d reversals on bottom"\
+        InfoMsg("airfoil has %d reversals on top and %d reversals on bottom"\
                    %(reversals_top, reversals_bot))
         DoneMsg()
 
@@ -1804,11 +1807,12 @@ class polarGraph:
 
 
     # plots lift/drag-polars (Xfoil-worker-polars and target-polars)
-    def plot_LiftDragPolars(self, ax, x_limits, y_limits, polars, targetPolars, params):
+    def plot_LiftDragPolars(self, ax, x_limits, y_limits, params):
         T1_label = None
         T1T2_labelOk = False
         Target_labelOk = False
         Reference_labelOk = False
+        polars = params.merged_polars
 
         # set axes and labels
         self.set_AxesAndLabels(ax, 'CL, CD', 'CD', 'CL')
@@ -1835,13 +1839,20 @@ class polarGraph:
             if (self.check_polarVisibility(params, polarIdx) == False):
                 # do not plot this polar
                 continue
+
             try:
-                #  get polar and target-polar to plot
+                #  get polar to plot
                 polar = polars[polarIdx]
-                targetPolar = targetPolars[polarIdx]
             except:
-                ErrorMsg("Unable to get polars for polarIdx %d" % polarIdx)
-                return
+                ErrorMsg("Unable to get polar for polarIdx %d" % polarIdx)
+                continue
+
+            try:
+                # get inputfile.
+                inputFile = params.inputFiles[polarIdx]
+            except:
+                ErrorMsg("Unable to get inputfile for polarIdx %d" % polarIdx)
+                continue
 
             # determine idx for changing colors
             switchIdx = polar.T2_T1_switchIdx
@@ -1930,26 +1941,19 @@ class polarGraph:
                 else:
                     label = None
 
+                # get the x,y values
+                (x, y) = inputFile.get_xyTargets('spec-cl')
+
                 # is this the selected target polar for editing ?
                 if (polarIdx == params.activeTargetPolarIdx):
                     style = opt_point_style_root
-                    # get inputfile for the weightings
-                    inputFile = params.inputFiles[polarIdx]
                     weightings = inputFile.get_weightings('spec-cl')
                 else:
                     style = opt_point_style_strak
                     weightings = None
 
-                linewidth = lw_targetPolar
-
-                # remove last elements, as they are dummies
-                x = deepcopy(targetPolar.CD)
-                x.pop()
-                y = deepcopy(targetPolar.CL)
-                y.pop()
-
                 ax.plot(x, y, style, linestyle = ls_targetPolar,
-                     linewidth = linewidth, markersize=ms_target, label = label)
+                     linewidth = lw_targetPolar, markersize=ms_target, label = label)
 
                 # plot weightings, if any
                 self.plot_weightings(params, ax, weightings, x, y)
@@ -1982,10 +1986,11 @@ class polarGraph:
 
 
     # plots lift/alpha-polars (Xfoil-worker-polars and target-polars)
-    def plot_LiftAlphaPolars(self, ax, x_limits, y_limits, polars, targetPolars, params):
+    def plot_LiftAlphaPolars(self, ax, x_limits, y_limits, params):
         T1_label = None
         T1T2_labelOk = False
         Target_labelOk = False
+        polars = params.merged_polars
 
         # set axes and labels
         self.set_AxesAndLabels(ax, 'CL, alpha', 'alpha', 'CL')
@@ -2014,12 +2019,15 @@ class polarGraph:
                 #  get polar to plot
                 polar = polars[polarIdx]
             except:
-                ErrorMsg("Unable to get polars for polarIdx %d" % polarIdx)
-                return
+                ErrorMsg("Unable to get polar for polarIdx %d" % polarIdx)
+                continue
 
-            # get inputfile. We can only determine the alpha targets
-            # from the inputfile, not the target polar. Also get weightings from here
-            inputFile = params.inputFiles[polarIdx]
+            try:
+                # get inputfile.
+                inputFile = params.inputFiles[polarIdx]
+            except:
+                ErrorMsg("Unable to get inputfile for polarIdx %d" % polarIdx)
+                continue
 
             # set label only once
             if (T1T2_labelOk == False):
@@ -2119,11 +2127,12 @@ class polarGraph:
 
 
     # plots glide-polars (Xfoil-worker-polars and target-polars)
-    def plot_GlidePolars(self, ax, x_limits, y_limits, polars, targetPolars, params):
+    def plot_GlidePolars(self, ax, x_limits, y_limits, params):
         T1_label = None
         T1T2_labelOk = False
         Target_labelOk = False
         Reference_labelOk = False
+        polars = params.merged_polars
 
         # set axes and labels
         self.set_AxesAndLabels(ax, 'CL/CD, CL', 'CL', 'CL/CD')
@@ -2149,12 +2158,18 @@ class polarGraph:
                 continue
 
             try:
-                #  get polar and target-polar to plot
+                #  get polar to plot
                 polar = polars[polarIdx]
-                targetPolar = targetPolars[polarIdx]
             except:
-                ErrorMsg("Unable to get polars for polarIdx %d" % polarIdx)
-                return
+                ErrorMsg("Unable to get polar for polarIdx %d" % polarIdx)
+                continue
+
+            try:
+                # get inputfile.
+                inputFile = params.inputFiles[polarIdx]
+            except:
+                ErrorMsg("Unable to get inputfile for polarIdx %d" % polarIdx)
+                continue
 
             # set label only once
             if (T1T2_labelOk == False):
@@ -2243,27 +2258,26 @@ class polarGraph:
                 else:
                     label = None
 
+                # get CL, CD targets from inputfile
+                (CD, CL) = inputFile.get_xyTargets('spec-cl')
+                CL_CD = []
+
+                # calculate y values
+                for i in range(len(CL)):
+                    CL_CD.append(CL[i]/CD[i])
+
                 # is this the selected target polar for editing ?
                 if (polarIdx == params.activeTargetPolarIdx):
                     style = opt_point_style_root
-                    # get inputfile for the weightings
-                    inputFile = params.inputFiles[polarIdx]
                     # get all weightings of 'spec-cl' oppoints
                     weightings = inputFile.get_weightings('spec-cl')
                 else:
                     style = opt_point_style_strak
                     weightings = None
 
-                linewidth = lw_targetPolar
-
-                x = deepcopy(targetPolar.CL)
-                x.pop()
-                y = deepcopy(targetPolar.CL_CD)
-                y.pop()
-
                 # plot
-                ax.plot(x, y, style, linestyle = ls_targetPolar,
-                    linewidth = linewidth, markersize=ms_target, label = label)
+                ax.plot(CL, CL_CD, style, linestyle = ls_targetPolar,
+                    linewidth = lw_targetPolar, markersize=ms_target, label = label)
 
                 # plot weightings, if any
                 self.plot_weightings(params, ax, weightings, x, y)
@@ -2300,19 +2314,15 @@ class polarGraph:
 
 
     def draw_diagram(self, params, diagramType, ax, x_limits, y_limits):
-        # get polars
-        polars = params.merged_polars
-        targetPolars = params.target_polars
-
         if diagramType == "CL_CD_diagram":
             # plot Glide polar
-            self.plot_LiftDragPolars(ax, x_limits, y_limits, polars, targetPolars, params)
+            self.plot_LiftDragPolars(ax, x_limits, y_limits, params)
         elif diagramType == "CL_alpha_diagram":
             # plot Glide polar
-            self.plot_LiftAlphaPolars(ax, x_limits, y_limits, polars, targetPolars, params)
+            self.plot_LiftAlphaPolars(ax, x_limits, y_limits, params)
         elif diagramType == "CLCD_CL_diagram":
             # plot Glide polar
-            self.plot_GlidePolars(ax, x_limits, y_limits, polars, targetPolars, params)
+            self.plot_GlidePolars(ax, x_limits, y_limits, params)
         else:
             ErrorMsg("undefined diagramtype")
 
@@ -2388,7 +2398,7 @@ class polarData:
         airfoilNameTag = "Calculated polar for:"
         ReTag = "Re ="
         parseInDataPoints = 0
-        my_print("importing polar %s..." %fileName)
+        InfoMsg("importing polar %s..." %fileName)
 
         # open file
         fileHandle = open(fileName)
@@ -2474,7 +2484,7 @@ class polarData:
             ReString = 'fixed / ~ 1/sqrt(CL)'
             MachString = 'fixed / ~ 1/sqrt(CL)'
 
-        my_print("writing polar to file %s..." %fileName)
+        InfoMsg("writing polar to file %s..." %fileName)
 
         # open file
         fileHandle = open(fileName, 'w+')
@@ -2511,7 +2521,7 @@ class polarData:
 
     # analyses a polar
     def analyze(self, params):
-        my_print("analysing polar \'%s\'..." % self.polarName)
+        InfoMsg("analysing polar \'%s\'..." % self.polarName)
 
         maxGlideIdx = self.determine_MaxGlide()
         self.determine_MaxSpeed(maxGlideIdx)
@@ -3257,7 +3267,7 @@ def get_InFileName(args):
         # use Default-name
         inFileName = '.' + bs + ressourcesPath + bs + strakMachineInputFileName
 
-    my_print("filename for strak-machine input-data is: %s\n" % inFileName)
+    InfoMsg("filename for strak-machine input-data is: %s\n" % inFileName)
     return inFileName
 
 
@@ -3450,53 +3460,6 @@ def set_PolarDataFromInputFile(polarData, rootPolar, inputFile,
     polarData.Cm.append(0.0)
     polarData.Top_Xtr.append(0.0)
     polarData.Bot_Xtr.append(0.0)
-
-
-def generate_TargetPolars(params, writeToDisk):
-     # clear all previsously generated target polars
-    params.target_polars.clear()
-
-    # local variables
-    inputFiles = params.inputFiles
-    Re = params.ReNumbers
-    numTargetPolars = len(Re)
-    rootPolar = params.merged_polars[0]
-
-    # get name of the root-airfoil
-    airfoilName = params.airfoilNames[0]
-    NoteMsg("Generating target polars for airfoil %s..." % airfoilName)
-
-    for i in range(numTargetPolars):
-
-        # get inputfile
-        inputFile = inputFiles[i]
-
-        # create new target polar
-        targetPolar = polarData()
-
-        # put the necessary data into the polar
-        set_PolarDataFromInputFile(targetPolar, rootPolar, inputFile,
-                                  airfoilName, Re[i], i)
-
-        # append the new target polar to list of target_polars
-        params.target_polars.append(targetPolar)
-
-        if writeToDisk:
-            # compose polar-dir
-            polarDir = params.buildDir + bs + airfoilName + '_polars'
-
-            # check if output-folder exists. If not, create folder.
-            if not path.exists(polarDir):
-                makedirs(polarDir)
-
-            # compose filename and path
-            polarFileNameAndPath = polarDir + bs + ('target_polar_%s.txt' %\
-                                   get_ReString(Re[i]))
-
-            # write polar to file
-            targetPolar.write_ToFile(polarFileNameAndPath)
-
-    DoneMsg()
 
 
 # merge two polar files, the merging-point will be specified as a CL-value.
@@ -3742,7 +3705,7 @@ class polar_worker:
              self.get_missingPolars(airfoilName, ReList_T1, ReList_T2)
 
         if (len(ReList_T1_missing) > 0):
-            my_print("generating missing T1 polars for airfoil %s..." % airfoilName)
+            InfoMsg("generating missing T1 polars for airfoil %s..." % airfoilName)
             # create inputfile for worker
             T1_fileName = 'iPolars_T1_%s.txt' % airfoilName
             self.generate_PolarCreationFile(T1_fileName, 'T1', ReList_T1_missing)
@@ -3755,7 +3718,7 @@ class polar_worker:
 
 
         if (len(ReList_T2_missing) > 0):
-            my_print("generating missing T2 polars for airfoil %s..." % airfoilName)
+            InfoMsg("generating missing T2 polars for airfoil %s..." % airfoilName)
             # create inputfile for worker
             T2_fileName = 'iPolars_T2_%s.txt' % airfoilName
             self.generate_PolarCreationFile(T2_fileName, 'T2', ReList_T2_missing)
@@ -3897,7 +3860,7 @@ class strak_machine:
         self.read_InputFiles()
 
         # generate target polars and write to file
-        generate_TargetPolars(self.params, True)
+        self.generate_targetPolars()
 
         # generate Xoptfoil command-lines
         commandlines = generate_Commandlines(self.params)
@@ -4123,6 +4086,58 @@ class strak_machine:
 
             # reduce initial perturb for the next pass
             initialPerturb = initialPerturb*0.5
+
+
+    def generate_targetPolars(self):
+        num = len(self.params.ReNumbers)
+
+        NoteMsg("Generating target polars")
+
+        for i in range(num):
+            self.generate_targetPolar(i)
+
+        DoneMsg()
+
+
+    def generate_targetPolar(self, airfoilIdx):
+        # local variables
+        i = airfoilIdx
+        inputFiles = self.params.inputFiles
+        Re = self.params.ReNumbers
+        numTargetPolars = len(Re)
+        rootPolar = self.params.merged_polars[0]
+
+        # get name of the root-airfoil
+        airfoilName = self.params.airfoilNames[0]
+
+        # get name of the airfoil whose target polar will be generated
+        polarAirfoilName = self.params.airfoilNames[i]
+
+        # compose polar-dir
+        polarDir = self.params.buildDir + bs + airfoilName + '_polars'
+
+         # check if output-folder exists. If not, create folder.
+        if not path.exists(polarDir):
+            makedirs(polarDir)
+
+        InfoMsg("Generating target polar for airfoil %s..." % polarAirfoilName)
+
+        # get inputfile
+        inputFile = inputFiles[i]
+
+        # create new target polar
+        targetPolar = polarData()
+
+        # put the necessary data into the polar
+        set_PolarDataFromInputFile(targetPolar, rootPolar, inputFile,
+                                  airfoilName, Re[i], i)
+
+        # compose filename and path
+        polarFileNameAndPath = polarDir + bs + ('target_polar_%s.txt' %\
+                                   get_ReString(Re[i]))
+
+        # write polar to file
+        targetPolar.write_ToFile(polarFileNameAndPath)
 
 
     def create_new_inputFile(self, i):
@@ -4481,6 +4496,9 @@ class strak_machine:
         except:
             ErrorMsg("Unable to save input-file %s" % self.get_inputfileName(airfoilIdx))
             return self.exit_action(-1)
+
+        # write target polar to file
+        self.generate_targetPolar(airfoilIdx)
 
         # write geometry params of the airfoil to parameterfile
         result = self.params.write_geoParamsToFile(airfoilIdx)
