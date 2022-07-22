@@ -2280,7 +2280,7 @@ class polarGraph:
                     linewidth = lw_targetPolar, markersize=ms_target, label = label)
 
                 # plot weightings, if any
-                self.plot_weightings(params, ax, weightings, x, y)
+                self.plot_weightings(params, ax, weightings, CL, CL_CD)
 
         # plot strak-polars
         if params.showReferencePolars:
