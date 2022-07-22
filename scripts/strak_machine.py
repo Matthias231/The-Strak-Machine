@@ -234,6 +234,34 @@ class inputFile:
         class_name = self.__class__.__name__
 
 
+    def validate(self):
+        valid = True
+        operatingConditions = self.get_OperatingConditions()
+        num = len(operatingConditions['op_point'])
+
+        num_op_mode = len(operatingConditions['op_mode'])
+        num_target_value = len(operatingConditions['target_value'])
+        num_weighting = len(operatingConditions['weighting'])
+
+        # check if we have the same number of list elements
+        if (num_op_mode != num):
+            valid = False
+            ErrorMsg("number of op_mode elements differs from number of oppoints")
+            ErrorMsg("op_point: %d, op_mode: %d" (num, num_op_mode))
+
+        if (num_target_value != num):
+            valid = False
+            ErrorMsg("number of target_value elements differs from number of oppoints")
+            ErrorMsg("op_point: %d, target_value: %d" (num, num_target_value))
+
+        if (num_weighting != num):
+            valid = False
+            ErrorMsg("number of weighting elements differs from number of oppoints")
+            ErrorMsg("op_point: %d, weighting: %d" (num, num_weighting))
+
+        return valid
+
+
     # writes contents to file, using f90nnml-parser
     def write_ToFile(self, fileName):
         # delete 'name'
@@ -342,8 +370,58 @@ class inputFile:
     def get_OperatingConditions(self):
          # get operating-conditions from dictionary
         operatingConditions = self.values["operating_conditions"]
-
         return operatingConditions
+
+    def get_oppointValues(self, idx):
+        num = self.get_numOpPoints()
+
+        if (idx >= num):
+            ErrorMsg("idx %d exceeds num oppoint: %d" % (idx, num))
+            return None
+
+        operatingConditions = self.get_OperatingConditions()
+
+        # type of op-point
+        mode = operatingConditions['op_mode'][idx]
+        # x-value of op-point
+        oppoint = operatingConditions['op_point'][idx]
+        # target value of op-point
+        target = operatingConditions['target_value'][idx]
+        # weighting of op-point
+        weighting = operatingConditions['weighting'][idx]
+
+        return (mode, oppoint, target, weighting)
+
+
+    def set_oppointValues(self, idx, values):
+        num = self.get_numOpPoints()
+
+        if (idx >= num):
+            ErrorMsg("idx %d exceeds num oppoint: %d" % (idx, num))
+
+        if (values == None):
+            ErrorMsg("no values")
+
+        # unpack tuple
+        (mode, oppoint, target, weighting) = values
+
+        # get operating conditions
+        operatingConditions = self.get_OperatingConditions()
+
+        # type of op-point
+        operatingConditions['op_mode'][idx] = mode
+        # x-value of op-point
+        operatingConditions['op_point'][idx] = oppoint
+        # target value of op-point
+        operatingConditions['target_value'][idx] = target
+        # weighting of op-point
+        operatingConditions['weighting'][idx] = weighting
+
+
+
+    def get_numOpPoints(self):
+        operatingConditions = self.get_OperatingConditions()
+        return len(operatingConditions['op_point'])
 
 
     def set_OperatingConditions(self, operatingConditions):
@@ -4321,7 +4399,7 @@ class strak_machine:
 
     def entry_action(self, airfoilIdx):
         global print_disabled
-        print_disabled = False
+        #print_disabled = False #FIXME debug
 
         # check if airfoilIdx exceeds number of airfoils handled by parameters
         if airfoilIdx > len(self.params.ReNumbers):
@@ -4352,25 +4430,22 @@ class strak_machine:
 
     def get_targetValues(self, airfoilIdx):
         self.entry_action(airfoilIdx)
-
         targetValues = []
+
+        # get corresponding inputfile
         inputFile = self.params.inputFiles[airfoilIdx]
-        operatingConditions = inputFile.get_OperatingConditions()
-        num = len(operatingConditions['op_point'])
+
+         # validate the inputfile
+        valid = inputFile.validate()
+
+        if (valid == False):
+            self.exit_action(None)
+
+        # get number of oppoints
+        num = inputFile.get_numOpPoints()
 
         for idx in range(num):
-            # type of op-point
-            mode = operatingConditions['op_mode'][idx]
-            # x-value of op-point
-            oppoint = operatingConditions['op_point'][idx]
-            # target value of op-point
-            target = operatingConditions['target_value'][idx]
-            try:
-                # weighting of op-point
-                weighting = operatingConditions['weighting'][idx]
-            except:
-                weighting = None
-
+            (mode, oppoint, target, weighting) = inputFile.get_oppointValues(idx)
             targetValues.append({"type": mode, "oppoint" : oppoint,
                                  "target" : target, "weighting" : weighting})
 
@@ -4379,30 +4454,31 @@ class strak_machine:
 
     def set_targetValues(self, airfoilIdx, targetValues):
         self.entry_action(airfoilIdx)
-
+        # get corresponding inputfile
         inputFile = self.params.inputFiles[airfoilIdx]
-        operatingConditions = inputFile.get_OperatingConditions()
-        num = len(operatingConditions['op_point'])
 
-##        print(operatingConditions['op_mode'])
-##        print(operatingConditions['op_point'])
-##        print(operatingConditions['target_value'])
-##        print(operatingConditions['weighting'])
+        # validate the inputfile
+        valid = inputFile.validate()
 
+        if (valid == False):
+            self.exit_action(-1)
+
+        # get number of oppoints
+        num = inputFile.get_numOpPoints()
+        num_targetValues = len(targetValues)
+
+        # check length of given targetValues against inputfile
+        if (num != num_targetValues):
+            ErrorMsg("number of oppoints in inputfile %d differs from number of"\
+             " oppoints in targetValues: %d" % (num, num_targetValues))
+            self.exit_action(-1)
+
+        # copy the target values
         for idx in range(num):
             target = targetValues[idx]
-            # type of op-point
-            operatingConditions['op_mode'][idx] = target["type"]
-            # x-value of op-point
-            operatingConditions['op_point'][idx] = target["oppoint"]
-            # target value of op-point
-            operatingConditions['target_value'][idx] = target["target"]
-            # weighting of op-point
-            operatingConditions['weighting'][idx] = target["weighting"]
-
-
-        # writeback operating-conditions
-        inputFile.set_OperatingConditions(operatingConditions)
+            values = (target["type"], target["oppoint"], target["target"],
+                      target["weighting"])
+            inputFile.set_oppointValues(idx, values)
 
         return self.exit_action(0)
 
