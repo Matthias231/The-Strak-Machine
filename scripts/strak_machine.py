@@ -4166,8 +4166,8 @@ class strak_machine:
         newFile.distribute_MainOpPoints(targets, i)
 
         # insert additional opPoints (if there are any):
-        if len(self.params.additionalOpPoints[0])>0:
-            newFile.insert_AdditionalOpPoints(self.params.additionalOpPoints[0])
+        if len(self.params.additionalOpPoints)>0:
+            newFile.insert_AdditionalOpPoints(self.params.additionalOpPoints)
             # The below line will use "adjusted" additional oppoints for each
             # strak-polar. Sometimes this behaviour is not desired, bcause this means
             # that the CL-value is changed.
