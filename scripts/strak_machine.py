@@ -850,7 +850,7 @@ class inputFile:
 
         #self.my_print_OpPoints()#Debug
 
-    def insert_alpha0_oppoint(self, params, strakPolar, i):
+    def append_alpha0_oppoint(self, params, strakPolar, i):
         # get maxRe
         maxRe = params.maxReNumbers[i]
 
@@ -858,11 +858,11 @@ class inputFile:
         alpha = round(params.targets["alpha0"][i], AL_decimals)
 
         # insert op-Point, get index
-        idx = self.insert_OpPoint('alpha0', 'spec-al', alpha, 'target-lift',
+        idx = self.add_Oppoint('alpha0', 'spec-al', alpha, 'target-lift',
                                      0.0, params.weight_spec_al, maxRe)
 
 
-    def insert_alphaMaxGlide_oppoint(self, params, i):
+    def append_alphaMaxGlide_oppoint(self, params, i):
         # get maxRe
         maxRe = params.maxReNumbers[i]
         rootPolar = params.merged_polars[0]
@@ -872,10 +872,10 @@ class inputFile:
         CL = round(rootPolar.CL_maxGlide, CL_decimals)
 
         # insert op-Point, get index
-        idx = self.insert_OpPoint('alphaMaxGlide', 'spec-al', alpha, 'target-lift',
+        idx = self.add_Oppoint('alphaMaxGlide', 'spec-al', alpha, 'target-lift',
                                      CL, params.weight_spec_al, None)
 
-    def insert_alphaMaxLift_oppoint(self, params, i):
+    def append_alphaMaxLift_oppoint(self, params, i):
         # get maxRe
         maxRe = params.maxReNumbers[i]
         rootPolar = params.merged_polars[0]
@@ -885,7 +885,7 @@ class inputFile:
         CL = round(params.targets["CL_pre_maxLift"][i], CL_decimals)
 
         # insert op-Point, get index
-        idx = self.insert_OpPoint('alphaMaxLift', 'spec-al', alpha, 'target-lift',
+        idx = self.add_Oppoint('alphaMaxLift', 'spec-al', alpha, 'target-lift',
                                      CL, params.weight_spec_al, None)
 
 
@@ -1382,8 +1382,8 @@ class strak_machineParams:
         self.maxReFactor = self.get_ParameterFromDict(fileContent, "maxReynoldsFactor",
                                                             self.maxReFactor)
 
-        self.additionalOpPoints[0] = self.get_ParameterFromDict(fileContent, "additionalOpPoints",
-                                                       self.additionalOpPoints[0])
+        self.additionalOpPoints = self.get_ParameterFromDict(fileContent, "additionalOpPoints",
+                                                       self.additionalOpPoints)
 
         self.numOpPoints = self.get_ParameterFromDict(fileContent, "numOpPoints",
                                                    self.numOpPoints)
@@ -4284,11 +4284,11 @@ class strak_machine:
         newFile.adapt_ReNumbers(strakPolar)
 
         # insert oppoint for alpha @ CL = 0
-        newFile.insert_alpha0_oppoint(self.params, strakPolar,i)
+        newFile.append_alpha0_oppoint(self.params, strakPolar,i)
 
         # insert oppoints for alpha @maxGlide, maxLift
-        newFile.insert_alphaMaxGlide_oppoint(self.params, i)
-        newFile.insert_alphaMaxLift_oppoint(self.params, i)
+        newFile.append_alphaMaxGlide_oppoint(self.params, i)
+        newFile.append_alphaMaxLift_oppoint(self.params, i)
 
         # get geo params of single airfoil
         airfoil_geoParams =\
