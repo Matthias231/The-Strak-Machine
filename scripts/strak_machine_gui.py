@@ -56,7 +56,7 @@ class control_frame():
         self.strak_machine = strak_machine
         self.master = master
 
-        # get some data form strak_machine
+        # get some data from strak_machine
         self.airfoilNames = self.strak_machine.get_airfoilNames()
 
         # determine screen size
@@ -206,6 +206,27 @@ class control_frame():
         #targetValue["type"] = mode # FIXME We do not support changing mode at the moment
         self.targetValues[idx] = targetValue
 
+
+    def set_unsavedChangesFlag(self, airfoilIdx):
+        try:
+            i = airfoilIdx-1
+            self.unsavedChangesFlags[i] = True
+            self.label_unsavedChanges[i].configure(text = 'unsaved changes')
+        except:
+            ErrorMsg("invalid airfoilIdx: %d" & airfoilIdx)
+
+
+    def clear_unsavedChangesFlag(self, airfoilIdx):
+        try:
+            i = airfoilIdx-1
+            self.unsavedChangesFlags[i] = False
+            self.label_unsavedChanges[i].configure(text = '')
+        except:
+            ErrorMsg("invalid airfoilIdx: %d" & airfoilIdx)
+
+
+    def get_unsavedChangesFlags(self):
+        return (self.unsavedChangesFlags)
 
     def add_geoEntries(self, frame):
         # get initial geo parameters
@@ -416,6 +437,9 @@ class control_frame():
         self.strak_machine.set_targetValues(self.master.airfoilIdx,
                                             self.targetValues)
 
+        # notify about the unsaved changes
+        self.set_unsavedChangesFlag(self.master.airfoilIdx)
+
         # perform update of the target polars
         self.strak_machine.update_targetPolars()
 
@@ -483,6 +507,9 @@ class control_frame():
             idx = idx + 1
 
         if (writeback_needed):
+            # notify the unsaved changes
+            self.set_unsavedChangesFlag(self.master.airfoilIdx)
+
             # writeback dictionary to strakmachine
             self.strak_machine.set_targetValues(self.master.airfoilIdx,
                                                 self.targetValues)
@@ -509,6 +536,9 @@ class control_frame():
 
         # store in own data structure
         self.geoParams = (thickness, thicknessPosition, camber, camberPosition)
+
+        # notify the unsaved changes
+        self.set_unsavedChangesFlag(self.master.airfoilIdx)
 
         # write targets to strakmachine
         self.strak_machine.set_geoParams(self.master.airfoilIdx,
@@ -610,10 +640,11 @@ class control_frame():
     def add_visiblePolarsCheckboxes(self, frame):
         self.checkBoxes = []
         self.visibleFlags = []
+        self.unsavedChangesFlags = []
         self.lastVisibleFlags = []
         self.label_visiblePolars = customtkinter.CTkLabel(master=frame, text="Visible polars:")
+        self.label_unsavedChanges = []
 
-        widget_1 = self.label_visiblePolars
         num = len(self.airfoilNames)
         idx = 0
 
@@ -627,9 +658,18 @@ class control_frame():
               variable=self.visibleFlags[idx])
             self.checkBoxes.append(checkBox)
 
+            if (idx>0):
+                # new unsaved changes flag and label
+                self.unsavedChangesFlags.append(False)
+                widget_1 = customtkinter.CTkLabel(master=frame, text='',
+                 text_color = 'red' )
+
+                self.label_unsavedChanges.append(widget_1)
+            else:
+                widget_1 = self.label_visiblePolars
+
             # placing the widgets
             self.place_widgets(widget_1, checkBox)
-            widget_1 = None
             idx = idx + 1
 
 
@@ -1235,6 +1275,7 @@ class App(customtkinter.CTk):
         result = self.strak_machine.load(self.airfoilIdx)
         if (result == 0):
             self.strak_machine.update_targetPolars()
+            self.frame_left.clear_unsavedChangesFlag(self.airfoilIdx)
             self.frame_left.update_Entries(self.airfoilIdx)
             self.frame_left.update_GeoEntries(self.airfoilIdx)
             self.updateNeeded = True
@@ -1242,12 +1283,14 @@ class App(customtkinter.CTk):
 
     def save(self):
         self.strak_machine.save(self.airfoilIdx)
+        self.frame_left.clear_unsavedChangesFlag(self.airfoilIdx)
 
 
     def reset(self):
         result = self.strak_machine.reset(self.airfoilIdx)
         if (result == 0):
             self.strak_machine.update_targetPolars()
+            self.frame_left.set_unsavedChangesFlag(self.airfoilIdx)
             self.frame_left.update_Entries(self.airfoilIdx)
             self.frame_left.update_GeoEntries(self.airfoilIdx)
             self.updateNeeded = True
@@ -1264,8 +1307,69 @@ class App(customtkinter.CTk):
 
         self.destroy()
 
+
+    def unsaved_changesDialog(self, flags):
+        airfoilNames = self.strak_machine.get_airfoilNames()
+        airfoilString = ''
+
+        # generate string containing list of airfoils with unsaved changes
+        num = len(flags)
+        for i in range(num):
+            if (flags[i] == True):
+                # get name of the airfoil. We have no flag for the root airfoil,
+                # so start at the first strak airfoil
+                airfoilString = airfoilString + ('%s\n' % airfoilNames[i+1])
+
+        # create complete dialog text
+        dialogText ="There are unsaved changes for the airfoils\n\n%s\n" % airfoilString
+        dialogText = dialogText + "To quit without saving type \'quit'\n"
+        dialogText = dialogText + "To quit and save the changes type \'save'"
+
+        # create dialog
+        dialog = customtkinter.CTkInputDialog(master=None, text=dialogText,
+                        title = 'Unsaved Changes detected')
+
+        # get user input, what to do
+        inputstring = dialog.get_input()
+        return inputstring
+
+
+    def save_unsavedChanges(self, flags):
+        num = len(flags)
+
+        # check all flags,
+        for i in range(num):
+            if (flags[i] == True):
+                # save the data of the airfoil. We have no flag for the
+                # root airfoil, so start at the first strak airfoil
+                self.strak_machine.save(i+1)
+
+
     def on_closing(self, event=0):
-        self.app_running = False
+        unsavedChanges = False
+
+        # get unsaved changes flags
+        flags = self.frame_left.get_unsavedChangesFlags()
+
+        # check all flags
+        for flag in flags:
+            if (flag == True):
+                unsavedChanges = True
+
+        if unsavedChanges:
+            # we have unsaved changes - get user input, what to do
+            userInput = self.unsaved_changesDialog(flags)
+
+            if userInput == 'quit':
+                # quit without saving
+                self.app_running = False
+            elif userInput == 'save':
+                # first save, then quit
+                self.save_unsavedChanges(flags)
+                self.app_running = False
+        else:
+            # no unsaved changes, just quit
+            self.app_running = False
 
 if __name__ == "__main__":
     # init colorama
