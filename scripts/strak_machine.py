@@ -89,11 +89,14 @@ ms_oppoint = 7
 ms_target = 5
 scaled = False
 
-# colours
+# colours for diagram plotting
+cl_background = 'black'
+cl_grid = 'ghostwhite'
+cl_label = 'darkgrey'
 cl_infotext = 'DeepSkyBlue'
-cl_polar_change = 'orange'
 cl_T1_polar = 'g'
 cl_T2_polar = 'b'
+cl_targetPolar = 'y'
 
 # styles
 opt_point_style_root = 'y.'
@@ -452,6 +455,7 @@ class inputFile:
         target_values = operatingConditions["target_value"]
         op_points = operatingConditions["op_point"]
         op_modes =  operatingConditions["op_mode"]
+        opt_type = operatingConditions["optimization_type"]
 
         # get the number of op-points
         numOpPoints = len(op_points)
@@ -460,8 +464,13 @@ class inputFile:
             # check if the oppoint has the requested op-mode
             if (op_modes[i] == op_mode):
                 if (op_mode == 'spec-cl'):
+                    if opt_type == 'target-glide':
+                        value = op_points[i] / target_values[i]
+                    else:
+                        value = target_values[i]
+
                     # get CL, CD
-                    x.append(target_values[i]) # CD
+                    x.append(value) # CD
                     y.append(op_points[i])     # CL
                 # check if the op-mode is 'spec-al'
                 elif (op_modes[i] == 'spec-al'):
@@ -1847,10 +1856,16 @@ class polarGraph:
     def set_AxesAndLabels(self, ax, title, xlabel, ylabel):
         global fs_axes
         global fs_ticks
+        global cl_grid
+        global cl_label
+        global cl_background
+
+        # set background first (dark or light)
+        ax.set_facecolor(cl_background)
 
         # set axis-labels
-        ax.set_xlabel(xlabel, fontsize = fs_axes, color="darkgrey")
-        ax.set_ylabel(ylabel, fontsize = fs_axes, color="darkgrey")
+        ax.set_xlabel(xlabel, fontsize = fs_axes, color = cl_label)
+        ax.set_ylabel(ylabel, fontsize = fs_axes, color = cl_label)
 
         for tick in ax.xaxis.get_major_ticks():
             tick.label.set_fontsize(fs_ticks)
@@ -1859,7 +1874,7 @@ class polarGraph:
             tick.label.set_fontsize(fs_ticks)
 
         # customize grid
-        ax.grid(True, color='dimgrey',  linestyle='dotted', linewidth=0.4)
+        ax.grid(True, color=cl_grid,  linestyle='dotted', linewidth=0.4)
 
 
     def plot_weightings(self, params, ax, weightings, x, y):
@@ -1870,6 +1885,9 @@ class polarGraph:
             weight = weightings[i]
             if weight == None:
                 continue
+            elif weight == '':
+                continue
+
 
             # determine colour
             if (weight >= 1.0):
@@ -2031,7 +2049,7 @@ class polarGraph:
                     style = opt_point_style_strak
                     weightings = None
 
-                ax.plot(x, y, style, linestyle = ls_targetPolar,
+                ax.plot(x, y, style, color = cl_targetPolar, linestyle = ls_targetPolar,
                      linewidth = lw_targetPolar, markersize=ms_target, label = label)
 
                 # plot weightings, if any
@@ -2195,7 +2213,7 @@ class polarGraph:
                     weightings = inputFile.get_weightings('spec-al')
 
                     # plot
-                    ax.plot(x, y, opt_point_style_root,
+                    ax.plot(x, y, opt_point_style_root, color = cl_targetPolar,
                           markersize=ms_oppoint, label = label)
 
                     # plot weightings, if any
@@ -2355,7 +2373,7 @@ class polarGraph:
                     weightings = None
 
                 # plot
-                ax.plot(CL, CL_CD, style, linestyle = ls_targetPolar,
+                ax.plot(CL, CL_CD, style, color = cl_targetPolar, linestyle = ls_targetPolar,
                     linewidth = lw_targetPolar, markersize=ms_target, label = label)
 
                 # plot weightings, if any
@@ -2393,6 +2411,7 @@ class polarGraph:
 
 
     def draw_diagram(self, params, diagramType, ax, x_limits, y_limits):
+
         if diagramType == "CL_CD_diagram":
             # plot Glide polar
             self.plot_LiftDragPolars(ax, x_limits, y_limits, params)
@@ -3965,6 +3984,31 @@ class strak_machine:
         print_disabled = True
 
 
+    def set_appearance_mode(self, new_appearanceMode):
+        global cl_background
+        global cl_grid
+        global cl_label
+        global cl_targetPolar
+        global cl_infotext
+
+        if (new_appearanceMode == "Dark"):
+            cl_background = 'black'
+            cl_grid = 'ghostwhite'
+            cl_label = 'darkgrey'
+            cl_targetPolar = 'y'
+            cl_infotext = 'DeepSkyBlue'
+        elif (new_appearanceMode == "Light"):
+            cl_background = 'lightgray'
+            cl_grid = 'black'
+            cl_label = 'darkgrey'
+            cl_targetPolar = 'brown'
+            cl_infotext = 'midnightblue'
+        else:
+            ErrorMsg("unknown appearance mode %s" % new_appearanceMode)
+        # FIXME change colors here, depending on appearance mode
+        return
+
+
     def read_InputFiles(self):
         NoteMsg("Reading inputfiles...")
 
@@ -4173,7 +4217,11 @@ class strak_machine:
         NoteMsg("Generating target polars")
 
         for i in range(num):
-            self.generate_targetPolar(i)
+            try:
+                self.generate_targetPolar(i)
+            except:
+                ErrorMsg("failed to generate target polar!")
+                pass
 
         DoneMsg()
 
@@ -4209,7 +4257,7 @@ class strak_machine:
 
         # put the necessary data into the polar
         set_PolarDataFromInputFile(targetPolar, rootPolar, inputFile,
-                                  airfoilName, Re[i], i)
+                                      airfoilName, Re[i], i)
 
         # compose filename and path
         polarFileNameAndPath = polarDir + bs + ('target_polar_%s.txt' %\

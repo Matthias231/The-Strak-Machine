@@ -43,8 +43,8 @@ controlFrame = None
 
 # name of logo-image
 logoName = 'strakmachine.png'
-bg_color_scrollableFrame_light = "#DDDDDD"
-bg_color_scrollableFrame_dark =  "#222222"
+bg_color_light = "#DDDDDD"
+bg_color_dark =  "#222222"
 
 # class control frame, change the input-variables / parameters of the
 # strak machine
@@ -72,13 +72,13 @@ class control_frame():
         self.container = customtkinter.CTkFrame(master=master, width=180,
                                             corner_radius=0)
 
-        self.canvas = tk.Canvas(self.container, bg=bg_color_scrollableFrame_dark,
+        self.canvas = tk.Canvas(self.container, bg=bg_color_dark,
                                  highlightthickness=0)
         self.scrollbar_v = customtkinter.CTkScrollbar(self.container,
                                                 command=self.canvas.yview)
 
         self.frame_bottom  = tk.Frame(self.canvas, width=180,
-                                         bg = bg_color_scrollableFrame_dark)
+                                         bg = bg_color_dark)
 
         self.frame_bottom.bind("<Configure>", self.OnFrameConfigure)
 
@@ -97,7 +97,7 @@ class control_frame():
         # add different widgets to upper frame (not scrollable)
         self.add_label(self.frame_top)
         self.add_buttons(self.frame_top, left_Buttons, right_Buttons)
-        #self.add_appearanceModeMenu(self.frame_top) #FIXME not supported at the moment
+        self.add_appearanceModeMenu(self.frame_top)
         self.add_airfoilChoiceMenu(self.frame_top)
         self.add_visiblePolarsCheckboxes(self.frame_top)
         self.add_referencePolarsCheckbox(self.frame_top)
@@ -687,8 +687,23 @@ class control_frame():
         self.nextRow = self.nextRow + 1
 
 
-    def change_appearance_mode(self, new_appearance_mode):
-        customtkinter.set_appearance_mode(new_appearance_mode)
+    def change_appearance_mode(self, new_appearanceMode):
+        customtkinter.set_appearance_mode(new_appearanceMode)
+
+        # change the color of the scrollable frame manually,as this is not a
+        # customtkinter frame
+        if (new_appearanceMode == 'Dark'):
+            self.frame_bottom.configure(bg = bg_color_dark)
+            self.canvas.configure(bg = bg_color_dark)
+        else:
+            self.frame_bottom.configure(bg = bg_color_light)
+            self.canvas.configure(bg = bg_color_light)
+
+        # change appearance mode in strak machine
+        self.strak_machine.set_appearance_mode(new_appearanceMode)
+
+        # notify the diagram frame about the change
+        self.master.set_updateNeeded()
 
          # maximize the window again using state property
         self.master.state('zoomed')
