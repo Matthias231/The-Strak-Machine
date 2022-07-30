@@ -50,8 +50,6 @@ bg_color_dark =  "#222222"
 # strak machine
 class control_frame():
     def __init__(self, master, side, left_Buttons, right_Buttons, strak_machine):
-        global bg_color_scrollableFrame
-
         # store some variables in own class data structure
         self.strak_machine = strak_machine
         self.master = master

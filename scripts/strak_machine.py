@@ -2771,14 +2771,15 @@ class polarData:
     def determine_MaxSpeed(self, startIdx):
         # initialize minimum
         minimum = self.CD[startIdx]
-        num = len(self.CD)-startIdx-1
+        num = startIdx-1
 
         # find the first minimum CD starting from the highest lift coefficient
         for idx in reversed(range(num)):
-            if (self.CD[idx] < minimum):
+            value = self.CD[idx]
+            if (value < minimum):
                 # found new minimum
-                minimum = self.CD[idx]
-            else:
+                minimum = value
+            elif (value > minimum):
                 # CD starts incresing again, so we have found the first minimum
                 break
 
