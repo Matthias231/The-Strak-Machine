@@ -3,7 +3,7 @@
   shape_functions  = 'hicks-henne'
   initial_perturb  = 0.0025
   min_bump_width   = 0.1  
-  nfunctions_top   = 4
+  nfunctions_top   = 5
   nfunctions_bot   = 4
 /  
 
