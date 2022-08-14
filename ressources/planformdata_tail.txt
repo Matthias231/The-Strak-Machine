@@ -17,14 +17,14 @@
  "leadingEdgeCorrection": 0.009,
  "dihedral": 40.0,
  "interpolationSegments" : 4,
- "airfoilBasicName": "JX-E",
+ "airfoilBasicName": "JX-Fe",
  "airfoilPositions": [    null,    null,     null,    null,   null,   null ],
  "airfoilReynolds":  [   80000,   74000,    63000,   52000,  40000,  30000 ],
  "airfoilTypes":     [  "user", "blend",  "blend", "blend", "blend", "user" ],
  "flapGroup":        [       1,       1,        1,       1,       1,     1  ],
  "smoothUserAirfoils" : "True",
- "userAirfoils":     [".\\airfoil_library\\Tail\\JX\\\\JX-E\\JX-Fe-250.dat",
-                      ".\\airfoil_library\\Tail\\JX\\\\JX-E\\JX-Fe-150.dat"],
+ "userAirfoils":     [".\\airfoil_library\\Tail\\JX\\\\JX-Fe\\JX-Fe-250.dat",
+                      ".\\airfoil_library\\Tail\\JX\\\\JX-Fe\\JX-Fe-150.dat"],
  "polar_Reynolds":   [20000, 40000, 70000, 100000, 150000, 200000, 250000, 300000, 350000, 400000, 600000, 700000],
  "polar_Ncrit": 7.0
 }
