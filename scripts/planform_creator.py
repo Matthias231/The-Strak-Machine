@@ -2049,8 +2049,8 @@ def generate_polarCreationFile(wingData):
         # generate lines of the batchfile for this airfoil, write to file
         for Re in ReList:
             workerCall = "echo y | ..\\bin\\xfoil_worker.exe -i \"..\\ressources\\i"\
-            "Polars_T1.txt\" -a \".\\airfoils\%s.dat\" -w polar -o \"%s\" -r %d\n" \
-            %(airfoilName, airfoilName, Re)
+            "Polars_T1.txt\" -a \".\\%s\%s.dat\" -w polar -o \"%s\" -r %d\n" \
+            %(airfoilPath, airfoilName, airfoilName, Re)
 
             # write worker call to batchfile
             AirfoilPolarCreationFile.write(workerCall)
