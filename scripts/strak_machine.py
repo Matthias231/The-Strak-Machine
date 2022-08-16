@@ -396,6 +396,22 @@ class inputFile:
         return (mode, oppoint, target, weighting)
 
 
+    def get_weighting(self, oppointValue):
+        weighting = None
+        if (oppointValue < -0.08):
+            weighting = -0.1
+        elif (oppointValue < 0.0):
+            weighting = -0.5
+        elif (oppointValue >= 0.0) and (oppointValue < 0.03):
+            weighting = 0.5
+        elif (oppointValue >= 0.25) and (oppointValue < 0.3):
+            weighting = 1.2
+        elif (oppointValue >= 0.3) and (oppointValue < 0.4):
+            weighting = 1.5
+
+        return weighting
+
+
     def set_oppointValues(self, idx, values):
         num = self.get_numOpPoints()
 
@@ -799,7 +815,7 @@ class inputFile:
         op_mode = 'spec-cl'
         optimization_type = 'target-drag'
         target_value = 0.0
-        weighting = None #1.0
+        weighting = -0.05 #1.0
         reynolds = None
 
         # now build up new opPoints
@@ -809,6 +825,9 @@ class inputFile:
 
             # round opPoint
             op_point_value = round(op_point, CL_decimals)
+
+            # get weighting for this oppoint
+            weighting = self.get_weighting(op_point_value)
 
             # add new opPoint to dictionary
             self.add_Oppoint(name, op_mode, op_point_value, optimization_type,
@@ -832,10 +851,12 @@ class inputFile:
 
             # compose name
             name = "add_op_%s" % num
+            # get weighting
+            weighting = self.get_weighting(opPoint)
 
             # insert new op-Point, get index
             idx = self.insert_OpPoint(name, 'spec-cl', opPoint, 'target-drag',
-                                     0.0, None, None)
+                                     0.0, weighting, None)
 
             # correct idx of main op-points
             if (idx <= self.idx_CL0):
@@ -868,7 +889,7 @@ class inputFile:
 
         # insert op-Point, get index
         idx = self.add_Oppoint('alpha0', 'spec-al', alpha, 'target-lift',
-                                     0.0, params.weight_spec_al, maxRe)
+                                     0.0, 2.1, maxRe)
 
 
     def append_alphaMaxGlide_oppoint(self, params, i):
@@ -882,7 +903,7 @@ class inputFile:
 
         # insert op-Point, get index
         idx = self.add_Oppoint('alphaMaxGlide', 'spec-al', alpha, 'target-lift',
-                                     CL, params.weight_spec_al, None)
+                                     CL, 2.2, None)
 
     def append_alphaMaxLift_oppoint(self, params, i):
         # get maxRe
@@ -895,7 +916,7 @@ class inputFile:
 
         # insert op-Point, get index
         idx = self.add_Oppoint('alphaMaxLift', 'spec-al', alpha, 'target-lift',
-                                     CL, params.weight_spec_al, None)
+                                     CL, 2.3, None)
 
 
     # All op-points between start and end shall be distributed equally.
@@ -999,8 +1020,9 @@ class inputFile:
         opPointNames[self.idx_maxSpeed] = 'maxSpeed'
 
         # always insert CL0 as new oppoint
+        weighting = self.get_weighting(CL0)
         self.idx_CL0 = self.insert_OpPoint('CL0', 'spec-cl', CL0, 'target-drag',
-                                           CD0, None, None)
+                                           CD0, weighting, None)
         # correct idx of main op-points
         if (self.idx_CL0 <= self.idx_maxSpeed):
             self.idx_maxSpeed = self.idx_maxSpeed + 1
