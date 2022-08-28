@@ -17,6 +17,7 @@
 
 #  Copyright (C) 2020-2022 Matthias Boese
 
+import ctypes
 import tkinter as tk
 from tkinter import ttk
 import customtkinter
@@ -1387,6 +1388,9 @@ class App(customtkinter.CTk):
 if __name__ == "__main__":
     # init colorama
     init()
+
+    # bugfix (wrong scaling matplotlib)
+    ctypes.windll.shcore.SetProcessDpiAwareness(0)
 
      # init strakmachine
     NoteMsg("Starting Strak Machine...")

@@ -17,6 +17,7 @@
 
 #  Copyright (C) 2020-2022 Matthias Boese
 
+import ctypes
 import re
 import xml.etree.ElementTree as ET
 from copy import deepcopy
@@ -2233,6 +2234,9 @@ def GUI():
 # Main program
 if __name__ == "__main__":
     init()
+
+    # bugfix (wrong scaling matplotlib)
+    ctypes.windll.shcore.SetProcessDpiAwareness(0)
 
     # get command-line-arguments or user-input
     (planformDataFileName, strakDataFileName) = get_Arguments()

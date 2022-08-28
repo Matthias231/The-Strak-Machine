@@ -152,3 +152,4 @@ Strakmachine/airfoil_library/Tail/JX/JX-Fe/images/JX-Fe_family_polars.png
 Strakmachine/airfoil_library/Tail/JX/JX-Fe/JX-Fe-150.dat
 Strakmachine/airfoil_library/Tail/JX/JX-Fe/JX-Fe-250.dat
 Strakmachine/airfoil_library/Tail/JX/JX-Fe/readme.md
+*.pyc
