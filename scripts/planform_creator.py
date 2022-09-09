@@ -31,7 +31,6 @@ from matplotlib import rcParams
 import numpy as np
 from scipy.interpolate import make_interp_spline
 from scipy import interpolate as scipy_interpolate
-from scipy.optimize import curve_fit
 from math import log10, floor, tan, atan, sin, cos, pi, sqrt
 import json
 import tkinter
@@ -51,8 +50,6 @@ from strak_machine import (copyAndSmooth_Airfoil, get_ReString,
 from colorama import init
 from termcolor import colored
 from FLZ_Vortex_export import export_toFLZ
-#import bezier FIXME BEZIER
-
 
 ################################################################################
 # some global variables
@@ -153,6 +150,13 @@ PLanformDict =	{
                                  ".\\airfoil_library\\Scale_Glider\\SD\\SD-80.dat"]
             }
 
+
+# calculate the distance between to points
+def calculate_distance(x1, x2, y1, y2):
+    dist = np.sqrt(np.square(x2-x1) + np.square(y2-y1))
+    return dist
+
+
 # derivative function
 def deriv(f,x):
      h = 0.000000001                 #step-size
@@ -225,53 +229,6 @@ def objective_elliptical(x, normalizedTipChord, tipSharpness,
 
     return y
 
-
-##def objective_bezier_wrapper(values, b1_x, b1_y, b2_x, b2_y, b3_x, b3_y, b4_x, b4_y, b5_x, b5_y):
-##    result = []
-##
-##    for x in values:
-##        y = objective_bezier(x, b1_x, b1_y, b2_x, b2_y, b3_x, b3_y, b4_x, b4_y, b5_x, b5_y)
-##
-##        result.append(y)
-##
-##    return (result)
-##
-##
-##def objective_bezier(x, b1_x, b1_y, b2_x, b2_y, b3_x, b3_y, b4_x, b4_y, b5_x, b5_y):
-##
-##    nodes = np.asfortranarray([
-##    [0.0, b1_x, b2_x, b3_x, b4_x, b5_x, 1.0],
-##    [1.0, b1_y, b2_y, b3_y, b4_y, b5_y, 0.0],
-##    ])
-##
-##
-##    deg = len(nodes[0])-1
-##
-##    curve = bezier.Curve(nodes, degree=deg)
-##
-##    result = curve.evaluate(b1_x)
-##    if b1_y < result[1][0] :
-##        return -1
-##
-##    result = curve.evaluate(b2_x)
-##    if b2_y < result[1][0] :
-##        return -1
-##
-##    result = curve.evaluate(b3_x)
-##    if b3_y < result[1][0] :
-##        return -1
-##
-##    result = curve.evaluate(b4_x)
-##    if b4_y < result[1][0] :
-##        return -1
-##
-##    result = curve.evaluate(b5_x)
-##    if b5_y < result[1][0] :
-##        return -1
-##
-##    result = curve.evaluate(x)
-##    y = result[1][0]
-##    return y
 
 ################################################################################
 # function that gets a single boolean parameter from dictionary and returns a
@@ -383,8 +340,9 @@ class wing:
         self.wingspan = 2.54
         self.fuselageWidth = 0.035
         self.planformShape = 'elliptical'
-        self.planform_chord = []
-        self.planform_y = []
+        self.planformPoints = [(0.0, 1.0)]
+        self.planform_chord = [1.0]
+        self.planform_y = [0.0]
         self.halfwingspan = 0.0
         self.numberOfGridChords = 16384
         self.hingeDepthRoot = 23.0
@@ -412,9 +370,6 @@ class wing:
         self.showTipLine = False
         self.showHingeLine = True
         self.smoothUserAirfoils = True
-        self.use_bezier = False
-        self.bezier_x = []
-        self.bezier_y = []
 
 
     def set_colours(self):
@@ -540,17 +495,13 @@ class wing:
         self.planformShape =  get_MandatoryParameterFromDict(dictData, "planformShape")
 
         if ((self.planformShape != 'elliptical') and\
-            (self.planformShape != 'curve_fitting') and\
             (self.planformShape != 'trapezoidal')):
-            ErrorMsg("planformshape must be elliptical or curve_fitting or trapezoidal")
+            ErrorMsg("planformshape must be elliptical or trapezoidal")
             sys.exit(-1)
 
         if self.planformShape == 'elliptical':
             self.leadingEdgeCorrection = get_MandatoryParameterFromDict(dictData, "leadingEdgeCorrection")
             self.tipSharpness =  get_MandatoryParameterFromDict(dictData, "tipSharpness")
-        elif self.planformShape == 'curve_fitting':
-            self.planform_chord = get_MandatoryParameterFromDict(dictData, "planform_chord")
-            self.planform_y = get_MandatoryParameterFromDict(dictData, "planform_y")
 
         if (self.planformShape == 'elliptical') or\
            (self.planformShape == 'trapezoidal'):
@@ -743,6 +694,7 @@ class wing:
     def set_lastSectionAirfoilName(self, section):
             section.airfoilName = self.airfoilNames[section.number-2]
 
+
    # calculates a chord-distribution, which is normalized to root_chord = 1.0
    # half wingspan = 1
     def calculate_normalizedChordDistribution(self):
@@ -751,22 +703,11 @@ class wing:
         normalizedTipChord = self.tipDepthPercent / 100
         normalizedRootChord = normalizedTipChord
 
-        # In case of curve fitting, determine the optimum parameters
-        # automatically
-        if self.planformShape == 'curve_fitting':
-##            if self.use_bezier: FIXME BEZIER
-##                # curve fitting with objective function
-##                guess = (0.6,1.0,  0.5,1.0,  0.7,0.8,  0.9,0.5,  0.95,0.4)
-##                popt, _ = curve_fit(objective_bezier_wrapper, self.planform_chord, self.planform_y, p0=guess)
-##                b1_x, b1_y, b2_x, b2_y, b3_x, b3_y, b4_x, b4_y, b5_x, b5_y = popt
-##
-##                # store bezier control points
-##                self.bezier_x = (b1_x, b2_x, b3_x, b4_x, b5_x)
-##                self.bezier_y = (b1_y, b2_y, b3_y, b4_y, b5_y)
-            #else:
-            guess = (0.18, 0.1, 0.005)
-            popt, _ = curve_fit(objective_elliptical_wrapper, self.planform_chord, self.planform_y, p0=guess, bounds=(0.0, 100.0))
-            normalizedTipChord, self.tipSharpness, self.leadingEdgeCorrection = popt
+        # setup first point of normalized chord distribution and the distance
+        # between the points
+        last_x = 0.0
+        last_y = 1.0
+        distDelta = 0.05
 
         # calculate all Grid-chords
         for i in range(1, (self.numberOfGridChords + 1)):
@@ -778,8 +719,6 @@ class wing:
 
             # pure elliptical shaping of the wing as a reference
             grid.referenceChord = np.sqrt(1.0-(grid.y*grid.y))
-            #if (grid.y % 0.1) < grid_delta_y:
-             #   print("%1.5f\n" % grid.referenceChord)
 
             # normalized chord-length
             if (self.planformShape == 'elliptical'):
@@ -787,28 +726,26 @@ class wing:
                 grid.chord = objective_elliptical(grid.y, normalizedTipChord,
                                 self.tipSharpness, self.leadingEdgeCorrection)
 
-            elif(self.planformShape == 'curve_fitting'):
-##                if self.use_bezier: FIXME BEZIER
-##                    # curve fitting algorithm with bezier
-##                    grid.chord = objective_bezier(grid.y, b1_x, b1_y, b2_x, b2_y, b3_x, b3_y, b4_x, b4_y, b5_x, b5_y)
-##                else:
-                grid.chord = objective_elliptical(grid.y, normalizedTipChord,
-                                self.tipSharpness, self.leadingEdgeCorrection)
+                # distance to last point, that was stored
+                dist = calculate_distance(grid.y, last_x, grid.chord, last_y)
+
+                if (dist >= distDelta):
+                    # append new point to list of chord distribution points
+                    self.planformPoints.append((grid.y, grid.chord))
+                    last_x = grid.y
+                    last_y = grid.chord
 
             elif self.planformShape == 'trapezoidal':
                 # trapezoidal shaping of the wing
                 grid.chord = (1.0-grid.y) \
                             + normalizedTipChord * (grid.y)
 
-##            # calculate hinge line
-##            grid.hinge = interpolate(0.0 , 1.0, (self.hingeDepthRoot/100),
-##                   ((self.hingeDepthTip/100) * normalizedTipChord), grid.y)
-##
-##            # calculate leadingEdge, trailingedge
-##            grid.leadingEdge = grid.hingeLine -(grid.chord-grid.hingeDepth
-
             # append section to section-list of wing
             self.normalizedGrid.append(grid)
+
+        # append last point of normalized chord distribution
+        self.planformPoints.append((1.0, 0.0))
+
 
     # calculate planform-shape of the half-wing (high-resolution wing planform)
     def calculate_planform(self):
@@ -1567,10 +1504,6 @@ class wing:
         #self.set_AxesAndLabels(ax, "Half-wing planform")
 
 
-        plt.plot(normalizedHalfwingspan, normalizedChord, color=cl_normalizedChord,
-                linewidth = lw_planform, solid_capstyle="round",
-                label = "normalized chord")
-
         plt.plot(normalizedHalfwingspan, referenceChord, color=cl_referenceChord,
                 linewidth = lw_planform, solid_capstyle="round",
                 label = "pure ellipse")
@@ -1579,16 +1512,28 @@ class wing:
 ##                linewidth = lw_planform, solid_capstyle="round",
 ##                label = "hinge line")
 
-        if self.planformShape =='curve_fitting':
-            plt.scatter(self.planform_chord, self.planform_y, color=cl_normalizedChord,
-            label = "planform points points")
+        if self.planformPoints != []:
+            pts = np.vstack([self.planformPoints])
+            x, y = pts.T
+            i = np.arange(len(pts))
 
-##            if self.use_bezier:FIXME BEZIER
-##                 plt.scatter(self.bezier_x, self.bezier_y, color=cl_controlPoints,
-##                 label = "control points")
+            interp_i = np.linspace(0, i.max(), 100000 * i.max())
+
+            xi = scipy_interpolate.interp1d(i, x, kind='cubic')(interp_i)
+            yi = scipy_interpolate.interp1d(i, y, kind='cubic')(interp_i)
+
+            plt.scatter(x, y, color=cl_normalizedChord)
+            plt.plot(xi, yi, color=cl_normalizedChord,
+                     linewidth = lw_planform, solid_capstyle="round",
+                     label = "normalized chord")
+
+        else:
+            plt.plot(normalizedHalfwingspan, normalizedChord, color=cl_normalizedChord,
+                     linewidth = lw_planform, solid_capstyle="round",
+                     label = "normalized chord")
 
         plt.title("Normalized chord distribution")
-        plt.legend(loc='lower right', fontsize = fs_legend)
+        plt.legend(loc='upper right', fontsize = fs_legend)
 
         # maximize window
         figManager = plt.get_current_fig_manager()
