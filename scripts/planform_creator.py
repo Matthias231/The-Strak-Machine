@@ -340,9 +340,8 @@ class wing:
         self.wingspan = 2.54
         self.fuselageWidth = 0.035
         self.planformShape = 'elliptical'
-        self.planformPoints = [(0.0, 1.0)]
-        self.planform_chord = [1.0]
-        self.planform_y = [0.0]
+        self.chordDistribution = []
+        self.numChordDistributionPoints = 30
         self.halfwingspan = 0.0
         self.numberOfGridChords = 16384
         self.hingeDepthRoot = 23.0
@@ -511,6 +510,16 @@ class wing:
         self.hingeDepthRoot = get_MandatoryParameterFromDict(dictData, "hingeDepthRoot")
         self.hingeDepthTip = get_MandatoryParameterFromDict(dictData, "hingeDepthTip")
         self.dihedral = get_MandatoryParameterFromDict(dictData, "dihedral")
+
+        # get existing chord distribution, if any
+        try:
+            self.chordDistribution = dictData["chordDistribution"]
+        except:
+            # not found, initially calculate chord distribution
+            WarningMsg("parameter \'chordDistribution\' not found, initializing chord distribution")
+            self.initialize_normalizedChordDistribution()
+            # write initial chordDistribution to json-File #FIXME
+            #update_planformdata(self, dictData) #FIXME
 
         # get airfoil- / section data
         self.airfoilTypes = get_MandatoryParameterFromDict(dictData, 'airfoilTypes')
@@ -695,19 +704,49 @@ class wing:
             section.airfoilName = self.airfoilNames[section.number-2]
 
 
-   # calculates a chord-distribution, which is normalized to root_chord = 1.0
+
+   # initializes a chord-distribution, which is normalized to root_chord = 1.0
    # half wingspan = 1
-    def calculate_normalizedChordDistribution(self):
+    def initialize_normalizedChordDistribution(self):
         # calculate interval for setting up the grid
-        grid_delta_y = 1 / (self.numberOfGridChords-1)
+        grid_delta = 1 / (self.numberOfGridChords-1)
         normalizedTipChord = self.tipDepthPercent / 100
-        normalizedRootChord = normalizedTipChord
+
+        # setup first point of normalized chord distribution and the distance
+        # between the points
+        last_x = 0.0
+        last_chord = 1.0
+        totalDistance = 0.0
+
+        # calculate length of of normalized chord distribution
+        for i in range(1, (self.numberOfGridChords + 1)):
+
+            # calculate grid coordinates
+            x = grid_delta * (i-1)
+
+            # normalized chord-length
+            if (self.planformShape == 'elliptical'):
+                # elliptical shaping of the wing
+                chord = objective_elliptical(x, normalizedTipChord,
+                                self.tipSharpness, self.leadingEdgeCorrection)
+
+            elif self.planformShape == 'trapezoidal':
+                # trapezoidal shaping of the wing
+                chord = (1.0-x) + (normalizedTipChord * x)
+
+            # distance to previous point that was stored
+            totalDistance = totalDistance + calculate_distance(x, last_x, chord, last_chord)
+            last_x = x
+            last_chord = chord
 
         # setup first point of normalized chord distribution and the distance
         # between the points
         last_x = 0.0
         last_y = 1.0
-        distDelta = 0.05
+        distDelta = totalDistance / (self.numChordDistributionPoints-1)
+
+        # intialize chord distribtion (first point)
+        self.chordDistribution = [(0.0, 1.0)]
 
         # calculate all Grid-chords
         for i in range(1, (self.numberOfGridChords + 1)):
@@ -715,7 +754,7 @@ class wing:
             grid = normalizedGrid()
 
             # calculate grid coordinates
-            grid.y = grid_delta_y * (i-1)
+            grid.y = grid_delta * (i-1)
 
             # pure elliptical shaping of the wing as a reference
             grid.referenceChord = np.sqrt(1.0-(grid.y*grid.y))
@@ -726,25 +765,47 @@ class wing:
                 grid.chord = objective_elliptical(grid.y, normalizedTipChord,
                                 self.tipSharpness, self.leadingEdgeCorrection)
 
-                # distance to last point, that was stored
-                dist = calculate_distance(grid.y, last_x, grid.chord, last_y)
-
-                if (dist >= distDelta):
-                    # append new point to list of chord distribution points
-                    self.planformPoints.append((grid.y, grid.chord))
-                    last_x = grid.y
-                    last_y = grid.chord
-
             elif self.planformShape == 'trapezoidal':
                 # trapezoidal shaping of the wing
                 grid.chord = (1.0-grid.y) \
                             + normalizedTipChord * (grid.y)
 
+            # distance to last point, that was stored
+            dist = calculate_distance(grid.y, last_x, grid.chord, last_y)
+
+            if (dist >= distDelta):
+                # append new point to list of chord distribution points
+                self.chordDistribution.append((grid.y, grid.chord))
+                last_x = grid.y
+                last_y = grid.chord
+
             # append section to section-list of wing
             self.normalizedGrid.append(grid)
 
         # append last point of normalized chord distribution
-        self.planformPoints.append((1.0, 0.0))
+        self.chordDistribution.append((1.0, 0.0))
+
+
+    # calculates a chord-distribution by means of interpolation
+    def calculate_normalizedChordDistribution(self):
+        if (self.planformShape == 'elliptical'):
+            # elliptical shaping of the wing
+            pts = np.vstack([self.chordDistribution])
+            x, y = pts.T
+            i = np.arange(len(pts))
+            interp_i = np.linspace(0, 1.0, self.numberOfGridChords)
+
+            xi = scipy_interpolate.interp1d(i, x, kind='cubic')(interp_i)
+            yi = scipy_interpolate.interp1d(i, y, kind='cubic')(interp_i)
+
+            # set the chord
+            #for n in range(0, self.numberOfGridChords):
+                #self.normalizedGrid[n].y = xi[n]
+                #self.normalizedGrid[n].chord = yi[n]
+
+        elif self.planformShape == 'trapezoidal': #FIXME implement, use linear intepolation
+            ErrorMsg('trapezoidal shaping not implemented yet')
+
 
 
     # calculate planform-shape of the half-wing (high-resolution wing planform)
@@ -1489,49 +1550,32 @@ class wing:
         # customize grid
         plt.grid(True, color='dimgrey',  linestyle='dotted', linewidth=0.4)
 
+        # generate lists of x and y-coordinates
         normalizedHalfwingspan = []
         normalizedChord = []
         referenceChord = []
-        hinge = []
 
         for element in self.normalizedGrid:
             normalizedHalfwingspan.append(element.y)
             normalizedChord.append(element.chord)
             referenceChord.append(element.referenceChord)
-            #hinge.append(element.hinge)
 
-        # set axes and labels
-        #self.set_AxesAndLabels(ax, "Half-wing planform")
-
-
+        # plot reference chord (pure ellipse)
         plt.plot(normalizedHalfwingspan, referenceChord, color=cl_referenceChord,
                 linewidth = lw_planform, solid_capstyle="round",
                 label = "pure ellipse")
 
-##        plt.plot(normalizedHalfwingspan, hinge, color=cl_hingeLine,
-##                linewidth = lw_planform, solid_capstyle="round",
-##                label = "hinge line")
+        # plot normalized chord that will be taken for planform generation
+        plt.plot(normalizedHalfwingspan, normalizedChord, color=cl_normalizedChord,
+                 linewidth = lw_planform, solid_capstyle="round",
+                 label = "normalized chord")
 
-        if self.planformPoints != []:
-            pts = np.vstack([self.planformPoints])
-            x, y = pts.T
-            i = np.arange(len(pts))
+        # plot discrete points of normalized chord
+        pts = np.vstack([self.chordDistribution])
+        x, y = pts.T
+        plt.scatter(x, y, color=cl_normalizedChord)
 
-            interp_i = np.linspace(0, i.max(), 100000 * i.max())
-
-            xi = scipy_interpolate.interp1d(i, x, kind='cubic')(interp_i)
-            yi = scipy_interpolate.interp1d(i, y, kind='cubic')(interp_i)
-
-            plt.scatter(x, y, color=cl_normalizedChord)
-            plt.plot(xi, yi, color=cl_normalizedChord,
-                     linewidth = lw_planform, solid_capstyle="round",
-                     label = "normalized chord")
-
-        else:
-            plt.plot(normalizedHalfwingspan, normalizedChord, color=cl_normalizedChord,
-                     linewidth = lw_planform, solid_capstyle="round",
-                     label = "normalized chord")
-
+        # place title and legend
         plt.title("Normalized chord distribution")
         plt.legend(loc='upper right', fontsize = fs_legend)
 
@@ -2083,16 +2127,15 @@ def update_strakdata(wingData):
     NoteMsg("strakdata was successfully updated")
 
 
+def update_planformdata(wingdata, dictData):
+    # update parameters in json dictionary
+    dictData["chordDistribution"] = wingdata.chordDistribution
 
-# GUI-Handling
-def on_key_press(event):
-        print("you pressed {}".format(event.key))
-        key_press_handler(event, canvas, toolbar)
+    # write json-File
+    with open(planformDataFileName, "w") as write_file:
+        json.dump(dictData, write_file, indent=4, separators=(", ", ": "), sort_keys=False)
+        write_file.close()
 
-def _quit():
-        root.quit()     # stops mainloop
-        root.destroy()  # this is necessary on Windows to prevent
-                        # Fatal Python Error: PyEval_RestoreThread: NULL tstate
 
 ################################################################################
 # function that gets arguments from the commandline
@@ -2112,69 +2155,6 @@ def get_Arguments():
     args = parser.parse_args()
     return (get_planformDataFileName(args), get_strakDataFileName(args))
 
-
-def addEntryToGUI(entryName, xOffset, yOffset):
-    canvas1 = tkinter.Canvas(root, width = 400, height = 300)
-    canvas1.pack()
-
-    # add label
-    label2 = tkinter.Label(root, text=entryName)
-    label2.config(font=('helvetica', 20))
-    canvas1.create_window(xOffset, yOffset, window=label2)
-
-    # add entry-field
-    entry1 = tkinter.Entry (root)
-    entry1.setvar("2.98")
-    canvas1.create_window(xOffset + 100, yOffset, window=entry1)
-
-
-def GUI():
-    # !! WIP !!!
-    # set up GUI
-    root = tkinter.Tk()
-    root.wm_title("Planform-Creator")
-
-    # get Figure from wing-class
-    fig = newWing.getFigure()
-    canvas = FigureCanvasTkAgg(fig, master=root)  # A tk.DrawingArea.
-    canvas.draw()
-    canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
-
-    toolbar = NavigationToolbar2Tk(canvas, root)
-    toolbar.update()
-    canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
-    canvas.mpl_connect("key_press_event", on_key_press)
-
-    # define font for button
-    myFont = font.Font(size=30)
-    # add the button
-    button = tkinter.Button(master=root, text="Quit", command=_quit)
-    # apply font to the button label
-    button['font'] = myFont
-    button.pack(side=tkinter.BOTTOM)
-
-    # create parameter-GUI
-    addEntryToGUI("Wing-span", 0, 20)
-
-##
-##"wingspan": 2.98,#2.54,
-##            # shape of the planform, elliptical / trapezoidal
-##            "planformShape": 'elliptical',
-##            # orientation of the wings leading edge
-##            "leadingEdgeOrientation": 'up',
-##            # length of the root-chord in m
-##            "rootchord": 0.223,
-##            # depth of the tip in percent of the chord-length
-##            "tipDepthPercent": 8.0,
-##            # sweep of the tip of the wing in degrees
-##            "rootTipSweep": 3.2,
-##            # depth of the aileron / flap in percent of the chord-length
-##            "hingeDepthPercent": 23.5,
-##            # dihedral of the of the wing in degree
-##            "dihedral": 2.5,
-
-
-    tkinter.mainloop()
 
 # Main program
 if __name__ == "__main__":
@@ -2219,7 +2199,6 @@ if __name__ == "__main__":
     # before calculating the planform with absolute numbers,
     # calculate normalized chord distribution
     newWing.calculate_normalizedChordDistribution()
-    #newWing.draw_NormalizedChordDistribution()#FIXME
 
     # denormalize position / calculate absolute numbers
     newWing.denormalize_positions()
