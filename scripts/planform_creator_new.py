@@ -2170,9 +2170,6 @@ class planform_creator:
         # get current working dir
         self.workingDir = getcwd()
 
-        # create a new planform
-        self.newWing = wing()
-
         # try to open .json-file
         try:
             paramFile = open(planformDataFileName)
@@ -2189,6 +2186,9 @@ class planform_creator:
             ErrorMsg('Error, failed to read data from file %s' % planformDataFileName)
             paramFile.close()
             exit(-1)
+
+        # create a new planform
+        self.newWing = wing()
 
         # set data for the planform
         self.newWing.set_Data(self.planformData)
@@ -2263,9 +2263,54 @@ class planform_creator:
     def reset(self):
         print("reset")
 
+    def get_planformParams(self):
+        return self.planformData
+
+    def set_planformParams(self, newData):
+        self.planformData = newData
 
     def update_planform(self):
-        print("update planform")
+        try:
+            self.newWing.destroy()
+        except:
+            pass
+
+        # create a new planform
+        self.newWing = wing()
+
+        # set data for the planform
+        self.newWing.set_Data(self.planformData)
+
+        # before calculating the planform with absolute numbers,
+        # calculate normalized chord distribution
+        self.newWing.calculate_normalizedChordDistribution()
+
+        # denormalize position / calculate absolute numbers
+        self.newWing.denormalize_positions()
+
+        # calculate the grid, the chordlengths of the airfoils and the sections
+        self.newWing.calculate_planform()
+        self.newWing.calculate_ReNumbers()
+        self.newWing.calculate_chordlengths()
+        self.newWing.calculate_positions() # must be done after chordlenghts ar known
+        self.newWing.set_AirfoilNames()
+
+        # if there is a fuselage, insert data for the fuselage section
+        # at the beginning of the list.
+        if self.newWing.fuselageIsPresent():
+            self.newWing.insert_fuselageData()
+
+        # always insert data for the wing tip
+        self.newWing.insert_tipData()
+
+        # calculate the sections now
+        self.newWing.calculate_sections()
+
+        # assign the flap groups to the different sections
+        self.newWing.assignFlapGroups()
+
+        # set colours according to selected theme
+        self.newWing.set_colours()
 
 
     def plot_diagram(self, diagramType, ax, x_limits, y_limits):

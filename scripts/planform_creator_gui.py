@@ -33,9 +33,7 @@ from matplotlib.figure import Figure
 
 # imports from strak machine
 from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg,
-                           bs, ressourcesPath,
-                           CL_decimals, CD_decimals, CL_CD_decimals,
-                           AL_decimals, camb_decimals, thick_decimals)
+                           bs, ressourcesPath)
 
 # imports from planform creator
 from planform_creator_new import (planform_creator, diagTypes)
@@ -43,8 +41,12 @@ from planform_creator_new import (planform_creator, diagTypes)
 # some global variables
 num_diagrams = len(diagTypes)
 diagram_width = 10
-diagram_height = 5
+diagram_height = 7
 controlFrame = None
+creatorInstances = []
+
+# names of the planformfiles
+planformFiles = ["planformdata_wing.txt", "planformdata_tail.txt"]
 
 bg_color_light = "#DDDDDD"
 bg_color_dark =  "#222222"
@@ -52,16 +54,14 @@ bg_color_dark =  "#222222"
 # class control frame, change the input-variables / parameters of the
 # planform creator
 class control_frame():
-    def __init__(self, master, side, left_Buttons, right_Buttons, creatorInst):
+    def __init__(self, master, side, left_Buttons, right_Buttons):
         # store some variables in own class data structure
-        self.creatorInst = creatorInst
         self.master = master
         self.unsavedChangesFlags = [0,0]
 
         # determine screen size
         self.width = self.master.winfo_screenwidth()
         self.heigth = self.master.winfo_screenheight()
-        creatorInst.set_screenParams(self.width, self.heigth)
 
         # create top frame
         self.frame_top = customtkinter.CTkFrame(master=master, width=180,
@@ -172,11 +172,11 @@ class control_frame():
 
     def clear_unsavedChangesFlag(self, planformIdx):
         try:
-            i = planformIdx-1
+            i = planformIdx
             self.unsavedChangesFlags[i] = False
             self.label_unsavedChanges[i].configure(text = '')
         except:
-            ErrorMsg("invalid planformIdx: %d" & planformIdx)
+            ErrorMsg("invalid planformIdx: %d" % planformIdx)
 
 
     def get_unsavedChangesFlags(self):
@@ -426,14 +426,11 @@ class diagram(customtkinter.CTkFrame):
             self.controller.move_visibleArea(event)
 
 
-
-
-# class diagram frame, shows the graphical output of the strak machine
-class diagram_frame():
-    def __init__(self, master, side, creatorInst):
-        # store planform creator instance locally
+# class creator diagrams, will store figures and also related data of a planform
+# creator instance
+class creatorDiagrams():
+    def __init__(self, creatorInst):
         self.creatorInst = creatorInst
-        self.master = master
         self.figures = []
         self.axes = []
         self.initial_limits = {}
@@ -444,15 +441,56 @@ class diagram_frame():
         self.captured_x_Position = 0.0
         self.captured_y_Position = 0.0
 
-        # determine screen size
-        self.width = self.master.winfo_screenwidth()
-        self.heigth = self.master.winfo_screenheight()
-        self.scaleFactor = self.width/1980
-        creatorInst.set_screenParams(self.width, self.heigth)
+    def get_figures(self):
+        return self.figures
 
+    def get_axes(self):
+        return self.axes
+
+    def get_initial_limits(self):
+        return self.initial_limits
+
+    def get_zoomed_limits(self):
+        return self.zoomed_limits
+
+    def create_figures(self, scaleFactor):
+        global num_diagrams
+        global diagram_width
+        global diagram_height
+
+        # add figures for different diagram types
+        figures = {}
+        axes = {}
+        limits = {}
+
+        # set 'dark' style
+        plt.style.use('dark_background')
+
+        for diagType in diagTypes:
+            # new figure
+            x = diagram_width* scaleFactor
+            y = diagram_height* scaleFactor
+            fig = Figure(figsize=(x, y))
+            ax = fig.add_subplot()
+
+            # initial diagram (limits will be determined automatically)
+            self.creatorInst.plot_diagram(diagType, ax, None, None)
+
+            # get initial limits
+            (x_limits, y_limits) = (ax.get_xlim(), ax.get_ylim())
+
+            # append to lists
+            figures[diagType] = fig
+            axes[diagType] = ax
+            limits[diagType] = (x_limits, y_limits)
+
+        return (figures, axes, limits)
+
+    def create_figures_buffered(self, scaleFactor):
         # create figures initially (two of each kind for buffering)
         for i in range(2):
-            (figures, axes, limits) =  self.create_figures()
+            (figures, axes, limits) =  self.create_figures(scaleFactor)
+
             self.figures.append(figures)
             self.axes.append(axes)
 
@@ -469,6 +507,184 @@ class diagram_frame():
             self.zoom_factors_old[diagType] = 1.0
             self.offsets[diagType] = (0.0, 0.0)
 
+    def change_zoom_factor(self, step):
+        zoomsteps = 30.0
+        max_zoom = 1.0
+        min_zoom = 0.08
+
+        # get actual zoom factor for diagType
+        zoom_factor = self.zoom_factors[self.activeDiagram]
+
+        # store as "old" zoom factor
+        self.zoom_factors_old[self.activeDiagram] = zoom_factor
+
+        # change zoom factor, steps is either -1.0 (scroll down) or +1.0 (scroll up)
+        zoom_factor = zoom_factor + (step/zoomsteps)
+
+        # limit zoom_factor
+        if (zoom_factor > max_zoom):
+                zoom_factor = max_zoom
+        elif (zoom_factor < min_zoom):
+              zoom_factor = min_zoom
+
+        # writeback
+        self.zoom_factors[self.activeDiagram] = zoom_factor
+
+
+    def get_zoom_factor(self):
+        return self.zoom_factors[self.activeDiagram]
+
+
+    def calculate_zoomed_limits(self, x_pos, y_pos):
+        # get zoom factor for diagType
+        zoom_factor = self.zoom_factors[self.activeDiagram]
+        zoom_factor_old = self.zoom_factors_old[self.activeDiagram]
+        zoom_change = zoom_factor / zoom_factor_old
+
+        # get actual limits for diagType
+        (x_limTuple, y_limTuple) = self.zoomed_limits[self.activeDiagram]
+        (x_limits, y_limits) = (list(x_limTuple), list(y_limTuple))
+
+        # adjust limits relative to mouse position
+        x_left = x_pos - x_limits[0]
+        x_right = x_limits[1] - x_pos
+        x_left = x_left * zoom_change
+        x_right = x_right * zoom_change
+        x_left_lim = x_pos - x_left
+        x_right_lim = x_pos + x_right
+
+        y_below = y_pos - y_limits[0]
+        y_beyond = y_limits[1] - y_pos
+        y_below = y_below * zoom_change
+        y_beyond = y_beyond * zoom_change
+        y_below_lim = y_pos - y_below
+        y_beyond_lim = y_pos + y_beyond
+
+        # write zoomed limits
+        self.zoomed_limits[self.activeDiagram] = ((x_left_lim, x_right_lim),
+                                                  (y_below_lim, y_beyond_lim))
+
+
+    def zoom_in_out(self, event):
+        # check if there is an update going on
+        if (self.master.get_updateNeeded()):
+            return
+
+        # change zoom_factor first
+        self.change_zoom_factor(event.step)
+
+        # calculate zoomed_limits
+        self.calculate_zoomed_limits(event.xdata, event.ydata)
+
+        # set notification flag / update diagram
+        self.master.set_updateNeeded()
+
+
+    def capture_position(self, event):
+        # get curretn offsets
+        (x_offset, y_offset) = self.offsets[self.activeDiagram]
+        # capture new postion, including old offsets
+        self.captured_x_Position = event.x - x_offset
+        self.captured_y_Position = event.y - y_offset
+
+
+    def move_visibleArea(self, event):
+        # calculate offsets for x, y
+        x_offset = event.x - self.captured_x_Position
+        y_offset = event.y - self.captured_y_Position
+
+        # store offsets for active diagram type
+        self.offsets[self.activeDiagram] = (x_offset, y_offset)
+
+         # set notification flag / update diagram
+        self.master.set_updateNeeded()
+
+
+    def default_zoom(self):
+        # set zoom factor for active diagram to default
+        self.zoom_factors[self.activeDiagram] = 1.0
+        self.zoom_factors_old[self.activeDiagram] = 1.0
+
+        # restore initial limits for active diagram
+        self.zoomed_limits[self.activeDiagram] =\
+                self.initial_limits[self.activeDiagram]
+
+        # set offsets to zero
+        self.offsets[self.activeDiagram] = (0.0, 0.0)
+
+        # set notification flag / update diagram
+        self.master.set_updateNeeded()
+
+
+    def get_limits(self):
+        # get zoomed limits
+        (x_limTuple, y_limTuple) = self.zoomed_limits[self.activeDiagram]
+        (x_limits, y_limits) = (list(x_limTuple), list(y_limTuple))
+
+        # get offsets
+        (x_offset, y_offset) = self.offsets[self.activeDiagram]
+
+        # get diagram width and height
+        x_width = x_limits[1] - x_limits[0]
+        y_width = y_limits[1] - y_limits[0]
+
+        # determine scaler, depending on the screen resolution
+        scaler = 1000.0 * self.scaleFactor
+
+        # scale offsets to diagram width / height and screen resoultion
+        x_offset = x_offset * x_width / scaler
+        y_offset = y_offset * y_width / scaler
+
+        # shift the limits by offset values
+        x_limits[0] = x_limits[0] - x_offset
+        x_limits[1] = x_limits[1] - x_offset
+        y_limits[0] = y_limits[0] - y_offset
+        y_limits[1] = y_limits[1] - y_offset
+
+        return (tuple(x_limits), tuple(y_limits))
+
+
+# class diagram frame, shows the graphical output of the planform creator
+class diagram_frame():
+    def __init__(self, master, side, creatorInstances, scaleFactor):
+        self.master = master
+        self.scaleFactor = scaleFactor
+        self.Diagrams = []
+        self.figures = []
+        self.axes = []
+        self.initial_limits = {}
+        self.zoomed_limits = {}
+        self.offsets = {}
+        self.zoom_factors = {}
+        self.zoom_factors_old = {}
+        self.captured_x_Position = 0.0
+        self.captured_y_Position = 0.0
+
+        for creatorInst in creatorInstances:
+            diagrams = creatorDiagrams(creatorInst)
+            diagrams.create_figures_buffered(scaleFactor)
+            self.Diagrams.append(diagrams)
+
+
+        # create figures initially (two of each kind for buffering)
+        for i in range(2):
+            (figures, axes, limits) =  self.create_figures(creatorInstances[0], scaleFactor)
+
+            self.figures.append(figures)
+            self.axes.append(axes)
+
+            # initial limits unbuffered (only once each type)
+            if (i == 0):
+                self.initial_limits = limits
+
+        # set zoomed limits
+        self.zoomed_limits = deepcopy(self.initial_limits)
+
+        # set initial zoomfactors and offsets
+        for diagType in diagTypes:
+            self.zoom_factors[diagType] = 1.0
+            self.zoom_factors_old[diagType] = 1.0
+            self.offsets[diagType] = (0.0, 0.0)
 
         # create new frame (container)
         self.container = customtkinter.CTkFrame(master=master, width=180,
@@ -495,7 +711,7 @@ class diagram_frame():
         self.update_diagram(master)
 
 
-    def create_figures(self):
+    def create_figures(self, creatorInst, scaleFactor):
         global num_diagrams
         global diagram_width
         global diagram_height
@@ -510,13 +726,13 @@ class diagram_frame():
 
         for diagType in diagTypes:
             # new figure
-            x = diagram_width* self.scaleFactor
-            y = diagram_height* self.scaleFactor
+            x = diagram_width* scaleFactor
+            y = diagram_height* scaleFactor
             fig = Figure(figsize=(x, y))
             ax = fig.add_subplot()
 
             # initial diagram (limits will be determined automatically)
-            self.creatorInst.plot_diagram(diagType, ax, None, None)
+            creatorInst.plot_diagram(diagType, ax, None, None)
 
             # get initial limits
             (x_limits, y_limits) = (ax.get_xlim(), ax.get_ylim())
@@ -664,7 +880,7 @@ class diagram_frame():
         y_width = y_limits[1] - y_limits[0]
 
         # determine scaler, depending on the screen resolution
-        scaler = 1000.0 * (self.width/1920)
+        scaler = 1000.0 * self.scaleFactor
 
         # scale offsets to diagram width / height and screen resoultion
         x_offset = x_offset * x_width / scaler
@@ -680,6 +896,9 @@ class diagram_frame():
 
 
     def update_diagram(self, master):
+        global creatorInstances
+        creatorInst = creatorInstances[0]
+
         # check if an update has to be carried out
         if (self.master.get_updateNeeded()):
             # get buffer idx for modifing the frames that are currently not visible
@@ -698,7 +917,7 @@ class diagram_frame():
             ax.clear()
 
             # plot new diagram
-            self.creatorInst.plot_diagram(self.activeDiagram, ax, x_limits, y_limits)
+            creatorInst.plot_diagram(self.activeDiagram, ax, x_limits, y_limits)
 
             # update figure
             figure = self.figures[backgroundIdx][self.activeDiagram]
@@ -725,18 +944,19 @@ class diagram_frame():
 
 # main application
 class App(customtkinter.CTk):
-    def __init__(self, creatorInst_wing, creatorInst_tail):
+    def __init__(self):
         super().__init__()
         global controlFrame
+        global creatorInstances
+
         self.app_running = False
+
+        # index of active planform
+        self.planformIdx = 0
 
         # configure customtkinter
         customtkinter.set_appearance_mode("Dark")    # Modes: "System" (standard), "Dark", "Light"
         customtkinter.set_default_color_theme("blue") # Themes: "blue" (standard), "green", "dark-blue"
-
-        # store underlying class instance locally
-        self.creatorInst_wing = creatorInst_wing
-        self.creatorInst_tail = creatorInst_tail
 
         # set window title
         self.title("Planform Creator")
@@ -747,15 +967,24 @@ class App(customtkinter.CTk):
         # call .on_closing() when app gets closed
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+        # determine screen size and scale factor
+        width = self.winfo_screenwidth()
+        heigth = self.winfo_screenheight()
+        scaleFactor = width/1980
+
+        for creatorInst in creatorInstances:
+            creatorInst.set_screenParams(width, heigth)
+
         # notification variable for updating the diagrams
         self.updateNeeded = 0
 
         # create diagram frame, which is on the top
-        self.frame_top = diagram_frame(self, tk.TOP, self.creatorInst_wing)
+        self.frame_top = diagram_frame(self, tk.TOP, creatorInstances,
+         scaleFactor)
 
         # create control frame, which is on the left
         self.frame_bottom = control_frame(self, tk.BOTTOM,
-         self.get_leftButtons(), self.get_rightButtons(), self.creatorInst_wing)
+         self.get_leftButtons(), self.get_rightButtons())
 
         # set global variable
         controlFrame = self.frame_bottom
@@ -786,21 +1015,24 @@ class App(customtkinter.CTk):
         self.frame_top.change_diagram(newDiagram)
 
     def load(self, dummy):
-        result = self.creatorInst.load()
+        creatorInst = creatorInstances[self.planformIdx]
+        result = creatorInst.load()
         if (result == 0):
-            self.creatorInst.update_planform()
+            creatorInst.update_planform()
             self.frame_bottom.clear_unsavedChangesFlag(self.planformIdx)
 
             self.updateNeeded = True
 
 
     def save(self, dummy):
-        self.creatorInst.save(self.planformIdx)
+        creatorInst = creatorInstances[self.planformIdx]
+        creatorInst.save()
         self.frame_bottom.clear_unsavedChangesFlag(self.planformIdx)
 
 
     def reset(self, dummy):
-        result = self.creatorInst.reset(self.planformIdx)
+        creatorInst = creatorInstances[self.planformIdx]
+        result = creatorInst.reset()
         if (result == 0):
            self.frame_bottom.set_unsavedChangesFlag(self.planformIdx)
            self.updateNeeded = True
@@ -874,16 +1106,18 @@ if __name__ == "__main__":
     # bugfix (wrong scaling matplotlib)
     ctypes.windll.shcore.SetProcessDpiAwareness(0)
 
-     # init planform creator
+     # init planform creator instances
     NoteMsg("Starting Planform Creator...")
-    #try:
-    myPlanformCreator_wing = planform_creator("ressources//planformdata_wing.txt")
-    myPlanformCreator_vtail = planform_creator("ressources//planformdata_tail.txt")
-##    except:
-##        ErrorMsg("Planform Creator could not be started")
-##        input("Press any key to quit")
-##        exit(-1)
+
+    try:
+        for fileName in planformFiles:
+            newInst = planform_creator(ressourcesPath + bs + fileName)
+            creatorInstances.append(newInst)
+    except:
+        ErrorMsg("Planform Creator could not be started")
+        input("Press any key to quit")
+        exit(-1)
 
     NoteMsg("Starting Graphical User Interface...")
-    app = App(myPlanformCreator_wing, myPlanformCreator_vtail)
+    app = App()
     app.start()
