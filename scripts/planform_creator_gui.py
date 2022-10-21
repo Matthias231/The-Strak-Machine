@@ -54,9 +54,11 @@ bg_color_dark =  "#222222"
 # class control frame, change the input-variables / parameters of the
 # planform creator
 class control_frame():
-    def __init__(self, master, side, left_Buttons, right_Buttons):
+    def __init__(self, master, side, left_Buttons, right_Buttons, creatorInstances, scaleFactor):
         # store some variables in own class data structure
         self.master = master
+        self.creatorInstances = creatorInstances
+        self.scaleFactor = scaleFactor
         self.unsavedChangesFlags = [0,0]
 
         # determine screen size
@@ -243,6 +245,100 @@ class control_frame():
 
             self.place_widgets(left, right)
 
+    def add_entries(self, frame):
+        creatorInst = self.creatorInst[0]#FIXME
+        # get initial target values
+        self.singleParams = creatorInst.getSingleParams()
+
+        # init some structures to store data locally
+        self.entries = []
+        self.textVars = []
+
+        # determine number of entries
+        num_entries = len(self.targetValues)
+
+        # local variable to place spec-al entries in the frame
+        spec_al_entries = []
+
+        # Add Label
+        oppoint_label = customtkinter.CTkLabel(master=frame,
+                text="CL", text_font=("Roboto Medium", 13), anchor="e")
+        target_label = customtkinter.CTkLabel(master=frame,
+                text="CD", text_font=("Roboto Medium", 13), anchor="e")
+        weighting_label = customtkinter.CTkLabel(master=frame,
+                text="weighting", text_font=("Roboto Medium", 13), anchor="e")
+        self.place_3_widgets(oppoint_label, target_label, weighting_label)
+
+        # create entries and assign values
+        for i in range(num_entries):
+            # get dictionary containing oppoint / type / target value
+            targetValue = self.targetValues[i]
+
+            # get values from dictinory
+            (mode, oppoint, target, weighting) = self.get_valuesFromDict(targetValue)
+            if (mode == None):
+                # error, continue with next entry
+                continue
+
+            # create text-Vars to interact with entries
+            type_txt = tk.StringVar(frame, value=mode)
+            oppoint_txt = tk.StringVar(frame, value=oppoint)
+            target_txt = tk.StringVar(frame, value=target)
+            weighting_txt = tk.StringVar(frame, value=weighting)
+
+            self.textVars.append((type_txt, oppoint_txt, target_txt, weighting_txt))
+
+            # create entry for oppoint
+            oppoint_entry = customtkinter.CTkEntry(frame, show=None,
+             textvariable = oppoint_txt, text_font=('Roboto Medium', 11),
+             width=80, height=16)
+
+             # bind to "Enter"-Message
+            oppoint_entry.bind('<Return>', self.update_TargetValues)
+
+            # create entry for target
+            target_entry = customtkinter.CTkEntry(frame, show=None,
+             textvariable = target_txt, text_font=('Roboto Medium', 11),
+             width=80, height=16)
+
+            # bind to "Enter"-Message
+            target_entry.bind('<Return>', self.update_TargetValues)
+
+            # create entry for weighting
+            weighting_entry = customtkinter.CTkEntry(frame, show=None,
+             textvariable = weighting_txt, text_font=('Roboto Medium', 11),
+             width=80, height=16)
+
+            # bind to "Enter"-Message
+            weighting_entry.bind('<Return>', self.update_TargetValues)
+
+
+            # append all entries to list
+            self.entries.append((oppoint_entry, target_entry, weighting_entry))
+
+            # if oppoint is 'spec-cl' place widget now
+            if (mode == 'spec-cl'):
+                self.place_3_widgets(oppoint_entry, target_entry, weighting_entry)
+            elif (mode == 'spec-al'):
+                # append to list of spec-al entries
+                spec_al_entries.append((oppoint_entry, target_entry, weighting_entry))
+
+
+        # Add Label
+        oppoint_label = customtkinter.CTkLabel(master=frame,
+                  text="Alpha", text_font=("Roboto Medium", 13), anchor="e")
+        target_label = customtkinter.CTkLabel(master=frame,
+                  text="CL", text_font=("Roboto Medium", 13), anchor="e")
+        weighting_label = customtkinter.CTkLabel(master=frame,
+                  text="weighting", text_font=("Roboto Medium", 13), anchor="e")
+        self.place_3_widgets(oppoint_label, target_label, weighting_label)
+
+        # now place spec-al entries
+        for entryTuple in spec_al_entries:
+            # unpack tuple
+            (oppoint_entry, target_entry, weighting_entry) = entryTuple
+            self.place_3_widgets(oppoint_entry, target_entry, weighting_entry)
+        print("params")
 
     def create_button(self, frame, button):
         text = button["txt"]
@@ -984,7 +1080,8 @@ class App(customtkinter.CTk):
 
         # create control frame, which is on the left
         self.frame_bottom = control_frame(self, tk.BOTTOM,
-         self.get_leftButtons(), self.get_rightButtons())
+         self.get_leftButtons(), self.get_rightButtons(), creatorInstances,
+          scaleFactor)
 
         # set global variable
         controlFrame = self.frame_bottom
