@@ -2392,12 +2392,8 @@ class planform_creator:
     def reset(self):
         print("reset")
 
-    def get_singleParams(self):
-        params = []
-        for element in self.planformData:
-            print (element)
-
-        return params
+    def get_params(self):
+        return self.newWing.params
 
     def set_planformParams(self, newData):
         self.planformData = newData

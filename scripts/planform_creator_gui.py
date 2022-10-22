@@ -36,7 +36,7 @@ from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg,
                            bs, ressourcesPath)
 
 # imports from planform creator
-from planform_creator_new import (planform_creator, diagTypes)
+from planform_creator_new import (planform_creator, diagTypes, params)
 
 # some global variables
 num_diagrams = len(diagTypes)
@@ -59,14 +59,23 @@ class control_frame():
         self.master = master
         self.creatorInstances = creatorInstances
         self.scaleFactor = scaleFactor
-        self.unsavedChangesFlags = [0,0]
+        self.numPlanforms = len(creatorInstances)
+        self.unsavedChangesFlags = []
+        self.planformNames = []
+        self.params:params = []
+
+        for i in range(self.numPlanforms):
+            self.unsavedChangesFlags.append(0)
+            params = self.creatorInstances[i].get_params()
+            self.params.append(params)
+            self.planformNames.append(params.planformName)
 
         # determine screen size
         self.width = self.master.winfo_screenwidth()
         self.heigth = self.master.winfo_screenheight()
 
-        # create top frame
-        self.frame_top = customtkinter.CTkFrame(master=master, width=180,
+        # create left frame
+        self.frame_left = customtkinter.CTkFrame(master=master, width=180,
                                             corner_radius=0)
 
         # create scrollable Frame
@@ -78,12 +87,12 @@ class control_frame():
         self.scrollbar_v = customtkinter.CTkScrollbar(self.container,
                                                 command=self.canvas.yview)
 
-        self.frame_bottom  = tk.Frame(self.canvas, width=180,
+        self.frame_right  = tk.Frame(self.canvas, width=180,
                                          bg = bg_color_dark)
 
-        self.frame_bottom.bind("<Configure>", self.OnFrameConfigure)
+        self.frame_right.bind("<Configure>", self.OnFrameConfigure)
 
-        self.canvas.create_window((10, 10), window=self.frame_bottom , anchor="ne")
+        self.canvas.create_window((10, 10), window=self.frame_right , anchor="ne")
         self.canvas.configure(yscrollcommand=self.scrollbar_v.set)
         self.canvas.pack(side="left", fill="both", expand=True)
         self.scrollbar_v.pack(side="right", fill="y")
@@ -92,17 +101,18 @@ class control_frame():
         self.nextRow = 0
 
         # add different widgets to upper frame (not scrollable)
-        self.add_label(self.frame_top)
-        self.add_buttons(self.frame_top, left_Buttons, right_Buttons)
-        self.add_appearanceModeMenu(self.frame_top)
+        self.add_label(self.frame_left)
+        self.add_buttons(self.frame_left, left_Buttons, right_Buttons)
+        self.add_appearanceModeMenu(self.frame_left)
+        self.add_planformChoiceMenu(self.frame_left)
 
         self.nextRow = 0
 
         # show upper frame
-        self.frame_top.pack(side = 'top', fill=tk.BOTH)
+        self.frame_left.pack(side = 'left', fill=tk.BOTH)
 
         # show lower frame
-        self.container.pack(side = 'bottom', fill=tk.BOTH, expand=1)
+        self.container.pack(side = 'right', fill=tk.BOTH, expand=1)
 
 
     def OnFrameConfigure(self, event):
@@ -340,6 +350,12 @@ class control_frame():
             self.place_3_widgets(oppoint_entry, target_entry, weighting_entry)
         print("params")
 
+    def update_Entries(self, planformIdx):
+        # get params
+        params = self.params[planformIdx]
+        #FIXME implement
+
+
     def create_button(self, frame, button):
         text = button["txt"]
         callback = button["cmd"]
@@ -358,6 +374,13 @@ class control_frame():
                                                         command=self.change_appearance_mode)
         self.place_widgets(self.label_mode, self.optionmenu_1)
 
+    def add_planformChoiceMenu(self, frame):
+        self.label_planformChoice = customtkinter.CTkLabel(master=frame, text="Choose planform:")
+        self.optionmenu_2 = customtkinter.CTkOptionMenu(master=frame,
+                                                        values=self.planformNames,
+                                                        command=self.change_planform)
+        self.place_widgets(self.label_planformChoice, self.optionmenu_2)
+
     def add_blankRow(self):
         self.nextRow = self.nextRow + 1
 
@@ -368,14 +391,14 @@ class control_frame():
         # change the color of the scrollable frame manually,as this is not a
         # customtkinter frame
         if (new_appearanceMode == 'Dark'):
-            self.frame_bottom.configure(bg = bg_color_dark)
+            self.frame_left.configure(bg = bg_color_dark)
             self.canvas.configure(bg = bg_color_dark)
         else:
-            self.frame_bottom.configure(bg = bg_color_light)
+            self.frame_left.configure(bg = bg_color_light)
             self.canvas.configure(bg = bg_color_light)
 
-        # change appearance mode in strak machine
-        self.strak_machine.set_appearance_mode(new_appearanceMode)
+        # change appearance mode in planform-creator
+        #self.cr.set_appearance_mode(new_appearanceMode)#FIXME implement
 
         # notify the diagram frame about the change
         self.master.set_updateNeeded()
@@ -383,7 +406,22 @@ class control_frame():
          # maximize the window again using state property
         self.master.state('zoomed')
 
+    def change_planform(self, planformName):
+        # convert planformName to an index
+        planformIdx = self.planformNames.index(planformName)
 
+        # check if idx has been changed
+        if (self.master.planformIdx == planformIdx):
+            return
+
+        # set new idx
+        self.master.planformIdx = planformIdx
+
+        # update entry-frame
+        self.update_Entries(planformIdx)
+
+        # notify the diagram frame about the change
+        self.master.set_updateNeeded()
 
     def on_closing(self, event=0):
         self.destroy()
@@ -744,6 +782,7 @@ class creatorDiagrams():
 class diagram_frame():
     def __init__(self, master, side, creatorInstances, scaleFactor):
         self.master = master
+        self.creatorInstances = creatorInstances
         self.scaleFactor = scaleFactor
         self.Diagrams = []
         self.figures = []
@@ -992,8 +1031,7 @@ class diagram_frame():
 
 
     def update_diagram(self, master):
-        global creatorInstances
-        creatorInst = creatorInstances[0]
+        creatorInst = self.creatorInstances[master.planformIdx]
 
         # check if an update has to be carried out
         if (self.master.get_updateNeeded()):
