@@ -78,8 +78,8 @@ fs_legend = 7
 cl_background = 'dark_background'
 cl_quarterChordLine = 'orange'
 cl_areaCenterLine = 'blue'
-cl_hingeLine = 'r'
-cl_hingeLineFill ='r'
+cl_hingeLine = 'DeepSkyBlue'
+cl_hingeLineFill ='DeepSkyBlue'
 cl_planform = 'gray'
 cl_planformFill = 'gray'
 cl_sections = 'grey'
@@ -88,7 +88,7 @@ cl_optAirfoil = 'yellow'
 cl_infotext = 'DeepSkyBlue'
 cl_chordlengths = 'darkgray'
 cl_referenceChord = 'gray'
-cl_normalizedChord = 'y'
+cl_normalizedChord = 'orange'
 cl_controlPoints = 'red'
 
 ls_quarterChordLine = 'solid'
@@ -108,6 +108,7 @@ scaleFactor = 1.0
 
 # types of diagrams
 diagTypes = "Halfwing planform", "Wing planform", "Chord distribution"
+planformShapes = 'elliptical', 'trapezoidal'
 
 xfoilWorkerCall = "..\\..\\bin\\" + xfoilWorkerName + '.exe'
 inputFilename = "..\\..\\ressources\\" + smoothInputFile
@@ -934,9 +935,10 @@ class wing:
         global cl_optAirfoil
         global cl_infotext
         global cl_controlPoints
+        global cl_normalizedChord
         params = self.params
 
-        if params.theme == 'black_white':
+        if params.theme == 'light':
             # black and white theme
             cl_background = 'default'
             cl_quarterChordLine = 'black'
@@ -958,19 +960,32 @@ class wing:
             cl_background = 'dark_background'
             cl_quarterChordLine = 'orange'
             cl_areaCenterLine = 'blue'
-            cl_hingeLine = 'r'
+            cl_hingeLine = 'DeepSkyBlue'
+            cl_hingeLineFill ='DeepSkyBlue'
             cl_planform = 'gray'
-            cl_hingeLineFill = 'r'
             cl_planformFill = 'lightgray'
             cl_sections = 'grey'
             cl_userAirfoil = 'DeepSkyBlue'
-            cl_optAirfoil = 'yellow'
+            cl_optAirfoil = 'orange'
             cl_infotext = 'DeepSkyBlue'
             cl_chordlengths = 'darkgray'
             cl_referenceChord = 'gray'
-            cl_normalizedChord = 'blue'
+            cl_normalizedChord = 'orange'
             cl_controlPoints = 'red'
 
+    def update(self):
+        params = self.params
+        params.calculate_dependendValues()
+        params.denormalize_positions()
+
+        # get basic shape parameters
+        (shape, shapeParams) = params.get_shapeParams()
+
+        # setup chordDistribution
+        self.chordDistribution.calculate_grid(shape, shapeParams)
+
+        # calculate planform
+        self.planform.calculate(self.params, self.chordDistribution)
 
     # compose a name from the airfoil basic name and the Re-number
     def set_AirfoilNamesFromRe(self):
@@ -1486,8 +1501,8 @@ class wing:
 
             ax.annotate(text,
             xy=(xPos, yPosSectionLabel), xycoords='data',
-            xytext=(8, yPosOffsetSectionLabel), textcoords='offset points', color = 'white',
-            bbox=dict(boxstyle="round", facecolor = labelColor, alpha=0.5), fontsize=fs_infotext, rotation='vertical', arrowprops=props)
+            xytext=(8, yPosOffsetSectionLabel), textcoords='offset points', color = labelColor,fontsize=fs_infotext, rotation='vertical', arrowprops=props)
+           # bbox=dict(boxstyle="round", facecolor = "white", alpha=0.2), fontsize=fs_infotext, rotation='vertical', arrowprops=props)
 
             # append position of section to x-axis ticks
             x_tick_locations.append(xPos)
@@ -2325,7 +2340,7 @@ class planform_creator:
             exit(-1)
 
         # create a new wing
-        self.newWing = wing()
+        self.newWing:wing = wing()
 
         # set parameters for the wing
         self.newWing.set_Data(fileContent)
@@ -2365,8 +2380,9 @@ class planform_creator:
 
             scaled = True
 
-    def set_appearance_mode(self, new_appearanceMode):
-        print("set appearance mode")
+    def set_appearance_mode(self, theme):
+        self.params.theme = theme
+        self.newWing.set_colours()
 
 
     def exit_action(self, value):
@@ -2399,46 +2415,7 @@ class planform_creator:
         self.planformData = newData
 
     def update_planform(self):
-        try:
-            self.newWing.destroy()
-        except:
-            pass
-
-        # set data for the planform
-        self.newWing.set_Data(newData)
-
-        # before calculating the planform with absolute numbers,
-        # calculate normalized chord distribution
-        self.newWing.chordDistribution.calculate()
-
-        # denormalize position / calculate absolute numbers
-        self.newWing.denormalize_positions()
-
-        self.newWing.planform.calculate()
-
-        # calculate the grid, the chordlengths of the airfoils and the sections
-        self.newWing.calculate_ReNumbers()
-        self.newWing.calculate_chordlengths()
-        self.newWing.calculate_positions() # must be done after chordlenghts ar known
-        self.newWing.set_AirfoilNames()
-
-        # if there is a fuselage, insert data for the fuselage section
-        # at the beginning of the list.
-        if self.newWing.fuselageIsPresent():
-            self.newWing.insert_fuselageData()
-
-        # always insert data for the wing tip
-        self.newWing.insert_tipData()
-
-        # calculate the sections now
-        self.newWing.calculate_sections()
-
-        # assign the flap groups to the different sections
-        self.newWing.assignFlapGroups()
-
-        # set colours according to selected theme
-        self.newWing.set_colours()
-
+        self.newWing.update()
 
     def plot_diagram(self, diagramType, ax, x_limits, y_limits):
         # draw the graph

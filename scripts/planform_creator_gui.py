@@ -36,14 +36,14 @@ from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg,
                            bs, ressourcesPath)
 
 # imports from planform creator
-from planform_creator_new import (planform_creator, diagTypes, params)
+from planform_creator_new import (planform_creator, params, diagTypes, planformShapes)
 
 # some global variables
 num_diagrams = len(diagTypes)
 diagram_width = 10
 diagram_height = 7
 controlFrame = None
-creatorInstances = []
+creatorInstances:planform_creator = []
 
 # names of the planformfiles
 planformFiles = ["planformdata_wing.txt", "planformdata_tail.txt"]
@@ -61,14 +61,9 @@ class control_frame():
         self.scaleFactor = scaleFactor
         self.numPlanforms = len(creatorInstances)
         self.unsavedChangesFlags = []
+        self.label_unsavedChanges = []
         self.planformNames = []
         self.params:params = []
-
-        for i in range(self.numPlanforms):
-            self.unsavedChangesFlags.append(0)
-            params = self.creatorInstances[i].get_params()
-            self.params.append(params)
-            self.planformNames.append(params.planformName)
 
         # determine screen size
         self.width = self.master.winfo_screenwidth()
@@ -97,6 +92,18 @@ class control_frame():
         self.canvas.pack(side="left", fill="both", expand=True)
         self.scrollbar_v.pack(side="right", fill="y")
 
+        for i in range(self.numPlanforms):
+            # new unsaved changes flag and label
+            self.unsavedChangesFlags.append(False)
+            widget_1 = customtkinter.CTkLabel(master=self.frame_left, text='',
+             text_color = 'red' )
+            self.label_unsavedChanges.append(widget_1)
+
+            # get params
+            params = self.creatorInstances[i].get_params()
+            self.params.append(params)
+            self.planformNames.append(params.planformName)
+
         # init nextRow (where to place next widget)
         self.nextRow = 0
 
@@ -108,10 +115,13 @@ class control_frame():
 
         self.nextRow = 0
 
-        # show upper frame
+        # add entries to right frame (scrollable)
+        self.add_entries(self.frame_right)
+
+        # show left frame
         self.frame_left.pack(side = 'left', fill=tk.BOTH)
 
-        # show lower frame
+        # show right frame
         self.container.pack(side = 'right', fill=tk.BOTH, expand=1)
 
 
@@ -175,18 +185,16 @@ class control_frame():
 
     def set_unsavedChangesFlag(self, planformIdx):
         try:
-            i = planformIdx-1
-            self.unsavedChangesFlags[i] = True
-            self.label_unsavedChanges[i].configure(text = 'unsaved changes')
+            self.unsavedChangesFlags[planformIdx] = True
+            self.label_unsavedChanges[planformIdx].configure(text = 'unsaved changes')
         except:
-            ErrorMsg("invalid planformIdx: %d" & planformIdx)
+            ErrorMsg("invalid planformIdx: %d" % planformIdx)
 
 
     def clear_unsavedChangesFlag(self, planformIdx):
         try:
-            i = planformIdx
-            self.unsavedChangesFlags[i] = False
-            self.label_unsavedChanges[i].configure(text = '')
+            self.unsavedChangesFlags[planformIdx] = False
+            self.label_unsavedChanges[planformIdx].configure(text = '')
         except:
             ErrorMsg("invalid planformIdx: %d" % planformIdx)
 
@@ -255,106 +263,145 @@ class control_frame():
 
             self.place_widgets(left, right)
 
-    def add_entries(self, frame):
-        creatorInst = self.creatorInst[0]#FIXME
-        # get initial target values
-        self.singleParams = creatorInst.getSingleParams()
+    def __create_label(self, frame, text):
+        label = customtkinter.CTkLabel(master=frame,
+                text=text, text_font=("Roboto Medium", 13), anchor="e")
 
+    def get_paramTable(self, planformIdx):
+        params = self.params[planformIdx]
+        table = [{"txt": "Planform Name",               "options" : None,           "variable" : params.planformName,     "unit" : None},
+                 {"txt": "Planform Shape",              "options" : planformShapes, "variable" : params.planformShape,    "unit" : None },
+                 {"txt": "Airfoils Basic Name",         "options" : None,           "variable" : params.airfoilBasicName, "unit" : None},
+                 {"txt": "wingspan",                    "options" : None,           "variable" : params.wingspan,         "unit" : "m"},
+                 {"txt": "Re*Sqrt(Cl) of root airfoil", "options" : None,           "variable" : params.rootReynolds,     "unit" : None},
+                 {"txt": "Width of Fuselage",           "options" : None,           "variable" : params.fuselageWidth,    "unit" : None},
+                 {"txt": "Hinge Depth @Root",           "options" : None,           "variable" : params.hingeDepthRoot,   "unit" : "%"},
+                 {"txt": "Hinge Depth @Tip",            "options" : None,           "variable" : params.hingeDepthTip,    "unit" : "%"},
+                 {"txt": "NCrit",                       "options" : None,           "variable" : params.NCrit,            "unit" : None},
+                ]
+        return table
+
+    def add_entries(self, frame):
         # init some structures to store data locally
         self.entries = []
         self.textVars = []
 
-        # determine number of entries
-        num_entries = len(self.targetValues)
-
-        # local variable to place spec-al entries in the frame
-        spec_al_entries = []
-
-        # Add Label
-        oppoint_label = customtkinter.CTkLabel(master=frame,
-                text="CL", text_font=("Roboto Medium", 13), anchor="e")
-        target_label = customtkinter.CTkLabel(master=frame,
-                text="CD", text_font=("Roboto Medium", 13), anchor="e")
-        weighting_label = customtkinter.CTkLabel(master=frame,
-                text="weighting", text_font=("Roboto Medium", 13), anchor="e")
-        self.place_3_widgets(oppoint_label, target_label, weighting_label)
+        # get parameter table for active planform
+        paramTable = self.get_paramTable(self.master.planformIdx)
 
         # create entries and assign values
-        for i in range(num_entries):
-            # get dictionary containing oppoint / type / target value
-            targetValue = self.targetValues[i]
-
-            # get values from dictinory
-            (mode, oppoint, target, weighting) = self.get_valuesFromDict(targetValue)
-            if (mode == None):
-                # error, continue with next entry
-                continue
-
+        for param in paramTable:
             # create text-Vars to interact with entries
-            type_txt = tk.StringVar(frame, value=mode)
-            oppoint_txt = tk.StringVar(frame, value=oppoint)
-            target_txt = tk.StringVar(frame, value=target)
-            weighting_txt = tk.StringVar(frame, value=weighting)
+            value_txt = tk.StringVar(frame, value=param["variable"])
+            self.textVars.append(value_txt)
 
-            self.textVars.append((type_txt, oppoint_txt, target_txt, weighting_txt))
-
-            # create entry for oppoint
-            oppoint_entry = customtkinter.CTkEntry(frame, show=None,
-             textvariable = oppoint_txt, text_font=('Roboto Medium', 11),
+            # create entry for param value
+            value_entry = customtkinter.CTkEntry(frame, show=None,
+             textvariable = value_txt, text_font=('Roboto Medium', 11),
              width=80, height=16)
 
              # bind to "Enter"-Message
-            oppoint_entry.bind('<Return>', self.update_TargetValues)
+            value_entry.bind('<Return>', self.update_params)
 
-            # create entry for target
-            target_entry = customtkinter.CTkEntry(frame, show=None,
-             textvariable = target_txt, text_font=('Roboto Medium', 11),
-             width=80, height=16)
+            # append entry to list
+            self.entries.append(value_entry)
 
-            # bind to "Enter"-Message
-            target_entry.bind('<Return>', self.update_TargetValues)
+            # Add Label
+            param_label = customtkinter.CTkLabel(master=frame,
+                  text=param["txt"], text_font=("Roboto Medium", 13), anchor="e")
 
-            # create entry for weighting
-            weighting_entry = customtkinter.CTkEntry(frame, show=None,
-             textvariable = weighting_txt, text_font=('Roboto Medium', 11),
-             width=80, height=16)
+            unit = param["unit"]
+            if unit != None:
+                unit_label = customtkinter.CTkLabel(master=frame,
+                  text=unit, text_font=("Roboto Medium", 13), anchor="w")
+            else:
+                unit_label = None
 
-            # bind to "Enter"-Message
-            weighting_entry.bind('<Return>', self.update_TargetValues)
+            self.place_3_widgets(param_label, value_entry, unit_label)
 
+    def __get_Values(self, param, entry):
+        variable = param["variable"]
 
-            # append all entries to list
-            self.entries.append((oppoint_entry, target_entry, weighting_entry))
+        if isinstance(variable, str):
+            value_param = param["variable"]
+            value_entry = entry.get()
+        elif isinstance(variable, float):
+            value_param = str(param["variable"])
+            value_entry = str(float(entry.get()))
+        elif isinstance(variable, int):
+            value_param = str(param["variable"])
+            value_entry = entry.get()
+        else:
+            ErrorMsg("__get_Values(): unimplemented handling of parameter %s" % param["text"])
 
-            # if oppoint is 'spec-cl' place widget now
-            if (mode == 'spec-cl'):
-                self.place_3_widgets(oppoint_entry, target_entry, weighting_entry)
-            elif (mode == 'spec-al'):
-                # append to list of spec-al entries
-                spec_al_entries.append((oppoint_entry, target_entry, weighting_entry))
+        return (value_param, value_entry)
 
-
-        # Add Label
-        oppoint_label = customtkinter.CTkLabel(master=frame,
-                  text="Alpha", text_font=("Roboto Medium", 13), anchor="e")
-        target_label = customtkinter.CTkLabel(master=frame,
-                  text="CL", text_font=("Roboto Medium", 13), anchor="e")
-        weighting_label = customtkinter.CTkLabel(master=frame,
-                  text="weighting", text_font=("Roboto Medium", 13), anchor="e")
-        self.place_3_widgets(oppoint_label, target_label, weighting_label)
-
-        # now place spec-al entries
-        for entryTuple in spec_al_entries:
-            # unpack tuple
-            (oppoint_entry, target_entry, weighting_entry) = entryTuple
-            self.place_3_widgets(oppoint_entry, target_entry, weighting_entry)
-        print("params")
+    def __set_paramValue(self, param, value:str):
+        variable = param["variable"]
+        if isinstance(variable, str):
+            param["variable"] = value
+        elif isinstance(variable, float):
+            param["variable"] = float(value)
+        elif isinstance(variable, float):
+            param["variable"] = int(value)
 
     def update_Entries(self, planformIdx):
         # get params
         params = self.params[planformIdx]
         #FIXME implement
 
+    def update_params(self, command):
+        # get instance of planform-creator
+        creatorInst:planform_creator = self.creatorInstances[self.master.planformIdx]
+        change_detected = False
+
+        # get parameter table for active planform
+        paramTable = self.get_paramTable(self.master.planformIdx)
+
+        for idx in range(len(paramTable)):
+            param = paramTable[idx]
+            entry = self.entries[idx]
+            (value_param, value_entry) = self.__get_Values(param, entry)
+
+            # compare if something has changed
+            if (value_entry != value_param):
+                self.__set_paramValue(param, value_entry)
+                # set notification variable
+                change_detected = True
+
+            idx = idx + 1
+
+        if (change_detected):
+            # notify the unsaved changes
+            self.set_unsavedChangesFlag(self.master.planformIdx)
+
+            # perform update of the planform
+            creatorInst.update_planform()
+
+            # notify the diagram frame about the change
+            self.master.set_updateNeeded()
+
+    def change_controlPoint(self, x, y, idx):
+        if idx == None:
+            return
+
+        # get instance of planform-creator
+        creatorInst:planform_creator = self.creatorInstances[self.master.planformIdx]
+
+        # get control points
+        controlPoints = creatorInst.newWing.chordDistribution.controlPoints
+
+        # set control-point
+        controlPoints[idx] = (x,y)
+
+        # notify about the unsaved changes
+        self.set_unsavedChangesFlag(self.master.planformIdx)
+
+        # perform update of the planform
+        creatorInst.update_planform()
+
+        # notify the diagram frame about the change
+        self.master.set_updateNeeded()
 
     def create_button(self, frame, button):
         text = button["txt"]
@@ -445,57 +492,40 @@ class diagram(customtkinter.CTkFrame):
         canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
         canvas.mpl_connect('scroll_event', self.on_scrollwheel_turn)
 
-    def get_ind_under_point(self, event):
+    def __get_ind_under_point(self, event):
         """
         Return the index of the point closest to the event position or *None*
         if no point is within catching range to the event position.
         """
-        global targetValues
         global controlFrame
 
         # set ranges to catch points, consider zoomfactor
         zoom_factor = self.controller.get_zoom_factor()
-        catching_range_oppoint = 0.01 * zoom_factor
-        catching_range_targetValue = 0.001 * zoom_factor
+        catching_range_x = 0.01 * zoom_factor
+        catching_range_y = 0.01 * zoom_factor
 
         mouse_target = event.xdata
         mouse_oppoint = event.ydata
 
         # check type of active diagram
-        if (self.controller.activeDiagram == "CL_CD_diagram"):
-            edit_mode = 'spec-cl'
-            mouse_target = event.xdata  # target  -> CD
-            mouse_oppoint = event.ydata # oppoint -> CL
-        elif (self.controller.activeDiagram == "CLCD_CL_diagram"):
-            edit_mode = 'spec-cl'
-            mouse_oppoint = event.xdata # oppoint -> CL
-            # convert y-coordinates, CL/CD -> CD
-            mouse_target = event.xdata / event.ydata # target  -> CL/CD
-        elif (self.controller.activeDiagram == "CL_alpha_diagram"):
-            edit_mode = 'spec-al'
-            mouse_target = event.ydata  # target  -> CL
-            mouse_oppoint = event.xdata # oppoint -> alpha
-            catching_range_oppoint = 0.1 * zoom_factor
-            catching_range_targetValue = 0.01 * zoom_factor
-
-
-        # check visibility of editable polar
-        if (controlFrame.check_activePolarVisibility() == False):
+        if (self.controller.activeDiagram == diagTypes[2]):
+            mouse_x = event.xdata
+            mouse_y = event.ydata
+        else:
+            print("not implemented yet")
             return None
 
         # search entry with closest coordinates
         idx = 0
-        for targetValue in controlFrame.targetValues:
-            # get values from dictinory
-            (mode, oppoint, target, weighting) = controlFrame.get_valuesFromDict(targetValue)
 
-            if (mode != edit_mode):
-                # not graphically editable in this diagram
-                idx = idx + 1
-                continue
+        controlPoints = self.controller.get_controlPoints()
+        for point in controlPoints:
+            # unpack tuple
+            (x, y) = point
 
-            if ((abs(mouse_target - target) < catching_range_targetValue) and
-                (abs(mouse_oppoint - oppoint) < catching_range_oppoint)):
+            # check catching range
+            if ((abs(mouse_x - x) < catching_range_x) and
+                (abs(mouse_y - y) < catching_range_y)):
                 return idx
 
             idx = idx + 1
@@ -515,7 +545,7 @@ class diagram(customtkinter.CTkFrame):
             return
         if event.button == 1: # left mouse button
             # determine index of target point to change
-            self._ind = self.get_ind_under_point(event)
+            self._ind = self.__get_ind_under_point(event)
         elif event.button == 2: # middle mouse button / scrollwheel
             # restore default zoom
             self.controller.default_zoom()
@@ -545,16 +575,10 @@ class diagram(customtkinter.CTkFrame):
             if self._ind is None:
                 return
             # check type of active diagram
-            if (self.controller.activeDiagram == "CLCD_CL_diagram"):
-                # convert coordinates
-                x, y = event.ydata, event.xdata
-                x = y/x
-            elif (self.controller.activeDiagram == "CL_alpha_diagram"):
-                x, y = event.ydata, event.xdata
-            else:
+            if (self.controller.activeDiagram == diagTypes[2]):
                 x, y = event.xdata, event.ydata
-                    # set new target value
-            controlFrame.change_targetValue(x,y,self._ind)
+                # set new control point
+                controlFrame.change_controlPoint(x,y,self._ind)
         elif event.button == 3: # right mouse button
             # move visible area of the window
             self.controller.move_visibleArea(event)
@@ -780,7 +804,7 @@ class creatorDiagrams():
 
 # class diagram frame, shows the graphical output of the planform creator
 class diagram_frame():
-    def __init__(self, master, side, creatorInstances, scaleFactor):
+    def __init__(self, master, side, creatorInstances:planform_creator, scaleFactor):
         self.master = master
         self.creatorInstances = creatorInstances
         self.scaleFactor = scaleFactor
@@ -838,13 +862,12 @@ class diagram_frame():
         # set initial value of active buffer idx
         self.activeBufferIdx = 0
 
-        # set initial value of active diagram
+            # set initial value of active diagram
         self.activeDiagram = diagTypes[0]
 
         # show initial diagram
         self.master.set_updateNeeded()
         self.update_diagram(master)
-
 
     def create_figures(self, creatorInst, scaleFactor):
         global num_diagrams
@@ -1029,6 +1052,14 @@ class diagram_frame():
 
         return (tuple(x_limits), tuple(y_limits))
 
+    def get_controlPoints(self):
+        # get instance of planform-creator
+        creatorInst:planform_creator = self.creatorInstances[self.master.planformIdx]
+
+        # get control points
+        controlPoints = creatorInst.newWing.chordDistribution.controlPoints
+        return controlPoints
+
 
     def update_diagram(self, master):
         creatorInst = self.creatorInstances[master.planformIdx]
@@ -1131,10 +1162,10 @@ class App(customtkinter.CTk):
         return buttons
 
     def get_rightButtons(self):
-        buttons = []
-        buttons.append({"txt": "Load", "cmd" : self.load, "param" : None})
-        buttons.append({"txt": "Save", "cmd" : self.save, "param" : None})
-        buttons.append({"txt": "Reset", "cmd" : self.reset, "param" : None})
+        buttons = [{"txt": "Load",  "cmd" : self.load,  "param" : None},
+                   {"txt": "Save",  "cmd" : self.save,  "param" : None},
+                   {"txt": "Reset", "cmd" : self.reset, "param" : None}
+                  ]
         return buttons
 
     def set_updateNeeded(self):
