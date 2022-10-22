@@ -269,15 +269,16 @@ class control_frame():
 
     def get_paramTable(self, planformIdx):
         params = self.params[planformIdx]
-        table = [{"txt": "Planform Name",               "options" : None,           "variable" : params.planformName,     "unit" : None},
-                 {"txt": "Planform Shape",              "options" : planformShapes, "variable" : params.planformShape,    "unit" : None },
-                 {"txt": "Airfoils Basic Name",         "options" : None,           "variable" : params.airfoilBasicName, "unit" : None},
-                 {"txt": "wingspan",                    "options" : None,           "variable" : params.wingspan,         "unit" : "m"},
-                 {"txt": "Re*Sqrt(Cl) of root airfoil", "options" : None,           "variable" : params.rootReynolds,     "unit" : None},
-                 {"txt": "Width of Fuselage",           "options" : None,           "variable" : params.fuselageWidth,    "unit" : None},
-                 {"txt": "Hinge Depth @Root",           "options" : None,           "variable" : params.hingeDepthRoot,   "unit" : "%"},
-                 {"txt": "Hinge Depth @Tip",            "options" : None,           "variable" : params.hingeDepthTip,    "unit" : "%"},
-                 {"txt": "NCrit",                       "options" : None,           "variable" : params.NCrit,            "unit" : None},
+        table = [{"txt": "Planform name",               "options" : None,           "variable" : params.planformName,     "unit" : None, "scaleFactor" : None},
+                 {"txt": "Planform shape",              "options" : planformShapes, "variable" : params.planformShape,    "unit" : None, "scaleFactor" : None },
+                 {"txt": "Airfoils basic name",         "options" : None,           "variable" : params.airfoilBasicName, "unit" : None, "scaleFactor" : None},
+                 {"txt": "wingspan",                    "options" : None,           "variable" : params.wingspan,         "unit" : "mm", "scaleFactor" : 1000.0},
+                 {"txt": "Root chord",                  "options" : None,           "variable" : params.rootchord,        "unit" : "mm", "scaleFactor" : 1000.0},
+                 {"txt": "Re*Sqrt(Cl) of root airfoil", "options" : None,           "variable" : params.rootReynolds,     "unit" : None, "scaleFactor" : None},
+                 {"txt": "Width of fuselage",           "options" : None,           "variable" : params.fuselageWidth,    "unit" : "mm", "scaleFactor" : 1000.0},
+                 {"txt": "Hinge depth @root",           "options" : None,           "variable" : params.hingeDepthRoot,   "unit" : "%",  "scaleFactor" : None},
+                 {"txt": "Hinge depth @tip",            "options" : None,           "variable" : params.hingeDepthTip,    "unit" : "%",  "scaleFactor" : None},
+                 {"txt": "NCrit",                       "options" : None,           "variable" : params.NCrit,            "unit" : None, "scaleFactor" : None},
                 ]
         return table
 
@@ -292,7 +293,7 @@ class control_frame():
         # create entries and assign values
         for param in paramTable:
             # create text-Vars to interact with entries
-            value_txt = tk.StringVar(frame, value=param["variable"])
+            value_txt = tk.StringVar(frame, value=self.__get_paramValue(param))
             self.textVars.append(value_txt)
 
             # create entry for param value
@@ -321,29 +322,65 @@ class control_frame():
 
     def __get_Values(self, param, entry):
         variable = param["variable"]
+        scaleFactor = param["scaleFactor"]
 
         if isinstance(variable, str):
             value_param = param["variable"]
             value_entry = entry.get()
         elif isinstance(variable, float):
-            value_param = str(param["variable"])
+            float_value = param["variable"]
+            if (scaleFactor != None):
+                float_value = float_value * scaleFactor
+            value_param = str(float_value)
             value_entry = str(float(entry.get()))
         elif isinstance(variable, int):
-            value_param = str(param["variable"])
+            int_value = param["variable"]
+            if (scaleFactor != None):
+                int_value = int(int_value * scaleFactor)
+            value_param = str(int_value)
             value_entry = entry.get()
         else:
             ErrorMsg("__get_Values(): unimplemented handling of parameter %s" % param["text"])
 
         return (value_param, value_entry)
 
+    def __get_paramValue(self, param):
+        variable = param["variable"]
+        scaleFactor = param["scaleFactor"]
+
+        if isinstance(variable, str):
+            value_param = param["variable"]
+        elif isinstance(variable, float):
+            float_value = param["variable"]
+            if (scaleFactor != None):
+                float_value = float_value * scaleFactor
+            value_param = str(float_value)
+        elif isinstance(variable, int):
+            int_value = param["variable"]
+            if (scaleFactor != None):
+                int_value = int(int_value * scaleFactor)
+            value_param = str(int_value)
+        else:
+            ErrorMsg("__get_paramValue(): unimplemented handling of parameter %s" % param["text"])
+
+        return value_param
+
     def __set_paramValue(self, param, value:str):
         variable = param["variable"]
+        scaleFactor = param["scaleFactor"]
+
         if isinstance(variable, str):
             param["variable"] = value
         elif isinstance(variable, float):
-            param["variable"] = float(value)
+            float_value = float(value)
+            if (scaleFactor != None):
+                float_value = float_value * scaleFactor
+            param["variable"] = float_value
         elif isinstance(variable, float):
-            param["variable"] = int(value)
+            int_value = int(value)
+            if (scaleFactor != None):
+                int_value = int_value * scaleFactor
+            param["variable"] = int_value
 
     def update_Entries(self, planformIdx):
         # get params
