@@ -108,15 +108,16 @@ class control_frame():
         self.nextRow = 0
 
         # add different widgets to upper frame (not scrollable)
-        self.add_label(self.frame_left)
+        self.__add_labels(self.frame_left)
         self.__add_buttons(self.frame_left, Buttons)
-        self.add_appearanceModeMenu(self.frame_left)
-        self.add_planformChoiceMenu(self.frame_left)
+        self.__add_appearanceModeMenu(self.frame_left)
 
+        # right frame (scrollable)
         self.nextRow = 0
+        self.__add_planformChoiceMenu(self.frame_right)
 
-        # add entries to right frame (scrollable)
-        self.add_entries(self.frame_right)
+        # add entries
+        self.__add_entries(self.frame_right)
 
         # show left frame
         self.frame_left.pack(side = 'left', fill=tk.BOTH)
@@ -128,59 +129,6 @@ class control_frame():
     def OnFrameConfigure(self, event):
         '''Reset the scroll region to encompass the inner frame'''
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-
-
-    def get_valuesFromDict(self, targetValue):
-        # type of oppoint
-        mode = targetValue["type"]
-
-        if (mode == 'spec-cl'):
-            # oppoint is lift (CL)
-            oppoint = round(targetValue["oppoint"], CL_decimals)
-            # target is drag (CD)
-            target = round(targetValue["target"], CD_decimals)
-        elif (mode == 'spec-al'):
-            # oppoint is angle of attack (alpha)
-            oppoint = round(targetValue["oppoint"], AL_decimals)
-            # target is lift (CL)
-            target = round(targetValue["target"], CL_decimals)
-        else:
-            ErrorMsg("undefined oppoint type %s" % mode)
-            return (None, None, None)
-
-        weighting = targetValue["weighting"]
-        if weighting != None:
-            weighting = round(weighting, 1)
-
-        return (mode, oppoint, target, weighting)
-
-
-    def write_valuesToDict(self, idx, mode, oppoint, target, weighting):
-        targetValue = self.targetValues[idx]
-
-        if (mode == 'spec-cl'):
-            # oppoint is lift (CL)
-            oppoint = round(oppoint, CL_decimals)
-
-            # target is drag (CD)
-            target = round(target, CD_decimals)
-        elif (mode == 'spec-al'):
-            # oppoint is angle of attack (alpha)
-            oppoint = round(oppoint, AL_decimals)
-            # target is lift (CL)
-            target = round(target, CL_decimals)
-        else:
-            ErrorMsg("undefined oppoint type %s" % mode)
-
-        targetValue["oppoint"] = oppoint
-        targetValue["target"] = target
-
-        if (weighting != None):
-            weighting = round(weighting, 1)
-        targetValue["weighting"] = weighting
-
-        #targetValue["type"] = mode # FIXME We do not support changing mode at the moment
-        self.targetValues[idx] = targetValue
 
 
     def set_unsavedChangesFlag(self, planformIdx):
@@ -202,34 +150,13 @@ class control_frame():
     def get_unsavedChangesFlags(self):
         return (self.unsavedChangesFlags)
 
-
-    def place_widgets(self, widget1, widget2):
-        if widget1 != None:
-            widget1.grid(row=self.nextRow, column=0, pady=5, padx=5, sticky="e")
-
-        if widget2 != None:
-            widget2.grid(row=self.nextRow, column=1, pady=5, padx=5, sticky="w")
-
-        self.nextRow = self.nextRow + 1
-
-
-    def place_3_widgets(self, widget1, widget2, widget3):
-        if widget1 != None:
-            widget1.grid(row=self.nextRow, column=0, pady=0, padx=1, sticky="e")
-
-        if widget2 != None:
-            widget2.grid(row=self.nextRow, column=1, pady=0, padx=1, sticky="e")
-
-        if widget3 != None:
-            widget3.grid(row=self.nextRow, column=2, pady=0, padx=1, sticky="e")
-        self.nextRow = self.nextRow + 1
-
-    def add_label(self, frame):
+    def __add_labels(self, frame):
         # Label
-        label = customtkinter.CTkLabel(master=frame,
-                                              text="Select diagram",
-                                              text_font=("Roboto Medium", -16))
-        self.place_widgets(label, None)
+        label1 = self.__create_label(frame, "Select diagram", -16)
+        label2 = self.__create_label(frame, "Planform operations", -16)
+        label3 = self.__create_label(frame, "Data operations", -16)
+
+        self.__place_widgets([label1, label2, label3])
 
     def __get_buttonWidgetsRow(self, buttonWidgetsArray, rowIdx):
         row = []
@@ -263,7 +190,7 @@ class control_frame():
             buttonWidgetsColumn = []
 
             for button in buttonColumn:
-                buttonWidgetsColumn.append(self.create_button(frame, button))
+                buttonWidgetsColumn.append(self.__create_button(frame, button))
 
             buttonWidgetsArray.append(buttonWidgetsColumn)
             num_rows = len(buttonWidgetsColumn)
@@ -274,32 +201,34 @@ class control_frame():
             buttonWidgetsRow = self.__get_buttonWidgetsRow(buttonWidgetsArray, rowIdx)
             self.__place_widgets(buttonWidgetsRow)
 
-    def __create_label(self, frame, text):
+    def __create_label(self, frame, text, size):
         label = customtkinter.CTkLabel(master=frame,
-                text=text, text_font=("Roboto Medium", 13), anchor="e")
+                text=text, text_font=("Roboto Medium", size), anchor="e")
+        return label
 
-    def get_paramTable(self, planformIdx):
-        params = self.params[planformIdx]
-        table = [{"txt": "Planform name",               "options" : None,           "variable" : params.planformName,     "unit" : None, "scaleFactor" : None},
-                 {"txt": "Planform shape",              "options" : planformShapes, "variable" : params.planformShape,    "unit" : None, "scaleFactor" : None },
+    def __get_paramTable(self, planformIdx):
+        params:params = self.params[planformIdx]
+        table = [#{"txt": "Planform name",               "options" : None,           "variable" : params.planformName,     "unit" : None, "scaleFactor" : None},
+                 #{"txt": "Planform shape",              "options" : planformShapes, "variable" : params.planformShape,    "unit" : None, "scaleFactor" : None },
                  {"txt": "Airfoils basic name",         "options" : None,           "variable" : params.airfoilBasicName, "unit" : None, "scaleFactor" : None},
                  {"txt": "wingspan",                    "options" : None,           "variable" : params.wingspan,         "unit" : "mm", "scaleFactor" : 1000.0},
                  {"txt": "Root chord",                  "options" : None,           "variable" : params.rootchord,        "unit" : "mm", "scaleFactor" : 1000.0},
                  {"txt": "Re*Sqrt(Cl) of root airfoil", "options" : None,           "variable" : params.rootReynolds,     "unit" : None, "scaleFactor" : None},
                  {"txt": "Width of fuselage",           "options" : None,           "variable" : params.fuselageWidth,    "unit" : "mm", "scaleFactor" : 1000.0},
+                 {"txt": "Hingeline angle @root",       "options" : None,           "variable" : params.hingeLineAngle,   "unit" : "°",  "scaleFactor" : None},
                  {"txt": "Hinge depth @root",           "options" : None,           "variable" : params.hingeDepthRoot,   "unit" : "%",  "scaleFactor" : None},
                  {"txt": "Hinge depth @tip",            "options" : None,           "variable" : params.hingeDepthTip,    "unit" : "%",  "scaleFactor" : None},
                  {"txt": "NCrit",                       "options" : None,           "variable" : params.NCrit,            "unit" : None, "scaleFactor" : None},
                 ]
         return table
 
-    def add_entries(self, frame):
+    def __add_entries(self, frame):
         # init some structures to store data locally
         self.entries = []
         self.textVars = []
 
         # get parameter table for active planform
-        paramTable = self.get_paramTable(self.master.planformIdx)
+        paramTable = self.__get_paramTable(self.master.planformIdx)
 
         # create entries and assign values
         for param in paramTable:
@@ -329,7 +258,7 @@ class control_frame():
             else:
                 unit_label = None
 
-            self.place_3_widgets(param_label, value_entry, unit_label)
+            self.__place_widgets([param_label, value_entry, unit_label])
 
     def __get_Values(self, param, entry):
         variable = param["variable"]
@@ -395,7 +324,7 @@ class control_frame():
 
     def update_Entries(self, planformIdx):
         # get parameter table for active planform
-        paramTable = self.get_paramTable(self.master.planformIdx)
+        paramTable = self.__get_paramTable(self.master.planformIdx)
         textVars = self.textVars
 
         num = len(paramTable)
@@ -460,7 +389,7 @@ class control_frame():
         # notify the diagram frame about the change
         self.master.set_updateNeeded()
 
-    def create_button(self, frame, button):
+    def __create_button(self, frame, button):
         text = button["txt"]
         callback = button["cmd"]
         param = button["param"]
@@ -471,38 +400,40 @@ class control_frame():
                                             command= lambda ztemp=param : callback(ztemp))
         return button
 
-    def add_appearanceModeMenu(self, frame):
+    def __add_appearanceModeMenu(self, frame):
         self.label_mode = customtkinter.CTkLabel(master=frame, text="Appearance Mode:")
         self.optionmenu_1 = customtkinter.CTkOptionMenu(master=frame,
                                                         values=["Dark", "Light"],
-                                                        command=self.change_appearance_mode)
-        self.place_widgets(self.label_mode, self.optionmenu_1)
+                                                        command=self.__change_appearance_mode)
+        self.__place_widgets([self.label_mode, self.optionmenu_1])
 
-    def add_planformChoiceMenu(self, frame):
-        self.label_planformChoice = customtkinter.CTkLabel(master=frame, text="Choose planform:")
+    def __add_planformChoiceMenu(self, frame):
+        self.label_planformChoice = self.__create_label(frame, "Choose planform:", -16)
         self.optionmenu_2 = customtkinter.CTkOptionMenu(master=frame,
                                                         values=self.planformNames,
-                                                        command=self.change_planform)
-        self.place_widgets(self.label_planformChoice, self.optionmenu_2)
+                                                        command=self.__change_planform)
+        self.__place_widgets([self.label_planformChoice, self.optionmenu_2])
 
     def add_blankRow(self):
         self.nextRow = self.nextRow + 1
 
 
-    def change_appearance_mode(self, new_appearanceMode):
+    def __change_appearance_mode(self, new_appearanceMode):
         customtkinter.set_appearance_mode(new_appearanceMode)
 
         # change the color of the scrollable frame manually,as this is not a
         # customtkinter frame
         if (new_appearanceMode == 'Dark'):
-            self.frame_left.configure(bg = bg_color_dark)
+            self.frame_right.configure(bg = bg_color_dark)
             self.canvas.configure(bg = bg_color_dark)
         else:
-            self.frame_left.configure(bg = bg_color_light)
+            self.frame_right.configure(bg = bg_color_light)
             self.canvas.configure(bg = bg_color_light)
 
         # change appearance mode in planform-creator
-        #self.cr.set_appearance_mode(new_appearanceMode)#FIXME implement
+        for idx in range (len(self.creatorInstances)):
+            creatorInst = self.creatorInstances[idx]
+            creatorInst.set_appearance_mode(new_appearanceMode)
 
         # notify the diagram frame about the change
         self.master.set_updateNeeded()
@@ -510,7 +441,7 @@ class control_frame():
          # maximize the window again using state property
         self.master.state('zoomed')
 
-    def change_planform(self, planformName):
+    def __change_planform(self, planformName):
         # convert planformName to an index
         planformIdx = self.planformNames.index(planformName)
 
@@ -1223,12 +1154,20 @@ class App(customtkinter.CTk):
         buttons.append(buttonsColumn)
 
         # 2nd column
+        buttonsColumn = [{"txt": "Add planform",    "cmd" : self.add_planform,  "param" : None},
+                         {"txt": "Remove planform", "cmd" : self.remove_planform,  "param" : None}
+                        ]
+
+        buttons.append(buttonsColumn)
+
+        # 3nd column
         buttonsColumn = [{"txt": "Load",  "cmd" : self.load,  "param" : None},
                          {"txt": "Save",  "cmd" : self.save,  "param" : None},
                          {"txt": "Reset", "cmd" : self.reset, "param" : None}
                         ]
 
         buttons.append(buttonsColumn)
+
         return buttons
 
     def set_updateNeeded(self):
@@ -1252,6 +1191,11 @@ class App(customtkinter.CTk):
 
             self.updateNeeded = True
 
+    def add_planform(self, dummy):
+        return #FIXME implement
+
+    def remove_planform(self, dummy):
+        return #FIXME implement
 
     def save(self, dummy):
         creatorInst = creatorInstances[self.planformIdx]

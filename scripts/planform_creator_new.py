@@ -75,8 +75,8 @@ fs_infotext = 7
 fs_legend = 7
 
 # colours, lineStyles
-cl_background = 'dark_background'
-cl_quarterChordLine = 'orange'
+cl_background = None
+cl_quarterChordLine = None
 cl_areaCenterLine = 'blue'
 cl_hingeLine = 'DeepSkyBlue'
 cl_hingeLineFill ='DeepSkyBlue'
@@ -215,11 +215,11 @@ class params:
     # class init
     def __init__(self):
         # single parameters, strings
-        self.planformName = ''
-        self.planformShape = ''
+        self.planformName = 'main wing'
+        self.planformShape = 'elliptical'
         self.leadingEdgeOrientation = 'up'
-        self.airfoilBasicName = ''
-        self.theme = ''
+        self.airfoilBasicName = 'airfoil'
+        self.theme = 'Dark'
 
         # single parameters,boolean
         self.isFin = False
@@ -938,9 +938,9 @@ class wing:
         global cl_normalizedChord
         params = self.params
 
-        if params.theme == 'light':
+        if params.theme == 'Light':
             # black and white theme
-            cl_background = 'default'
+            cl_background = 'lightgray'
             cl_quarterChordLine = 'black'
             cl_areaCenterLine = 'black'
             cl_hingeLine = 'dimgray'
@@ -955,9 +955,9 @@ class wing:
             cl_referenceChord = 'gray'
             cl_normalizedChord = 'black'
             cl_controlPoints = 'red'
-        else:
+        elif params.theme == 'Dark':
             # dark theme
-            cl_background = 'dark_background'
+            cl_background = 'black'
             cl_quarterChordLine = 'orange'
             cl_areaCenterLine = 'blue'
             cl_hingeLine = 'DeepSkyBlue'
@@ -972,6 +972,8 @@ class wing:
             cl_referenceChord = 'gray'
             cl_normalizedChord = 'orange'
             cl_controlPoints = 'red'
+        else:
+            ErrorMsg("undefined Theme: %s" %params.theme)
 
     def update(self):
         params = self.params
@@ -1073,6 +1075,9 @@ class wing:
 
         # calculate planform
         self.planform.calculate(self.params, self.chordDistribution)
+
+        # set colours according to theme
+        self.set_colours()
 
     # get name of the user defined airfoil, as it will appear in the planform
     def get_UserAirfoilName(self, userAirfoil_idx):
@@ -2381,7 +2386,7 @@ class planform_creator:
             scaled = True
 
     def set_appearance_mode(self, theme):
-        self.params.theme = theme
+        self.newWing.params.theme = theme
         self.newWing.set_colours()
 
 
@@ -2418,6 +2423,10 @@ class planform_creator:
         self.newWing.update()
 
     def plot_diagram(self, diagramType, ax, x_limits, y_limits):
+        global cl_background
+        # set background first (dark or light)
+        ax.set_facecolor(cl_background)
+
         # draw the graph
         self.newWing.draw_diagram(diagramType, ax, x_limits, y_limits)
 
