@@ -54,7 +54,7 @@ bg_color_dark =  "#222222"
 # class control frame, change the input-variables / parameters of the
 # planform creator
 class control_frame():
-    def __init__(self, master, side, left_Buttons, right_Buttons, creatorInstances, scaleFactor):
+    def __init__(self, master, side, Buttons, creatorInstances, scaleFactor):
         # store some variables in own class data structure
         self.master = master
         self.creatorInstances = creatorInstances
@@ -109,7 +109,7 @@ class control_frame():
 
         # add different widgets to upper frame (not scrollable)
         self.add_label(self.frame_left)
-        self.add_buttons(self.frame_left, left_Buttons, right_Buttons)
+        self.__add_buttons(self.frame_left, Buttons)
         self.add_appearanceModeMenu(self.frame_left)
         self.add_planformChoiceMenu(self.frame_left)
 
@@ -224,7 +224,6 @@ class control_frame():
             widget3.grid(row=self.nextRow, column=2, pady=0, padx=1, sticky="e")
         self.nextRow = self.nextRow + 1
 
-
     def add_label(self, frame):
         # Label
         label = customtkinter.CTkLabel(master=frame,
@@ -232,36 +231,48 @@ class control_frame():
                                               text_font=("Roboto Medium", -16))
         self.place_widgets(label, None)
 
+    def __get_buttonWidgetsRow(self, buttonWidgetsArray, rowIdx):
+        row = []
+        num_columns = len(buttonWidgetsArray)
 
-    def add_buttons(self, frame, left_Buttons, right_Buttons):
-        buttonsLeft = []
-        buttonsRight = []
+        for columnIdx in range(num_columns):
+            try:
+                row.append(buttonWidgetsArray[columnIdx][rowIdx])
+            except:
+                row.append(None)
 
-        # create all buttons and add to list
-        for button in left_Buttons:
-            buttonsLeft.append(self.create_button(frame, button))
+        return row
 
-        for button in right_Buttons:
-            buttonsRight.append(self.create_button(frame, button))
+    def __place_widgets(self, widgetsRow):
+        columnIdx = 0
+
+        for widget in widgetsRow:
+            if widget != None:
+                widget.grid(row=self.nextRow, column=columnIdx, pady=5, padx=5, sticky="e")
+            columnIdx += 1
+        self.nextRow += 1
 
 
-        numButtonsLeft = len(buttonsLeft)
-        numButtonsRight = len(buttonsRight)
-        numTotal = max(numButtonsLeft, numButtonsRight)
+    def __add_buttons(self, frame, buttonArray):
+        buttonWidgetsArray = []
+        max_rows = 0
 
-        # place buttons
-        for idx in range(numTotal):
-            if idx < numButtonsLeft:
-                left = buttonsLeft[idx]
-            else:
-                left = None
+        # build up array of button widgets, also store number of entries for
+        # each coluumn
+        for buttonColumn in buttonArray:
+            buttonWidgetsColumn = []
 
-            if idx < numButtonsRight:
-                right = buttonsRight[idx]
-            else:
-                right = None
+            for button in buttonColumn:
+                buttonWidgetsColumn.append(self.create_button(frame, button))
 
-            self.place_widgets(left, right)
+            buttonWidgetsArray.append(buttonWidgetsColumn)
+            num_rows = len(buttonWidgetsColumn)
+            max_rows = max(num_rows, max_rows)
+
+        # place buttons, row after row
+        for rowIdx in range(max_rows):
+            buttonWidgetsRow = self.__get_buttonWidgetsRow(buttonWidgetsArray, rowIdx)
+            self.__place_widgets(buttonWidgetsRow)
 
     def __create_label(self, frame, text):
         label = customtkinter.CTkLabel(master=frame,
@@ -383,9 +394,18 @@ class control_frame():
             param["variable"] = int_value
 
     def update_Entries(self, planformIdx):
-        # get params
-        params = self.params[planformIdx]
-        #FIXME implement
+        # get parameter table for active planform
+        paramTable = self.get_paramTable(self.master.planformIdx)
+        textVars = self.textVars
+
+        num = len(paramTable)
+        if (num != len(textVars)):
+            ErrorMsg("num_params %d != num_txtVars %d" % (num_params, num_txtVars))
+
+        # copy all param values to textvars
+        for idx in range(num):
+            textVars[idx].set(self.__get_paramValue(paramTable[idx]))
+
 
     def update_params(self, command):
         # get instance of planform-creator
@@ -1186,23 +1206,29 @@ class App(customtkinter.CTk):
 
         # create control frame, which is on the left
         self.frame_bottom = control_frame(self, tk.BOTTOM,
-         self.get_leftButtons(), self.get_rightButtons(), creatorInstances,
+         self.get_Buttons(), creatorInstances,
           scaleFactor)
 
         # set global variable
         controlFrame = self.frame_bottom
 
-    def get_leftButtons(self):
+    def get_Buttons(self):
         buttons = []
-        for diagType in diagTypes:
-            buttons.append({"txt": diagType, "cmd" : self.set_diagram, "param" : diagType})
-        return buttons
+        buttonsColumn = []
 
-    def get_rightButtons(self):
-        buttons = [{"txt": "Load",  "cmd" : self.load,  "param" : None},
-                   {"txt": "Save",  "cmd" : self.save,  "param" : None},
-                   {"txt": "Reset", "cmd" : self.reset, "param" : None}
-                  ]
+        # 1st column
+        for diagType in diagTypes:
+            buttonsColumn.append({"txt": diagType, "cmd" : self.set_diagram, "param" : diagType})
+
+        buttons.append(buttonsColumn)
+
+        # 2nd column
+        buttonsColumn = [{"txt": "Load",  "cmd" : self.load,  "param" : None},
+                         {"txt": "Save",  "cmd" : self.save,  "param" : None},
+                         {"txt": "Reset", "cmd" : self.reset, "param" : None}
+                        ]
+
+        buttons.append(buttonsColumn)
         return buttons
 
     def set_updateNeeded(self):
