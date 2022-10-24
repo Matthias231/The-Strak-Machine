@@ -205,7 +205,6 @@ class wingGrid:
         self.LE_derivative = 0.0
         self.areaCenterLine = 0.0
 
-
 ################################################################################
 #
 # params class
@@ -276,7 +275,7 @@ class params:
         value = default
         try:
             string = dict[key]
-            if (string == 'true') or (string == 'True'):
+            if (string == 'true') or (string == 'True') or (string == True):
                 value = True
             else:
                 value = False
@@ -293,11 +292,16 @@ class params:
             value = dict[key]
         except:
             ErrorMsg('parameter \'%s\' not specified, this key is mandatory!'% key)
-            sys.exit(-1)
+            value = None
         return value
 
 
     def read_fromDict(self, dictData):
+        '''Function that reads parameters from a given dictionary'''
+        # initialize params first
+        self.__init__()
+
+        # now check dictionary and read values into params
         self.planformName = self.__get_MandatoryParameterFromDict(dictData, "planformName")
         self.rootchord =  self.__get_MandatoryParameterFromDict(dictData, "rootchord")
         self.wingspan =  self.__get_MandatoryParameterFromDict(dictData, "wingspan")
@@ -365,10 +369,20 @@ class params:
             ErrorMsg("type of first airfoils must \"user\"")
             exit(-1)
 
-        # check if there is a valid reynolds number specified for the first airfoil
-        if (self.airfoilReynolds[0] == None):
-            ErrorMsg("reynolds of first airfoils must not be \"None\"")
-            exit(-1)
+        # check if reynolds number of root airfoil was specified separately
+        try:
+            self.rootReynolds = dictData["rootReynolds"]
+            # overwrite reynolds number of first airfoil
+            self.airfoilReynolds[0] = self.rootReynolds
+        except:
+            # not specified.
+            # check if there is a valid reynolds number specified for the first airfoil
+            if (self.airfoilReynolds[0] == None):
+                ErrorMsg("reynolds of first airfoils must not be \"None\"")
+                exit(-1)
+            else:
+                # copy reynolds number of first airfoil to rootReynolds
+                self.rootReynolds = self.airfoilReynolds[0]
 
         # get names and paths of user-defined airfoils
         self.userAirfoils = dictData["userAirfoils"]
@@ -454,6 +468,50 @@ class params:
                                    "showHingeLine", self.showHingeLine)
 
 
+    def write_toDict(self, dictData):
+        '''Function that writes actual parameter values to a given dictionary'''
+        # Clear Dictionary first
+        dictData.clear()
+
+        # Now export all parameters to empty dictionary.
+        # Remove references / make real copy by using [:] (important!)
+        dictData["planformName"] = self.planformName[:]
+        dictData["rootchord"] = self.rootchord
+        dictData["rootReynolds"] = self.airfoilReynolds[0]
+        dictData["wingspan"] = self.wingspan
+        dictData["fuselageWidth"] = self.fuselageWidth
+        dictData["planformShape"] = self.planformShape
+        dictData["tipSharpness"] = self.leadingEdgeCorrection
+        dictData["tipSharpness"] = self.tipSharpness
+        dictData["leadingEdgeCorrection"] = self.leadingEdgeCorrection
+        dictData["tipchord"] = self.tipchord
+        dictData["hingeLineAngle"] = self.hingeLineAngle
+        dictData["hingeDepthRoot"] = self.hingeDepthRoot
+        dictData["hingeDepthTip"] = self.hingeDepthTip
+        dictData["dihedral"] = self.dihedral
+        dictData['airfoilTypes'] = self.airfoilTypes[:]
+        dictData['airfoilPositions'] = self.airfoilPositions[:]
+        dictData['airfoilReynolds'] = self.airfoilReynolds[:]
+        dictData['flapGroup'] = self.flapGroups[:]
+        dictData["userAirfoils"] = self.userAirfoils[:]
+        dictData["chordDistribution"] = self.chordDistribution[:]
+
+        # -------------- set optional parameters --------------------
+        dictData["leadingEdgeOrientation"] = self.leadingEdgeOrientation
+        dictData["interpolationSegments"] = self.interpolationSegments
+        dictData["theme"] = self.theme
+        dictData["airfoilNames"] = self.airfoilNames[:]
+        dictData["airfoilBasicName"] = self.airfoilBasicName
+        dictData["polar_Reynolds"] = self.polarReynolds[:]
+        dictData["polar_Ncrit"] = self.NCrit
+
+        # set additional boolean data
+        dictData["smoothUserAirfoils"] = self.smoothUserAirfoils
+        dictData["isFin"] = self.isFin
+        dictData["showQuarterChordLine"] = self.showQuarterChordLine
+        dictData["showTipLine"] = self.showTipLine
+        dictData["showHingeLine"] = self.showHingeLine
+
     def calculate_dependendValues(self):
         # calculate dependent parameters
         self.tipDepthPercent = (self.tipchord/self.rootchord)*100
@@ -461,6 +519,11 @@ class params:
 
         # determine reynolds-number for root-airfoil
         self.rootReynolds = self.airfoilReynolds[0]
+
+    def normalize_positions(self):
+        for idx in range(len(self.airfoilPositions)):
+            if self.airfoilPositions[idx] != None:
+                self.airfoilPositions[idx] = self.airfoilPositions[idx] / self.halfwingspan
 
     def denormalize_positions(self):
         for idx in range(len(self.airfoilPositions)):
@@ -479,43 +542,6 @@ class params:
                 # calculate the number from postition now
                 Re = self.get_ReFromPosition(self.airfoilPositions[idx])
                 self.airfoilReynolds[idx] = int(round(Re ,0))
-
-
-
-    def write_toDict(self, dictData):
-        dictData["planformName"] = self.planformName
-        dictData["rootchord"] = self.rootchord
-        dictData["wingspan"] = self.wingspan
-        dictData["fuselageWidth"] = self.fuselageWidth
-        dictData["planformShape"] = self.planformShape
-        dictData["tipSharpness"] = self.leadingEdgeCorrection
-        dictData["tipSharpness"] = self.tipSharpness
-        dictData["tipchord"] = self.tipchord
-        dictData["hingeLineAngle"] = self.hingeLineAngle
-        dictData["hingeDepthRoot"] = self.hingeDepthRoot
-        dictData["hingeDepthTip"] = self.hingeDepthTip
-        dictData["dihedral"] = self.dihedral
-        dictData['airfoilTypes'] = self.airfoilTypes
-        dictData['airfoilPositions'] = self.airfoilPositions
-        dictData['airfoilReynolds'] = self.airfoilReynolds
-        dictData['flapGroup'] = self.flapGroups
-        dictData["userAirfoils"] = self.userAirfoils
-
-        # -------------- set optional parameters --------------------
-        dictData["leadingEdgeOrientation"] = self.leadingEdgeOrientation
-        dictData["interpolationSegments"] = self.interpolationSegments
-        dictData["theme"] = self.theme
-        dictData["airfoilNames"] = self.airfoilNames
-        dictData["airfoilBasicName"] = self.airfoilBasicName
-        dictData["polar_Reynolds"] = self.polarReynolds
-        dictData["polar_Ncrit"] = self.NCrit
-
-        # set additional boolean data
-        dictData["smoothUserAirfoils"] = self.smoothUserAirfoils
-        dictData["isFin"] = self.isFin
-        dictData["showQuarterChordLine"] = self.showQuarterChordLine
-        dictData["showTipLine"] = self.showTipLine
-        dictData["showHingeLine"] = self.showHingeLine
 
 
     def get_shapeParams(self):
@@ -672,6 +698,7 @@ class chordDistribution:
     # calculate a chord-distribution, which is normalized to root_chord = 1.0
     # half wingspan = 1
     def calculate_grid(self, shape, shapeParams):
+        self.normalizedGridPoints.clear()
         # calculate interval for setting up the grid
         grid_delta = 1 / (self.num_gridPoints-1)
         self.normalizedGrid = []
@@ -789,6 +816,7 @@ class planform:
 
     # calculate planform-shape of the half-wing (high-resolution wing planform)
     def calculate(self, params:params, chordDistribution:chordDistribution):
+        self.grid.clear()
         self.num_gridPoints = chordDistribution.get_numGridPoints()
         self.hingeInnerPoint = (1-(params.hingeDepthRoot/100))*params.rootchord
 
@@ -912,7 +940,10 @@ class wing:
         # create instance of params
         self.params = params()
 
-        # create insstance of chordDistribution
+        # dictionary, that will store actual params in dictionary format
+        self.paramsDict = {}
+
+        # create instance of chordDistribution
         self.chordDistribution = chordDistribution()
 
         # create instance of planform
@@ -975,20 +1006,6 @@ class wing:
         else:
             ErrorMsg("undefined Theme: %s" %params.theme)
 
-    def update(self):
-        params = self.params
-        params.calculate_dependendValues()
-        params.denormalize_positions()
-
-        # get basic shape parameters
-        (shape, shapeParams) = params.get_shapeParams()
-
-        # setup chordDistribution
-        self.chordDistribution.calculate_grid(shape, shapeParams)
-
-        # calculate planform
-        self.planform.calculate(self.params, self.chordDistribution)
-
     # compose a name from the airfoil basic name and the Re-number
     def set_AirfoilNamesFromRe(self):
         params = self.params
@@ -1042,7 +1059,6 @@ class wing:
         params.airfoilReynolds.append(int(round(reynolds,0)))
         self.chords.append(params.tipchord)
 
-
     # get the number of user defined airfoils
     def get_numUserAirfoils(self):
         num = 0
@@ -1052,23 +1068,19 @@ class wing:
 
         return num
 
+    def apply_params(self):
+        # first clean up in case this function was repeatedly called
+        self.chords.clear()
+        self.sections.clear()
 
-    # set basic data of the wing
-    def set_Data(self, dictData):
         params = self.params
-        params.read_fromDict(dictData)
+
+        # start modifying and applying params now
         params.calculate_dependendValues()
         params.denormalize_positions()
 
         # get basic shape parameters
         (shape, shapeParams) = params.get_shapeParams()
-
-        # are there control-points?
-        if (params.chordDistribution != None):
-            self.chordDistribution.set_controlPoints(params.chordDistribution)
-        else:
-            self.chordDistribution.init_controlPoints(shape, shapeParams)
-            params.chordDistribution = self.chordDistribution.get_controlPoints()
 
         # setup chordDistribution
         self.chordDistribution.calculate_grid(shape, shapeParams)
@@ -1076,8 +1088,59 @@ class wing:
         # calculate planform
         self.planform.calculate(self.params, self.chordDistribution)
 
-        # set colours according to theme
+        # calculate Re-numbers, the chordlengths of the airfoils and the sections
+        self.calculate_ReNumbers()
+        self.calculate_chordlengths()
+        self.calculate_positions() # must be done after chordlenghts ar known
+        self.set_AirfoilNames()
+
+        # if there is a fuselage, insert data for the fuselage section
+        # at the beginning of the list.
+        if self.fuselageIsPresent():
+            self.insert_fuselageData()
+
+        # always insert data for the wing tip
+        self.insert_tipData()
+
+        # calculate the sections now
+        self.calculate_sections()
+
+        # assign the flap groups to the different sections
+        self.assignFlapGroups()
+
+        # set colours according to selected theme
         self.set_colours()
+
+    # set basic data of the wing
+    def set_Data(self, dictData):
+        params = self.params
+
+        # read initial parameters from dictionary
+        params.read_fromDict(dictData)
+
+        # are there control-points?
+        if (params.chordDistribution != None):
+            self.chordDistribution.set_controlPoints(params.chordDistribution)
+        else:
+            # get basic shape parameters and init control points
+            (shape, shapeParams) = params.get_shapeParams()
+            self.chordDistribution.init_controlPoints(shape, shapeParams)
+            # writeback control points to params
+            controlPoints = self.chordDistribution.get_controlPoints()
+            params.chordDistribution = controlPoints[:]
+
+        # export initial params to dictionary
+        tempDict = {}
+        params.write_toDict(self.paramsDict)
+
+##        # CAUTION: to get rid of references for strings, lists etc. we have to
+##        # perform deepcopy. Otherwise all later modifications of strings and
+##        # lists will appear in self.paramsDict, which we do not want
+##        self.paramsDict = tempDict.copy()
+##        tempDict.clear()
+
+        # now apply params which will modify the content of params
+        self.apply_params()
 
     # get name of the user defined airfoil, as it will appear in the planform
     def get_UserAirfoilName(self, userAirfoil_idx):
@@ -1096,7 +1159,6 @@ class wing:
 
         # nothing was found
         return None
-
 
 
     # find planform-values for a given chord-length
@@ -1137,7 +1199,7 @@ class wing:
         section.airfoilName = params.airfoilNames[section.number-2]
 
     def get_params(self):
-        return self.params
+        return self.paramsDict
 
     def get_distributionParams(self):
         distributionParams = (self.params.planformShape,
@@ -1180,19 +1242,13 @@ class wing:
     # calculate all chordlenghts from the list of airfoil positions
     # and the given planform-data
     def calculate_chordlengths(self):
+        self.chords.clear()
         params = self.params
         for idx in range(len(params.airfoilPositions)):
             position = params.airfoilPositions[idx]
             reynolds = params.airfoilReynolds[idx]
             chord = self.get_chordFromPositionOrReynolds(position, reynolds)
             self.chords.append(chord)
-
-
-    def denormalize_positions(self):
-        for idx in range(len(self.airfoilPositions)):
-            if self.airfoilPositions[idx] != None:
-                self.airfoilPositions[idx] = self.airfoilPositions[idx] * self.halfwingspan
-
 
     def calculate_positions(self):
         params = self.params
@@ -1310,10 +1366,12 @@ class wing:
         # add section now
         self.add_sectionFromGrid(grid)
 
+    def remove_fuselageSection(self):
+       del(self.sections[0])
 
     # calculate all sections of the wing, oriented at the grid
     def calculate_sections(self):
-        self.sections = []
+        self.sections.clear()
         # check if fuselageWidth is > 0
         if self.fuselageIsPresent():
             # first add section for fuselage
@@ -1337,9 +1395,11 @@ class wing:
     def interpolate_sections(self):
         params = self.params
         if params.interpolationSegments < 1:
+            self.interpolated_params = None
             # nothing to do
             return
 
+        self.interpolated_params = interpolated_params(params)
         NoteMsg("Interpolation of sections was requested, interpolating each section with"\
                 " additional %d steps" % params.interpolationSegments)
 
@@ -1395,11 +1455,11 @@ class wing:
         # assignFlapGroups!
 
         # assign interpolated lists
-        params.airfoilPositions = new_positions
-        params.airfoilTypes = new_airfoilTypes
-        params.airfoilNames = new_airfoilNames
-        params.chords = new_chords
-        params.flapGroups = new_flapGroups
+        params.interpolated_airfoilPositions = new_positions
+        params.interpolated_airfoilTypes = new_airfoilTypes
+        params.interpolated_airfoilNames = new_airfoilNames
+        params.interpolated_chords = new_chords
+        params.interpolated_flapGroups = new_flapGroups
 
         # calculate the interpolated sections
         self.calculate_sections()
@@ -1416,10 +1476,15 @@ class wing:
 
         # append flapGroup for the tip section, which is the same as for the section before
         params.flapGroups.append(params.flapGroups[-1])
+        num = len(self.sections)
+        num_flap_groups = len(params.flapGroups)
 
-        # assign flap groups now
-        for idx in range (len(self.sections)):
-            self.sections[idx].flapGroup = params.flapGroups[idx]
+        if (num_flap_groups != num):
+            ErrorMsg("number of sections %d != number of flap groups %d" %(num, num_flap_groups))
+        else:
+            # assign flap groups now
+            for idx in range (len(self.sections)):
+                self.sections[idx].flapGroup = params.flapGroups[idx]
 
     # get color for plotting
     def get_colorFromAirfoilType(self, airfoilType):
@@ -2350,28 +2415,15 @@ class planform_creator:
         # set parameters for the wing
         self.newWing.set_Data(fileContent)
 
-       # calculate the grid, the chordlengths of the airfoils and the sections
-        self.newWing.calculate_ReNumbers()
-        self.newWing.calculate_chordlengths()
-        self.newWing.calculate_positions() # must be done after chordlenghts ar known
-        self.newWing.set_AirfoilNames()
+    def __exit_action(self, value):
+        global print_disabled
+        print_disabled = True
 
-        # if there is a fuselage, insert data for the fuselage section
-        # at the beginning of the list.
-        if self.newWing.fuselageIsPresent():
-            self.newWing.insert_fuselageData()
+        return value
 
-        # always insert data for the wing tip
-        self.newWing.insert_tipData()
-
-        # calculate the sections now
-        self.newWing.calculate_sections()
-
-        # assign the flap groups to the different sections
-        self.newWing.assignFlapGroups()
-
-        # set colours according to selected theme
-        self.newWing.set_colours()
+    def __entry_action(self, airfoilIdx):
+        global print_disabled
+        print_disabled = False
 
     def set_screenParams(self, width, height):
         global scaled
@@ -2389,19 +2441,6 @@ class planform_creator:
         self.newWing.params.theme = theme
         self.newWing.set_colours()
 
-
-    def exit_action(self, value):
-        global print_disabled
-        print_disabled = True
-
-        return value
-
-
-    def entry_action(self, airfoilIdx):
-        global print_disabled
-        print_disabled = False
-
-
     def load(self):
         print("load")
 
@@ -2414,16 +2453,15 @@ class planform_creator:
         print("reset")
 
     def get_params(self):
-        return self.newWing.params
 
-    def set_planformParams(self, newData):
-        self.planformData = newData
+        return self.newWing.get_params()
 
-    def update_planform(self):
-        self.newWing.update()
+    def update_planform(self, paramDict):
+        self.newWing.set_Data(paramDict)
 
     def plot_diagram(self, diagramType, ax, x_limits, y_limits):
         global cl_background
+
         # set background first (dark or light)
         ax.set_facecolor(cl_background)
 
