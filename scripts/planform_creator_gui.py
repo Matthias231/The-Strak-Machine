@@ -214,12 +214,17 @@ class control_frame():
                  {"txt": "Airfoils basic name",         "options" : None, "variable" : 'airfoilBasicName', "unit" : None, "scaleFactor" : None},
                  {"txt": "wingspan",                    "options" : None, "variable" : 'wingspan',         "unit" : "mm", "scaleFactor" : 1000.0},
                  {"txt": "Root chord",                  "options" : None, "variable" : 'rootchord',        "unit" : "mm", "scaleFactor" : 1000.0},
+                 {"txt": "Tip chord",                   "options" : None, "variable" : 'tipchord',         "unit" : "mm", "scaleFactor" : 1000.0},
+                 {"txt": "Tip sharpness",               "options" : None, "variable" : 'tipSharpness',     "unit" : None, "scaleFactor" : None},
+                 {"txt": "Leading edge correction",     "options" : None, "variable" : 'leadingEdgeCorrection',     "unit" : None, "scaleFactor" : None},
+                 {"txt": "Dihedral",                    "options" : None, "variable" : 'dihedral',         "unit" : "°",  "scaleFactor" : None},
                  {"txt": "Re*Sqrt(Cl) of root airfoil", "options" : None, "variable" : 'rootReynolds',     "unit" : None, "scaleFactor" : None},
                  {"txt": "Width of fuselage",           "options" : None, "variable" : 'fuselageWidth',    "unit" : "mm", "scaleFactor" : 1000.0},
                  {"txt": "Hingeline angle @root",       "options" : None, "variable" : 'hingeLineAngle',   "unit" : "°",  "scaleFactor" : None},
                  {"txt": "Hinge depth @root",           "options" : None, "variable" : 'hingeDepthRoot',   "unit" : "%",  "scaleFactor" : None},
                  {"txt": "Hinge depth @tip",            "options" : None, "variable" : 'hingeDepthTip',    "unit" : "%",  "scaleFactor" : None},
                  {"txt": "NCrit",                       "options" : None, "variable" : 'polar_Ncrit',      "unit" : None, "scaleFactor" : None},
+                 {"txt": "Interpolation Segments",      "options" : None, "variable" : 'interpolationSegments', "unit" :None,  "scaleFactor" : None},
                 ]
         return table
 

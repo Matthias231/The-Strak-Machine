@@ -109,7 +109,7 @@ scaled = False
 scaleFactor = 1.0
 
 # types of diagrams
-diagTypes = "Chord distribution", "Planform shape", "Halfwing planform", "Wing planform"
+diagTypes = "Chord distribution", "Planform shape", "Airfoil distribution", "Wing"
 planformShapes = 'elliptical', 'trapezoidal'
 
 xfoilWorkerCall = "..\\..\\bin\\" + xfoilWorkerName + '.exe'
@@ -756,10 +756,10 @@ class chordDistribution:
                  linewidth = lw_planform, solid_capstyle="round",
                  label = "normalized chord")
 
-        # plot control points
-        pts = np.vstack([self.controlPoints])
-        x, y = pts.T
-        ax.scatter(x, y, color=cl_normalizedChord)
+##        # plot control points
+##        pts = np.vstack([self.controlPoints])
+##        x, y = pts.T
+##        ax.scatter(x, y, color=cl_normalizedChord)
 
         # place title and legend
         #ax.title("Normalized chord distribution")
@@ -970,19 +970,19 @@ class wing:
         if params.theme == 'Light':
             # black and white theme
             cl_background = 'lightgray'
-            cl_quarterChordLine = 'black'
+            cl_quarterChordLine = 'blue'
             cl_geometricalCenterLine = 'black'
             cl_geoCenter = 'black'
-            cl_hingeLine = 'dimgray'
+            cl_hingeLine = 'DeepSkyBlue'
             cl_planform = 'black'
-            cl_hingeLineFill = 'gray'
-            cl_planformFill = 'lightgray'
+            cl_hingeLineFill = 'DeepSkyBlue'
+            cl_planformFill = 'darkgray'
             cl_sections = 'black'
             cl_userAirfoil = 'black'
             cl_optAirfoil = 'black'
             cl_infotext = 'black'
-            cl_chordlengths = 'lightgray'
-            cl_referenceChord = 'gray'
+            cl_chordlengths = 'darkgray'
+            cl_referenceChord = 'dark'
             cl_normalizedChord = 'black'
             cl_controlPoints = 'red'
         elif params.theme == 'Dark':
@@ -1579,16 +1579,16 @@ class wing:
             ax.set_ylim(ax.get_ylim()[::-1])
 
     # plot planform of the half-wing
-    def plot_HalfWingPlanform(self, ax):
+    def plot_AirfoilDistribution(self, ax):
         params = self.params
 
         # create empty lists
         xValues = []
         leadingEdge = []
         trailingeEge = []
-        hingeLine = []
-        quarterChordLine = []
-        geometricalCenterLine = []
+        #hingeLine = []
+        #quarterChordLine = []
+        #geometricalCenterLine = []
 
         # setup empty lists for new tick locations
         x_tick_locations = []
@@ -1681,9 +1681,9 @@ class wing:
             xValues.append(element.y)
             #build up lists of y-values
             leadingEdge.append(element.leadingEdge)
-            quarterChordLine.append(element.quarterChordLine)
-            geometricalCenterLine.append(element.geometricalCenterLine)
-            hingeLine.append(element.hingeLine)
+##            quarterChordLine.append(element.quarterChordLine)
+##            geometricalCenterLine.append(element.geometricalCenterLine)
+##            hingeLine.append(element.hingeLine)
             trailingeEge.append(element.trailingEdge)
 
         # setup root- and tip-joint
@@ -1694,22 +1694,22 @@ class wing:
         labelHingeLine = ("hinge line (%.1f %% / %.1f %%)" %
                            (params.hingeDepthRoot, params.hingeDepthTip))
 
-        # plot quarter-chord-line
-        if (params.showQuarterChordLine == True):
-            ax.plot(xValues, quarterChordLine, color=cl_quarterChordLine,
-              linestyle = ls_quarterChordLine, linewidth = lw_quarterChordLine,
-              solid_capstyle="round", label = "quarter-chord line")
-
-        if (params.showTipLine == True):
-            ax.plot(xValues, geometricalCenterLine, color=cl_geometricalCenterLine,
-              linestyle = ls_geometricalCenterLine, linewidth = lw_geometricalCenterLine,
-              solid_capstyle="round", label = "area CoG line")
-
-        # plot hinge-line
-        if (params.showHingeLine == True):
-            ax.plot(xValues, hingeLine, color=cl_hingeLine,
-              linestyle = ls_hingeLine, linewidth = lw_hingeLine,
-              solid_capstyle="round", label = labelHingeLine)
+##        # plot quarter-chord-line
+##        if (params.showQuarterChordLine == True):
+##            ax.plot(xValues, quarterChordLine, color=cl_quarterChordLine,
+##              linestyle = ls_quarterChordLine, linewidth = lw_quarterChordLine,
+##              solid_capstyle="round", label = "quarter-chord line")
+##
+##        if (params.showTipLine == True):
+##            ax.plot(xValues, geometricalCenterLine, color=cl_geometricalCenterLine,
+##              linestyle = ls_geometricalCenterLine, linewidth = lw_geometricalCenterLine,
+##              solid_capstyle="round", label = "area CoG line")
+##
+##        # plot hinge-line
+##        if (params.showHingeLine == True):
+##            ax.plot(xValues, hingeLine, color=cl_hingeLine,
+##              linestyle = ls_hingeLine, linewidth = lw_hingeLine,
+##              solid_capstyle="round", label = labelHingeLine)
 
         # plot the planform last
         ax.plot(xValues, leadingEdge, color=cl_planform,
@@ -1955,7 +1955,7 @@ class wing:
         fig.suptitle(text, fontsize = 12, color="darkgrey", **csfont)
 
         # first figure, display detailed half-wing
-        self.plot_HalfWingPlanform(upper)
+        self.plot_AirfoilDistribution(upper)
 
         # second figure, display
         self.plot_WingPlanform(lower)
@@ -1988,10 +1988,10 @@ class wing:
         fig.suptitle(text, fontsize = 12, color="darkgrey", **csfont)
 
         # first figure, display detailed half-wing
-        self.plot_HalfWingPlanform(upper)
+        self.plot_AirfoilDistribution(upper)
 
         # second figure, display
-        self.plot_HalfWingPlanform(lower)
+        self.plot_AirfoilDistribution(lower)
 
         return fig
 
@@ -2001,7 +2001,7 @@ class wing:
         elif diagramType == diagTypes[1]:
             self.plot_PlanformShape(ax)
         elif diagramType == diagTypes[2]:
-            self.plot_HalfWingPlanform(ax)
+            self.plot_AirfoilDistribution(ax)
         elif diagramType == diagTypes[3]:
             self.plot_WingPlanform(ax)
 
