@@ -1204,10 +1204,11 @@ class App(customtkinter.CTk):
     def load(self, dummy):
         creatorInst = creatorInstances[self.planformIdx]
         result = creatorInst.load()
-        if (result == 0):
-            creatorInst.update_planform()
-            self.frame_bottom.clear_unsavedChangesFlag(self.planformIdx)
 
+        if (result == 0):
+            creatorInst.update_planform(creatorInst.get_params())
+            self.frame_bottom.update_Entries(self.planformIdx)
+            self.frame_bottom.clear_unsavedChangesFlag(self.planformIdx)
             self.updateNeeded = True
 
     def add_planform(self, dummy):

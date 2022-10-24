@@ -1130,14 +1130,7 @@ class wing:
             params.chordDistribution = controlPoints[:]
 
         # export initial params to dictionary
-        tempDict = {}
         params.write_toDict(self.paramsDict)
-
-##        # CAUTION: to get rid of references for strings, lists etc. we have to
-##        # perform deepcopy. Otherwise all later modifications of strings and
-##        # lists will appear in self.paramsDict, which we do not want
-##        self.paramsDict = tempDict.copy()
-##        tempDict.clear()
 
         # now apply params which will modify the content of params
         self.apply_params()
@@ -2377,9 +2370,12 @@ def update_planformdata(wingdata, dictData):
 #
 ################################################################################
 class planform_creator:
-    #class init
     def __init__(self, paramFileName):
+        '''class init'''
         global print_disabled
+
+        # store paramFileName for later use
+        self.paramFileName = paramFileName
 
         # check working-directory, have we been started from "scripts"-dir? (Debugging)
         currentDir = getcwd()
@@ -2392,12 +2388,22 @@ class planform_creator:
         # get current working dir
         self.workingDir = getcwd()
 
+        # load parameters from file
+        fileContent = self.__load_paramFile()
+
+        # create a new wing
+        self.newWing:wing = wing()
+
+        # set parameters for the wing
+        self.newWing.set_Data(fileContent)
+
+    def __load_paramFile(self):
         # try to open .json-file
         try:
-            paramFile = open(paramFileName)
+            paramFile = open(self.paramFileName)
         except:
-            ErrorMsg("failed to open file %s" % paramFileName)
-            exit(-1)
+            ErrorMsg("failed to open file %s" % self.paramFileName)
+            return None
 
         # load parameter dictionary from .json-file
         try:
@@ -2405,15 +2411,34 @@ class planform_creator:
             paramFile.close()
         except ValueError as e:
             ErrorMsg('invalid json: %s' % e)
-            ErrorMsg('Error, failed to read data from file %s' % paramFileName)
+            ErrorMsg('Error, failed to read data from file %s' % self.paramFileName)
             paramFile.close()
-            exit(-1)
+            return None
 
-        # create a new wing
-        self.newWing:wing = wing()
+        return fileContent
 
-        # set parameters for the wing
-        self.newWing.set_Data(fileContent)
+    def __save_paramFile(self):
+        # try to open .json-file for writing / overwrite existing file
+        try:
+            paramFile = open(self.paramFileName, 'w')
+        except:
+            ErrorMsg("failed to open file %s" % self.paramFileName)
+            return -1
+
+        # get actual parameters
+        fileContent = self.newWing.get_params()
+
+        # save parameter dictionary to .json-file
+        try:
+            json.dump(fileContent, paramFile, indent=2, separators=(',', ':'))
+            paramFile.close()
+        except ValueError as e:
+            ErrorMsg('invalid json: %s' % e)
+            ErrorMsg('Error, failed to save data to file %s' % self.paramFileName)
+            paramFile.close()
+            return -1
+
+        return 0
 
     def __exit_action(self, value):
         global print_disabled
@@ -2426,6 +2451,7 @@ class planform_creator:
         print_disabled = False
 
     def set_screenParams(self, width, height):
+        '''set scalings for fonts etc. depending on screen resolution'''
         global scaled
         global scaleFactor
 
@@ -2438,28 +2464,40 @@ class planform_creator:
             scaled = True
 
     def set_appearance_mode(self, theme):
+        '''applies the given theme / appearance mode'''
         self.newWing.params.theme = theme
         self.newWing.set_colours()
 
     def load(self):
-        print("load")
+        '''restores parameters that are stored in .json-file'''
+        # load parameters from file
+        fileContent = self.__load_paramFile()
 
+        if fileContent != None:
+            # set parameters for the wing
+            self.newWing.set_Data(fileContent)
+            return 0
+        else:
+            return -1
 
     def save(self):
-        print("save")
-
+        '''saves all parameters to .json-file'''
+        return self.__save_paramFile()
 
     def reset(self):
+        '''sets all parameters to default'''
         print("reset")
 
     def get_params(self):
-
+        '''gets parameters as a dictionary'''
         return self.newWing.get_params()
 
     def update_planform(self, paramDict):
+        '''applies parameters coming with paramDict'''
         self.newWing.set_Data(paramDict)
 
     def plot_diagram(self, diagramType, ax, x_limits, y_limits):
+        '''plots diagram to ax according to diagraType'''
         global cl_background
 
         # set background first (dark or light)
