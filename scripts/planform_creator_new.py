@@ -28,6 +28,7 @@ from os import listdir, path, system, makedirs, chdir, getcwd, remove
 import f90nml
 from shutil import copyfile
 from matplotlib import pyplot as plt
+from matplotlib.patches import Wedge
 from matplotlib.figure import Figure
 from matplotlib import rcParams
 from matplotlib import bezier
@@ -77,24 +78,25 @@ fs_legend = 7
 # colours, lineStyles
 cl_background = None
 cl_quarterChordLine = None
-cl_areaCenterLine = 'blue'
-cl_hingeLine = 'DeepSkyBlue'
-cl_hingeLineFill ='DeepSkyBlue'
-cl_planform = 'gray'
-cl_planformFill = 'gray'
-cl_sections = 'grey'
-cl_userAirfoil = 'DeepSkyBlue'
-cl_optAirfoil = 'yellow'
-cl_infotext = 'DeepSkyBlue'
-cl_chordlengths = 'darkgray'
-cl_referenceChord = 'gray'
-cl_normalizedChord = 'orange'
-cl_controlPoints = 'red'
+cl_geometricalCenterLine = None
+cl_geoCenter = None
+cl_hingeLine = None
+cl_hingeLineFill = None
+cl_planform = None
+cl_planformFill = None
+cl_sections = None
+cl_userAirfoil = None
+cl_optAirfoil = None
+cl_infotext = None
+cl_chordlengths = None
+cl_referenceChord = None
+cl_normalizedChord = None
+cl_controlPoints = None
 
 ls_quarterChordLine = 'solid'
 lw_quarterChordLine  = 0.8
-ls_areaCenterLine = 'solid'
-lw_areaCenterLine = 0.8
+ls_geometricalCenterLine = 'solid'
+lw_geometricalCenterLine = 0.8
 ls_hingeLine = 'solid'
 lw_hingeLine = 0.6
 ls_planform = 'solid'
@@ -107,43 +109,30 @@ scaled = False
 scaleFactor = 1.0
 
 # types of diagrams
-diagTypes = "Halfwing planform", "Wing planform", "Chord distribution"
+diagTypes = "Chord distribution", "Planform shape", "Halfwing planform", "Wing planform"
 planformShapes = 'elliptical', 'trapezoidal'
 
 xfoilWorkerCall = "..\\..\\bin\\" + xfoilWorkerName + '.exe'
 inputFilename = "..\\..\\ressources\\" + smoothInputFile
 
-
-# calculate the distance between to points
+################################################################################
+#
+# helper functions
+#
+################################################################################
 def calculate_distance(x1, x2, y1, y2):
+    '''calculates the distance between two given points'''
     dist = np.sqrt(np.square(x2-x1) + np.square(y2-y1))
     return dist
 
-
-# derivative function
-def deriv(f,x):
-     h = 0.000000001                 #step-size
-     return (f(x+h) - f(x))/h        #definition of derivative
-
-
-
-def plot_Line(x, y):
-    plt.plot(x, y, color='blue', linewidth = lw_planform, solid_capstyle="round")
-
-    # maximize window
-    figManager = plt.get_current_fig_manager()
-    try:
-        figManager.window.Maximize(True)
-    except:
-        try:
-            figManager.window.state('zoomed')
-        except:
-            pass
-
-    # show diagram
-    plt.show()
-
-
+def bullseye(center, radius, color, ax, **kwargs):
+    '''function for plotting a bullseye with given radius and center'''
+    circle1 = plt.Circle(center, radius=radius, color=color, fill=False)
+    w1 = Wedge(center, radius, 90, 180, fill=True, color=color)
+    w2 = Wedge(center, radius, 270, 360, fill=True, color=color)
+    ax.add_patch(circle1)
+    ax.add_artist(w1)
+    ax.add_artist(w2)
 
 ################################################################################
 #
@@ -165,7 +154,7 @@ class wingSection:
         self.hingeDepth = 0
         self.hingeLine = 0
         self.quarterChordLine = 0
-        self.areaCenterLine = 0
+        self.geometricalCenterLine = 0
         self.dihedral= 3.00
         self.flapGroup = 0
 
@@ -203,7 +192,7 @@ class wingGrid:
         self.hingeLine = 0.0
         self.quarterChordLine = 0.0
         self.LE_derivative = 0.0
-        self.areaCenterLine = 0.0
+        self.geometricalCenterLine = 0.0
 
 ################################################################################
 #
@@ -791,28 +780,33 @@ class planform:
         self.hingeOuterPoint = 0
         self.hingeLineAngle = 0.0
         self.dihedral = 0.00
-        self.area = 0.0
-        self.area_Center = 0.0
+        self.wingArea = 0.0
+        self.geometricalCenter = (0.0, 0.0)
         self.aspectRatio = 0.0
 
     def __calculate_wingArea(self):
         grid_delta_y = self.grid[1].y - self.grid[0].y
-        area_Center = 0.0
-        self.area = 0.0
+        center_x = 0.0
+        center_y = 0.0
+        self.wingArea = 0.0
 
         for element in self.grid:
-            # sum up area
+            # sum up area of the grid elements
             area = (grid_delta_y*10 * element.chord*10)
-            area_Center = area_Center + element.centerLine*area
+            center_y = center_y + element.centerLine*area
+            center_x = center_x + element.y*area
 
-            # calculate area of the wing
-            self.area = self.area + area
+            # sum up area of the grid elements, which in the end will be half of
+            # the wing area
+            self.wingArea = self.wingArea + area
 
-        # Calculate areaCenter (Flaechenschwerpunkt)
-        self.area_Center = area_Center / self.area
+        # Calculate geometrical center of the halfwing
+        center_x = center_x / self.wingArea
+        center_y = center_y / self.wingArea
+        self.geometricalCenter = (center_x, center_y)
 
         # calculate area of the whole wing
-        self.area = self.area * 2.0
+        self.wingArea = self.wingArea * 2.0
 
     # calculate planform-shape of the half-wing (high-resolution wing planform)
     def calculate(self, params:params, chordDistribution:chordDistribution):
@@ -911,12 +905,15 @@ class planform:
         self.__calculate_wingArea()
 
         # calculate aspect ratio of the wing
-        self.aspectRatio = params.wingspan*params.wingspan / (self.area/100)
+        self.aspectRatio = params.wingspan*params.wingspan / (self.wingArea/100)
+
+        # get geometrical center
+        (center_x, center_y) = self.geometricalCenter
 
         # add offset of half of the fuselage-width to the y-coordinates
         for element in self.grid:
             element.y = element.y + params.fuselageWidth/2
-            element.areaCenterLine = self.area_Center
+            element.geometricalCenterLine = center_x
 
         #self.draw_LE_derivative() #FIXME Debug-plot
 
@@ -956,7 +953,8 @@ class wing:
     def set_colours(self):
         global cl_background
         global cl_quarterChordLine
-        global cl_areaCenterLine
+        global cl_geometricalCenterLine
+        global cl_geoCenter
         global cl_hingeLine
         global cl_planform
         global cl_hingeLineFill
@@ -973,7 +971,8 @@ class wing:
             # black and white theme
             cl_background = 'lightgray'
             cl_quarterChordLine = 'black'
-            cl_areaCenterLine = 'black'
+            cl_geometricalCenterLine = 'black'
+            cl_geoCenter = 'black'
             cl_hingeLine = 'dimgray'
             cl_planform = 'black'
             cl_hingeLineFill = 'gray'
@@ -990,7 +989,8 @@ class wing:
             # dark theme
             cl_background = 'black'
             cl_quarterChordLine = 'orange'
-            cl_areaCenterLine = 'blue'
+            cl_geometricalCenterLine = 'blue'
+            cl_geoCenter = 'lightgray'
             cl_hingeLine = 'DeepSkyBlue'
             cl_hingeLineFill ='DeepSkyBlue'
             cl_planform = 'gray'
@@ -1172,7 +1172,7 @@ class wing:
         section.trailingEdge = grid.trailingEdge
         section.leadingEdge = grid.leadingEdge
         section.quarterChordLine = grid.quarterChordLine
-        section.areaCenterLine = grid.areaCenterLine
+        section.geometricalCenterLine = grid.geometricalCenterLine
         section.dihedral = params.dihedral
 
         # set Re of the section (only for proper airfoil naming)
@@ -1491,6 +1491,93 @@ class wing:
         return color
 
 
+    def plot_PlanformShape(self, ax):
+        params = self.params
+
+        # create empty lists
+        xValues = []
+        leadingEdge = []
+        trailingeEge = []
+        hingeLine = []
+        quarterChordLine = []
+        geometricalCenterLine = []
+
+        # setup empty lists for new tick locations
+        x_tick_locations = []
+        y_tick_locations = [params.rootchord]
+
+        # set axes and labels
+        self.set_AxesAndLabels(ax, "Planform shape")
+
+        grid = self.planform.grid
+        for element in grid:
+            #build up list of x-values
+            xValues.append(element.y)
+
+            #build up lists of y-values
+            leadingEdge.append(element.leadingEdge)
+            quarterChordLine.append(element.quarterChordLine)
+            geometricalCenterLine.append(element.geometricalCenterLine)
+            hingeLine.append(element.hingeLine)
+            trailingeEge.append(element.trailingEdge)
+
+        # setup root- and tip-joint
+        trailingeEge[0] = leadingEdge[0]
+        trailingeEge[-1] = leadingEdge[-1]
+
+        # compose labels for legend
+        labelHingeLine = ("hinge line (%.1f %% / %.1f %%)" %
+                           (params.hingeDepthRoot, params.hingeDepthTip))
+
+        # plot quarter-chord-line
+        if (params.showQuarterChordLine == True):
+            ax.plot(xValues, quarterChordLine, color=cl_quarterChordLine,
+              linestyle = ls_quarterChordLine, linewidth = lw_quarterChordLine,
+              solid_capstyle="round", label = "quarter-chord line")
+
+        if (params.showTipLine == True):
+            ax.plot(xValues, geometricalCenterLine, color=cl_geometricalCenterLine,
+              linestyle = ls_geometricalCenterLine, linewidth = lw_geometricalCenterLine,
+              solid_capstyle="round", label = "area CoG line")
+
+        # plot hinge-line
+        if (params.showHingeLine == True):
+            ax.plot(xValues, hingeLine, color=cl_hingeLine,
+              linestyle = ls_hingeLine, linewidth = lw_hingeLine,
+              solid_capstyle="round", label = labelHingeLine)
+
+        # plot geometrical center
+        center = self.planform.geometricalCenter
+        radius = params.rootchord/20
+        bullseye(center, radius, cl_geoCenter, ax)
+
+        # plot the planform last
+        ax.plot(xValues, leadingEdge, color=cl_planform,
+                linewidth = lw_planform, solid_capstyle="round")
+        ax.plot(xValues, trailingeEge, color=cl_planform,
+                linewidth = lw_planform, solid_capstyle="round")
+        try:
+            airfoilType = params.airfoilTypes[0]
+        except:
+             airfoilType = 'blend'
+
+        # plot additional point (invisible) to expand the y-axis and
+        # get the labels inside the diagram
+        ax.plot(xValues[0], -1*(params.rootchord/2))
+
+        # place legend inside subplot
+        ax.legend(loc='lower right', fontsize = fs_legend)
+
+        # show grid
+        ax.grid(True)
+
+        # both axes shall be equal
+        ax.axis('equal')
+
+        # revert y-axis on demand
+        if (params.leadingEdgeOrientation == 'up'):
+            ax.set_ylim(ax.get_ylim()[::-1])
+
     # plot planform of the half-wing
     def plot_HalfWingPlanform(self, ax):
         params = self.params
@@ -1501,7 +1588,7 @@ class wing:
         trailingeEge = []
         hingeLine = []
         quarterChordLine = []
-        areaCenterLine = []
+        geometricalCenterLine = []
 
         # setup empty lists for new tick locations
         x_tick_locations = []
@@ -1595,7 +1682,7 @@ class wing:
             #build up lists of y-values
             leadingEdge.append(element.leadingEdge)
             quarterChordLine.append(element.quarterChordLine)
-            areaCenterLine.append(element.areaCenterLine)
+            geometricalCenterLine.append(element.geometricalCenterLine)
             hingeLine.append(element.hingeLine)
             trailingeEge.append(element.trailingEdge)
 
@@ -1614,8 +1701,8 @@ class wing:
               solid_capstyle="round", label = "quarter-chord line")
 
         if (params.showTipLine == True):
-            ax.plot(xValues, areaCenterLine, color=cl_areaCenterLine,
-              linestyle = ls_areaCenterLine, linewidth = lw_areaCenterLine,
+            ax.plot(xValues, geometricalCenterLine, color=cl_geometricalCenterLine,
+              linestyle = ls_geometricalCenterLine, linewidth = lw_geometricalCenterLine,
               solid_capstyle="round", label = "area CoG line")
 
         # plot hinge-line
@@ -1910,11 +1997,14 @@ class wing:
 
     def draw_diagram(self, diagramType, ax, x_limits, y_limits):
         if diagramType == diagTypes[0]:
-            self.plot_HalfWingPlanform(ax)
-        elif diagramType == diagTypes[1]:
-            self.plot_WingPlanform(ax)
-        elif diagramType == diagTypes[2]:
             self.chordDistribution.plot(ax)
+        elif diagramType == diagTypes[1]:
+            self.plot_PlanformShape(ax)
+        elif diagramType == diagTypes[2]:
+            self.plot_HalfWingPlanform(ax)
+        elif diagramType == diagTypes[3]:
+            self.plot_WingPlanform(ax)
+
         else:
             ErrorMsg("undefined diagramtype")
 
