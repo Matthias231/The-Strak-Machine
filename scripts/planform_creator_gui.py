@@ -46,7 +46,7 @@ controlFrame = None
 creatorInstances:planform_creator = []
 
 # names of the planformfiles
-planformFiles = ["planformdata_wing.txt", "planformdata_tail.txt"]
+planformFiles = ["planformdataNew_wing.txt", "planformdataNew_tail.txt"]
 
 bg_color_light = "#DDDDDD"
 bg_color_dark =  "#222222"
