@@ -73,10 +73,9 @@ outputFolder = buildPath + bs + planformsPath
 cl_background = None
 cl_grid = None
 cl_quarterChordLine = None
-cl_geometricalCenterLine = None
 cl_geoCenter = None
 cl_hingeLine = None
-cl_hingeLineFill = None
+cl_flapFill = None
 cl_planform = None
 cl_planformFill = None
 cl_sections = None
@@ -93,7 +92,6 @@ cl_controlPoints = None
 # linestyles
 ls_grid = 'dotted'
 ls_quarterChordLine = 'solid'
-ls_geometricalCenterLine = 'solid'
 ls_hingeLine = 'solid'
 ls_planform = 'solid'
 ls_sections = 'solid'
@@ -101,7 +99,6 @@ ls_sections = 'solid'
 # linewidths
 lw_grid = 0.3
 lw_quarterChordLine  = 0.8
-lw_geometricalCenterLine = 0.8
 lw_hingeLine = 0.6
 lw_planform = 1.0
 lw_sections = 0.4
@@ -148,6 +145,17 @@ def bullseye(center, radius, color, ax, **kwargs):
     ax.add_artist(w1)
     ax.add_artist(w2)
 
+def bullseye_BW(center, radius, ax, **kwargs):
+    '''function for plotting a bullseye with given radius and center'''
+    w1 = Wedge(center, radius, 90, 180, fill=True, color='white', alpha = 1.0)
+    w2 = Wedge(center, radius, 270, 360, fill=True, color='white', alpha = 1.0)
+    w3 = Wedge(center, radius, 180, 270, fill=True, color='black', alpha = 1.0)
+    w4 = Wedge(center, radius, 0, 90, fill=True, color='black', alpha = 1.0)
+    ax.add_artist(w1)
+    ax.add_artist(w2)
+    ax.add_artist(w3)
+    ax.add_artist(w4)
+
 ################################################################################
 #
 # wingSection class
@@ -165,10 +173,9 @@ class wingSection:
         self.Re = 0.0
         self.leadingEdge = 0
         self.trailingEdge = 0
-        self.hingeDepth = 0
+        self.flapDepth = 0
         self.hingeLine = 0
         self.quarterChordLine = 0
-        self.geometricalCenterLine = 0
         self.dihedral= 3.00
         self.flapGroup = 0
 
@@ -202,11 +209,10 @@ class wingGrid:
         self.chord = 0.0
         self.leadingEdge = 0.0
         self.trailingEdge = 0.0
-        self.hingeDepth = 0.0
+        self.flapDepth = 0.0
         self.hingeLine = 0.0
         self.quarterChordLine = 0.0
         self.LE_derivative = 0.0
-        self.geometricalCenterLine = 0.0
 
 ################################################################################
 #
@@ -238,9 +244,10 @@ class params:
         self.tipSharpness = 0.0
         self.fuselageWidth = 0.0
         self.leadingEdgeCorrection = 0.0
+        self.ellipseCorrection = 0.0
         self.hingeLineAngle = 0.0
-        self.hingeDepthRoot = 0.0
-        self.hingeDepthTip = 0.0
+        self.flapDepthRoot = 0.0
+        self.flapDepthTip = 0.0
         self.dihedral = 0.0
         self.NCrit = 0.0
 
@@ -319,8 +326,10 @@ class params:
         if self.planformShape == 'elliptical':
             self.leadingEdgeCorrection = self.__get_MandatoryParameterFromDict(dictData, "leadingEdgeCorrection")
             self.tipSharpness =  self.__get_MandatoryParameterFromDict(dictData, "tipSharpness")
+            self.ellipseCorrection = self.__get_MandatoryParameterFromDict(dictData, "ellipseCorrection")
         else:
             self.leadingEdgeCorrection = 0.0
+            self.ellipseCorrection = 0.0
             self.tipSharpness = 0.0
 
         if (self.planformShape == 'elliptical') or\
@@ -328,8 +337,8 @@ class params:
             self.tipchord =  self.__get_MandatoryParameterFromDict(dictData, "tipchord")
 
         self.hingeLineAngle = self.__get_MandatoryParameterFromDict(dictData, "hingeLineAngle")
-        self.hingeDepthRoot = self.__get_MandatoryParameterFromDict(dictData, "hingeDepthRoot")
-        self.hingeDepthTip = self.__get_MandatoryParameterFromDict(dictData, "hingeDepthTip")
+        self.flapDepthRoot = self.__get_MandatoryParameterFromDict(dictData, "flapDepthRoot")
+        self.flapDepthTip = self.__get_MandatoryParameterFromDict(dictData, "flapDepthTip")
         self.dihedral = self.__get_MandatoryParameterFromDict(dictData, "dihedral")
 
         # get existing chord distribution, if any
@@ -487,10 +496,11 @@ class params:
         dictData["tipSharpness"] = self.leadingEdgeCorrection
         dictData["tipSharpness"] = self.tipSharpness
         dictData["leadingEdgeCorrection"] = self.leadingEdgeCorrection
+        dictData["ellipseCorrection"] = self.ellipseCorrection
         dictData["tipchord"] = self.tipchord
         dictData["hingeLineAngle"] = self.hingeLineAngle
-        dictData["hingeDepthRoot"] = self.hingeDepthRoot
-        dictData["hingeDepthTip"] = self.hingeDepthTip
+        dictData["flapDepthRoot"] = self.flapDepthRoot
+        dictData["flapDepthTip"] = self.flapDepthTip
         dictData["dihedral"] = self.dihedral
         dictData['airfoilTypes'] = self.airfoilTypes[:]
         dictData['airfoilPositions'] = self.airfoilPositions[:]
@@ -550,7 +560,7 @@ class params:
     def get_shapeParams(self):
         normalizedTipChord = self.tipDepthPercent / 100
         shapeParams = (normalizedTipChord, self.tipSharpness,
-                       self.leadingEdgeCorrection)
+                       self.ellipseCorrection)
         return (self.planformShape, shapeParams)
 
 
@@ -578,7 +588,7 @@ class chordDistribution:
         self.controlPoints = []
 
     def __elliptical_shape(self, x, shapeParams):
-        (normalizedTipChord, tipSharpness, leadingEdgeCorrection) = shapeParams
+        (normalizedTipChord, tipSharpness, ellipseCorrection) = shapeParams
 
         # calculate distance to tip, where rounding starts
         tipRoundingDistance = normalizedTipChord * tipSharpness
@@ -606,14 +616,14 @@ class chordDistribution:
         # elliptical shaping of the wing plus additonal delta
         chord = (1.0-delta) * np.sqrt(1.0-(x*x)) + delta
 
-        # correct chord with leading edge correction
-        chord = chord - leadingEdgeCorrection * sin(interpolate(0.0, 1.0, 0.0, pi, x))
+        # correct chord with ellipseCorrection
+        chord = chord - ellipseCorrection * sin(interpolate(0.0, 1.0, 0.0, pi, x))
 
         return chord
 
 
     def __trapezoidal_shape(self, x, shapeParams):
-        (normalizedTipChord, tipSharpness, leadingEdgeCorrection) = shapeParams
+        (normalizedTipChord, tipSharpness, ellipseCorrection) = shapeParams
 
         chord = (1.0-x) + (normalizedTipChord * x)
         return chord
@@ -756,6 +766,15 @@ class chordDistribution:
                  linewidth = lw_planform, solid_capstyle="round",
                  label = "normalized chord")
 
+        ax.annotate('Root',
+            xy=(0.0, 0.0), xycoords='data',
+            xytext=(2, 5), textcoords='offset points', color = cl_legend,
+            fontsize=fs_legend, rotation='vertical')
+
+        ax.annotate('Tip',
+            xy=(1.0, 0.0), xycoords='data',
+            xytext=(2, 5), textcoords='offset points', color = cl_legend,
+            fontsize=fs_legend, rotation='vertical')
 ##        # plot control points
 ##        pts = np.vstack([self.controlPoints])
 ##        x, y = pts.T
@@ -812,13 +831,13 @@ class planform:
     def calculate(self, params:params, chordDistribution:chordDistribution):
         self.grid.clear()
         self.num_gridPoints = chordDistribution.get_numGridPoints()
-        self.hingeInnerPoint = (1-(params.hingeDepthRoot/100))*params.rootchord
+        self.hingeInnerPoint = (1-(params.flapDepthRoot/100))*params.rootchord
 
         # calculate tip-depth
         self.tipDepth = params.rootchord*(params.tipDepthPercent/100)
 
         # calculate the depth of the hinge at the tip
-        tipHingeDepth = self.tipDepth *(params.hingeDepthTip/100)
+        tipHingeDepth = self.tipDepth *(params.flapDepthTip/100)
 
         # calculate quarter-chord-lines
         rootQuarterChord = params.rootchord/4
@@ -862,15 +881,15 @@ class planform:
 
             # calculate hingeDepth in percent at this particular point along the wing
             hingeDepth_y = interpolate(0.0, params.halfwingspan,
-                                       params.hingeDepthRoot, params.hingeDepthTip,
+                                       params.flapDepthRoot, params.flapDepthTip,
                                        grid.y)
 
             # correction of leading edge for elliptical planform, avoid swept forward part of the wing
-            #delta = self.leadingEdgeCorrection * sin(interpolate(0.0, self.halfwingspan, 0.0, pi, grid.y))#FIXME
+            delta = (params.leadingEdgeCorrection) * sin(interpolate(0.0, params.halfwingspan, 0.0, pi, grid.y))
 
-            grid.hingeDepth = (hingeDepth_y/100)*grid.chord #+ delta FIXME
+            grid.flapDepth = (hingeDepth_y/100)*grid.chord + delta
             grid.hingeLine = (self.hingeOuterPoint-self.hingeInnerPoint)/(params.halfwingspan) * (grid.y) + self.hingeInnerPoint
-            grid.leadingEdge = grid.hingeLine -(grid.chord-grid.hingeDepth)
+            grid.leadingEdge = grid.hingeLine -(grid.chord-grid.flapDepth)
 
             # calculate trailing edge according to chordlength at this particular
             # point along the wing
@@ -891,11 +910,11 @@ class planform:
                 LE_derivative_max = grid.LE_derivative
 
             # calculate percentual hingeDepth
-            grid.hingeDepthPercent = ((grid.trailingEdge - grid.hingeLine) / grid.chord) * 100.0
+            grid.flapDepthPercent = ((grid.trailingEdge - grid.hingeLine) / grid.chord) * 100.0
 
             # Tracking of hingeDepth maximum value
-            if (grid.hingeDepthPercent > hingeDepthPercent_max):
-                hingeDepthPercent_max = grid.hingeDepthPercent
+            if (grid.flapDepthPercent > hingeDepthPercent_max):
+                hingeDepthPercent_max = grid.flapDepthPercent
 
 
             # append section to section-list of wing
@@ -913,7 +932,6 @@ class planform:
         # add offset of half of the fuselage-width to the y-coordinates
         for element in self.grid:
             element.y = element.y + params.fuselageWidth/2
-            element.geometricalCenterLine = center_x
 
         #self.draw_LE_derivative() #FIXME Debug-plot
 
@@ -954,11 +972,10 @@ class wing:
         global cl_background
         global cl_grid
         global cl_quarterChordLine
-        global cl_geometricalCenterLine
         global cl_geoCenter
         global cl_hingeLine
         global cl_planform
-        global cl_hingeLineFill
+        global cl_flapFill
         global cl_planformFill
         global cl_sections
         global cl_userAirfoil
@@ -975,11 +992,10 @@ class wing:
             cl_background = 'lightgray'
             cl_grid = 'black'
             cl_quarterChordLine = 'blue'
-            cl_geometricalCenterLine = 'black'
             cl_geoCenter = 'black'
             cl_hingeLine = 'DeepSkyBlue'
             cl_planform = 'black'
-            cl_hingeLineFill = 'DeepSkyBlue'
+            cl_flapFill = 'DeepSkyBlue'
             cl_planformFill = 'darkgray'
             cl_sections = 'black'
             cl_userAirfoil = 'black'
@@ -996,10 +1012,9 @@ class wing:
             cl_background = 'black'
             cl_grid = 'ghostwhite'
             cl_quarterChordLine = 'orange'
-            cl_geometricalCenterLine = 'blue'
             cl_geoCenter = 'lightgray'
             cl_hingeLine = 'DeepSkyBlue'
-            cl_hingeLineFill ='DeepSkyBlue'
+            cl_flapFill ='DeepSkyBlue'
             cl_planform = 'gray'
             cl_planformFill = 'lightgray'
             cl_sections = 'grey'
@@ -1176,12 +1191,11 @@ class wing:
         params = self.params
         section.y = grid.y
         section.chord = grid.chord
-        section.hingeDepth = grid.hingeDepth
+        section.flapDepth = grid.flapDepth
         section.hingeLine = grid.hingeLine
         section.trailingEdge = grid.trailingEdge
         section.leadingEdge = grid.leadingEdge
         section.quarterChordLine = grid.quarterChordLine
-        section.geometricalCenterLine = grid.geometricalCenterLine
         section.dihedral = params.dihedral
 
         # set Re of the section (only for proper airfoil naming)
@@ -1206,7 +1220,7 @@ class wing:
     def get_distributionParams(self):
         distributionParams = (self.params.planformShape,
         self.params.tipDepthPercent, self.params.tipSharpness,
-        self.params.leadingEdgeCorrection)
+        self.params.ellipseCorrection)
         return distributionParams
 
 
@@ -1324,6 +1338,33 @@ class wing:
         # join all values
         flapPositions_x = flapPositions_x_left + flapPositions_x_right
         flapPositions_y = flapPositions_y + flapPositions_y
+
+        return (flapPositions_x, flapPositions_y)
+
+    def getFlapSeparationLines(self):
+        params = self.params
+        sections = self.sections
+        numSections = len(sections)
+        flapPositions_x = []
+        flapPositions_y =[]
+        actualFlapGroup = 0
+
+        # check all sections
+        for idx in range (0, numSections):
+            # Change of Flap-Group or last section? -->separation line
+            if ((actualFlapGroup != sections[idx].flapGroup) or
+               ((idx == (numSections-1)) and (sections[idx].flapGroup !=0))):
+                # determine normalized x_pos and flapDepth
+                x = sections[idx].y / (params.wingspan/2)
+                flapDepth = sections[idx].trailingEdge - sections[idx].hingeLine
+                flapDepthPercent = (flapDepth / sections[idx].chord) * 100
+
+                # append tupel to lists
+                flapPositions_x.append((x,x))
+                flapPositions_y.append((0,flapDepthPercent))
+
+            # store actual flapGroup for comparison
+            actualFlapGroup = sections[idx].flapGroup
 
         return (flapPositions_x, flapPositions_y)
 
@@ -1509,11 +1550,6 @@ class wing:
         trailingeEge = []
         hingeLine = []
         quarterChordLine = []
-        geometricalCenterLine = []
-
-        # setup empty lists for new tick locations
-        x_tick_locations = []
-        y_tick_locations = [params.rootchord]
 
         grid = self.planform.grid
         for element in grid:
@@ -1523,7 +1559,6 @@ class wing:
             # build up lists of y-values
             leadingEdge.append(element.leadingEdge)
             quarterChordLine.append(element.quarterChordLine)
-            geometricalCenterLine.append(element.geometricalCenterLine)
             hingeLine.append(element.hingeLine)
             trailingeEge.append(element.trailingEdge)
 
@@ -1533,7 +1568,7 @@ class wing:
 
         # compose labels for legend
         labelHingeLine = ("hinge line (%.1f %% / %.1f %%)" %
-                           (params.hingeDepthRoot, params.hingeDepthTip))
+                           (params.flapDepthRoot, params.flapDepthTip))
 
         # plot quarter-chord-line
         if (params.showQuarterChordLine == True):
@@ -1548,9 +1583,10 @@ class wing:
               solid_capstyle="round", label = labelHingeLine)
 
         # plot geometrical center
-        center = self.planform.geometricalCenter
-        radius = params.rootchord/20
-        bullseye(center, radius, cl_geoCenter, ax)
+        (center_x, center_y) = self.planform.geometricalCenter
+        (y_min,y_max) = ax.get_ylim()
+        radius = (y_max-y_min)/10
+        bullseye((center_x, center_y), radius, cl_geoCenter, ax)
 
         # plot the planform last
         ax.plot(xValues, leadingEdge, color=cl_planform,
@@ -1558,6 +1594,18 @@ class wing:
         ax.plot(xValues, trailingeEge, color=cl_planform,
                 linewidth = lw_planform, solid_capstyle="round")
 
+        # set new ticks for the x-axis according to the positions of the sections
+        ax.set_xticks([params.fuselageWidth/2, center_x, params.wingspan])
+        ax.set_yticks([0.0, center_y, params.rootchord])
+
+        # set new fontsize of the x-tick labels
+        for tick in ax.xaxis.get_major_ticks():
+            tick.label.set_fontsize(fs_ticks)
+            tick.label.set_rotation('vertical')
+
+        # set new fontsize of the y-tick labels
+        for tick in ax.yaxis.get_major_ticks():
+            tick.label.set_fontsize(fs_ticks)
         # place legend
         ax.legend(loc='upper right', fontsize=fs_legend, labelcolor=cl_legend,
          frameon=False)
@@ -1579,58 +1627,78 @@ class wing:
 
         # create empty lists
         xValues = []
-        leadingEdge = []
-        trailingeEge = []
-        hingeLine = []
-        quarterChordLine = []
-        geometricalCenterLine = []
+        zeroLine = []
+        flapDepth = []
 
         # setup empty lists for new tick locations
         x_tick_locations = []
-        y_tick_locations = [params.rootchord]
 
+        # build up list of x- and y-values
         grid = self.planform.grid
         for element in grid:
-            #build up list of x-values
-            xValues.append(element.y)
+            zeroLine.append(0.0)
+            x = element.y / (params.wingspan/2)
+            xValues.append(x)
+            flapDepthPercent = (element.flapDepth / element.chord) * 100
+            flapDepth.append(flapDepthPercent)
 
-            #build up lists of y-values
-            leadingEdge.append(element.leadingEdge)
-            quarterChordLine.append(element.quarterChordLine)
-            geometricalCenterLine.append(element.geometricalCenterLine)
-            hingeLine.append(element.hingeLine)
-            trailingeEge.append(element.trailingEdge)
+        ax.plot(xValues, zeroLine, color=cl_hingeLine,
+          linestyle = ls_hingeLine, linewidth = lw_hingeLine,
+          solid_capstyle="round", label = "Flap depth (%)")
 
-        # setup root- and tip-joint
-        trailingeEge[0] = leadingEdge[0]
-        trailingeEge[-1] = leadingEdge[-1]
+        # get flap separation lines
+        (flapPositions_x, flapPositions_y) = self.getFlapSeparationLines()
 
-        # compose labels for legend
-        labelHingeLine = ("hinge line (%.1f %% / %.1f %%)" %
-                           (params.hingeDepthRoot, params.hingeDepthTip))
+        # control points for flaps
+        controlPoints_x = []
+        controlPoints_y = []
+        numLines = len(flapPositions_x)
 
-        # plot quarter-chord-line
-        if (params.showQuarterChordLine == True):
-            ax.plot(xValues, quarterChordLine, color=cl_quarterChordLine,
-              linestyle = ls_quarterChordLine, linewidth = lw_quarterChordLine,
-              solid_capstyle="round", label = "quarter-chord line")
+        for idx in range(numLines):
+            (dummy, x) = flapPositions_x[idx]
+            (dummy, y) = flapPositions_y[idx]
+            controlPoints_x.append(x)
+            controlPoints_y.append(y)
 
-        # plot hinge-line
-        if (params.showHingeLine == True):
-            ax.plot(xValues, hingeLine, color=cl_hingeLine,
-              linestyle = ls_hingeLine, linewidth = lw_hingeLine,
-              solid_capstyle="round", label = labelHingeLine)
+            text = "%2.1f %%" % y
+            ax.annotate(text,
+            xy=(x, y), xycoords='data',
+            xytext=(5, -15), textcoords='offset points', color = cl_legend,
+            fontsize=fs_legend)
 
-        # plot geometrical center
-        center = self.planform.geometricalCenter
-        radius = params.rootchord/20
-        bullseye(center, radius, cl_geoCenter, ax)
+            # append position of section to x-axis ticks
+            x_tick_locations.append(x)
 
-        # plot the planform last
-        ax.plot(xValues, leadingEdge, color=cl_planform,
-                linewidth = lw_planform, solid_capstyle="round")
-        ax.plot(xValues, trailingeEge, color=cl_planform,
-                linewidth = lw_planform, solid_capstyle="round")
+        # set new ticks for the x-axis according to the positions of the flap
+        # separation lines
+        ax.set_xticks(x_tick_locations)
+
+        # plot control-points
+        ax.scatter(controlPoints_x, controlPoints_y, color=cl_hingeLine)
+
+        # plot the flap separation lines
+        for idx in range(numLines):
+            ax.plot(flapPositions_x[idx], flapPositions_y[idx],
+            color=cl_hingeLine, linewidth = lw_hingeLine, solid_capstyle="round")
+
+        # fill between zero line and flapDepth
+        ax.fill_between(xValues, zeroLine, flapDepth, color=cl_flapFill, alpha=0.4)
+
+        # helper texts, Root and Tip
+        (dummy, y) = flapPositions_y[0]
+        ax.annotate('Root',
+            xy=(0.0, y), xycoords='data',
+            xytext=(-10, 5), textcoords='offset points', color = cl_legend,
+            fontsize=fs_legend, rotation='vertical')
+
+        # plot additional point (invisible) to expand the y-axis
+        ax.plot(0.0, 1.8*y)
+
+        (dummy, y) = flapPositions_y[-1]
+        ax.annotate('Tip',
+            xy=(1.0, y), xycoords='data',
+            xytext=(10, 5), textcoords='offset points', color = cl_legend,
+            fontsize=fs_legend, rotation='vertical')
 
         # place legend
         ax.legend(loc='upper right', fontsize=fs_legend, labelcolor=cl_legend,
@@ -1639,12 +1707,8 @@ class wing:
         # show grid
         ax.grid(True)
 
-        # both axes shall be equal
-        ax.axis('equal')
-
-        # revert y-axis on demand
-        if (params.leadingEdgeOrientation == 'up'):
-            ax.set_ylim(ax.get_ylim()[::-1])
+        # revert y-axis
+        ax.set_ylim(ax.get_ylim()[::-1])
 
     # plot planform of the half-wing
     def plot_AirfoilDistribution(self, ax):
@@ -1731,7 +1795,6 @@ class wing:
             xytext=(2, 5), textcoords='offset points', color = cl_chordlengths,
             fontsize=fs_infotext, rotation='vertical')
 
-
             # plot label for airfoil-name / section-name
             text = ("%s" % (remove_suffix(element.airfoilName,'.dat')))
             props=dict(arrowstyle="-", connectionstyle= "angle,angleA=-90,angleB=30,rad=10",
@@ -1748,6 +1811,9 @@ class wing:
 
         # set new ticks for the x-axis according to the positions of the sections
         ax.set_xticks(x_tick_locations)
+
+        # set new ticks for the y-axis
+        ax.set_yticks([0.0, params.rootchord])
 
         # set new fontsize of the x-tick labels
         for tick in ax.xaxis.get_major_ticks():
@@ -1848,6 +1914,14 @@ class wing:
             xValues.append(xVal)
             xValuesRight.append(xVal)
 
+        # adapt coordinates of geometrical center
+        (center_x, center_y) = self.planform.geometricalCenter
+        center_x *= proj_fact
+        center_right_x = center_x +xOffset
+        center_left_x = (self.params.wingspan/2)*proj_fact - center_x
+        center_right = (center_right_x, center_y)
+        center_left = (center_left_x, center_y)
+
         # build up lists of y-values
         # left half wing
         for element in reversed(grid):
@@ -1856,7 +1930,6 @@ class wing:
             trailingEdgeLeft.append(element.trailingEdge)
 
         # center-section / fuselage (y)
-        #wingRoot_y = (leadingEdgeLeft[lastElement],trailingEdgeLeft[lastElement])
         wingRoot_y = (leadingEdgeLeft[-1],trailingEdgeLeft[-1])
 
         # right half wing
@@ -1919,16 +1992,24 @@ class wing:
 
         # fill the wing
         ax.fill_between(xValuesLeft, leadingEdgeLeft, hingeLineLeft, color=cl_planformFill, alpha=0.4)
-        ax.fill_between(xValuesLeft, hingeLineLeft, trailingEdgeLeft, color=cl_hingeLineFill, alpha=0.4)
+        ax.fill_between(xValuesLeft, hingeLineLeft, trailingEdgeLeft, color=cl_flapFill, alpha=0.4)
         ax.fill_between(xValuesRight, leadingEdgeRight, hingeLineRight, color=cl_planformFill, alpha=0.4)
-        ax.fill_between(xValuesRight, hingeLineRight, trailingEdgeRight, color=cl_hingeLineFill, alpha=0.4)
+        ax.fill_between(xValuesRight, hingeLineRight, trailingEdgeRight, color=cl_flapFill, alpha=0.4)
+
+        # plot geometrical center, left and right halfwing
+        (y_min,y_max) = ax.get_ylim()
+        radius = (y_max-y_min)/10
+        bullseye_BW(center_left, radius, ax)
+        bullseye_BW(center_right, radius, ax)
 
         # setup list for new x-tick locations
-        new_tick_locations = [0.0, proj_halfwingSpan, (proj_halfwingSpan + params.fuselageWidth/2),
-                             (proj_halfwingSpan + params.fuselageWidth), proj_wingspan]
+        new_tick_locations_x = [0.0, proj_halfwingSpan, center_left_x,
+                                (proj_halfwingSpan + params.fuselageWidth),
+                                center_right_x, proj_wingspan]
 
-        # set new ticks for the x-axis according to the positions of the sections
-        ax.set_xticks(new_tick_locations)
+        # set new ticks
+        ax.set_xticks(new_tick_locations_x)
+        ax.set_yticks([0.0, center_y, params.rootchord])
 
         # set new fontsize of the x-tick labels
         for tick in ax.xaxis.get_major_ticks():
@@ -2085,7 +2166,7 @@ def insert_PlanformDataIntoXFLR5_File(data, inFileName, outFileName):
 
         # add the new section to the tree
         wing.append(newSection)
-        hingeDepthPercent = (section.hingeDepth /section.chord )*100
+        hingeDepthPercent = (section.flapDepth /section.chord )*100
         NoteMsg("Section %d: position: %.0f mm, chordlength %.0f mm, hingeDepth %.1f  %%, airfoilName %s was inserted" %
           (section.number, section.y*1000, section.chord*1000, hingeDepthPercent, section.airfoilName))
 
@@ -2569,7 +2650,6 @@ class planform_creator:
         # linewidths
         global lw_grid
         global lw_quarterChordLine
-        global lw_geometricalCenterLine
         global lw_hingeLine
         global lw_planform
         global lw_sections
@@ -2590,7 +2670,6 @@ class planform_creator:
             # linewidths
             lw_grid *= scaleFactor
             lw_quarterChordLine *= scaleFactor
-            lw_geometricalCenterLine *= scaleFactor
             lw_hingeLine *= scaleFactor
             lw_planform *= scaleFactor
             lw_sections *= scaleFactor
