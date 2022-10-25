@@ -208,11 +208,10 @@ class wingGrid:
         self.y = 0.0
         self.chord = 0.0
         self.leadingEdge = 0.0
-        self.trailingEdge = 0.0
-        self.flapDepth = 0.0
-        self.hingeLine = 0.0
         self.quarterChordLine = 0.0
-        self.LE_derivative = 0.0
+        self.hingeLine = 0.0
+        self.flapDepth = 0.0
+        self.trailingEdge = 0.0
 
 ################################################################################
 #
@@ -232,9 +231,6 @@ class params:
         # single parameters,boolean
         self.isFin = False
         self.smoothUserAirfoils = False
-        self.showQuarterChordLine = True
-        self.showTipLine = False
-        self.showHingeLine = True
 
         # single parameters, double /float
         self.wingspan = 0.0
@@ -274,9 +270,6 @@ class params:
 
         # dependend parameters int
         self.rootReynolds = 0
-
-        # dependend parameters, array
-        self.chordDistribution = None
 
     ################################################################################
     # function that gets a single boolean parameter from dictionary and returns a
@@ -340,13 +333,6 @@ class params:
         self.flapDepthRoot = self.__get_MandatoryParameterFromDict(dictData, "flapDepthRoot")
         self.flapDepthTip = self.__get_MandatoryParameterFromDict(dictData, "flapDepthTip")
         self.dihedral = self.__get_MandatoryParameterFromDict(dictData, "dihedral")
-
-        # get existing chord distribution, if any
-        try:
-            self.chordDistribution = dictData["chordDistribution"]
-        except:
-            # not found, initially calculate chord distribution
-            WarningMsg("parameter \'chordDistribution\' not found, initializing chord distribution")
 
         # get airfoil- / section data
         self.airfoilTypes = self.__get_MandatoryParameterFromDict(dictData, 'airfoilTypes')
@@ -470,15 +456,6 @@ class params:
         self.smoothUserAirfoils = self.__get_booleanParameterFromDict(dictData,
                                   "smoothUserAirfoils", self.smoothUserAirfoils)
 
-        self.showQuarterChordLine = self.__get_booleanParameterFromDict(dictData,
-                                  "showQuarterChordLine", self.showQuarterChordLine)
-
-        self.showTipLine = self.__get_booleanParameterFromDict(dictData,
-                                  "showTipLine", self.showTipLine)
-
-        self.showHingeLine = self.__get_booleanParameterFromDict(dictData,
-                                   "showHingeLine", self.showHingeLine)
-
 
     def write_toDict(self, dictData):
         '''Function that writes actual parameter values to a given dictionary'''
@@ -507,7 +484,6 @@ class params:
         dictData['airfoilReynolds'] = self.airfoilReynolds[:]
         dictData['flapGroup'] = self.flapGroups[:]
         dictData["userAirfoils"] = self.userAirfoils[:]
-        dictData["chordDistribution"] = self.chordDistribution[:]
 
         # -------------- set optional parameters --------------------
         dictData["leadingEdgeOrientation"] = self.leadingEdgeOrientation
@@ -521,9 +497,6 @@ class params:
         # set additional boolean data
         dictData["smoothUserAirfoils"] = self.smoothUserAirfoils
         dictData["isFin"] = self.isFin
-        dictData["showQuarterChordLine"] = self.showQuarterChordLine
-        dictData["showTipLine"] = self.showTipLine
-        dictData["showHingeLine"] = self.showHingeLine
 
     def calculate_dependendValues(self):
         # calculate dependent parameters
@@ -583,9 +556,7 @@ class chordDistribution:
     # class init
     def __init__(self):
         self.num_gridPoints = 16384
-        self.num_controlPoints = 30
         self.normalizedGridPoints = []
-        self.controlPoints = []
 
     def __elliptical_shape(self, x, shapeParams):
         (normalizedTipChord, tipSharpness, ellipseCorrection) = shapeParams
@@ -639,71 +610,11 @@ class chordDistribution:
 
         return chord
 
-
-    def __calculate_shapeLength(self, shape, shapeParams):
-        last_x = 0.0
-        last_chord = 1.0
-        totalDistance = 0.0
-        num_points = 1024
-
-        # calculate interval for setting up the grid
-        delta_x = 1 / (num_points-1)
-
-        for i in range(1, (num_points+1)):
-            x = delta_x * (i-1)
-
-            # normalized chord-length
-            chord = self.__calculate_chord(x, shape, shapeParams)
-
-            # distance to previous point that was stored
-            totalDistance = totalDistance + calculate_distance(x, last_x, chord,
-                                                               last_chord)
-            last_x = x
-            last_chord = chord
-
-        return totalDistance
-
-
-    def init_controlPoints(self, shape, shapeParams):
-        # get total distance along shape
-        totalDistance = self.__calculate_shapeLength(shape, shapeParams)
-
-        # setup first control point of normalized chord distribution and the
-        # distance between the points
-        self.controlPoints = [(0.0, 1.0)]
-        last_x = 0.0
-        last_y = 1.0
-        delta_x = 1 / (self.num_gridPoints-1)
-        distDelta = totalDistance / (self.num_controlPoints-1)
-
-        for i in range(1, (self.num_gridPoints + 1)):
-            x = delta_x * (i-1)
-
-            # normalized chord-length
-            y = self.__calculate_chord(x, shape, shapeParams)
-
-            # distance to last point, that was stored
-            dist = calculate_distance(x, last_x, y, last_y)
-
-            if (dist >= distDelta):
-                # append new point to list of control points
-                self.controlPoints.append((x, y))
-                last_x = x
-                last_y = y
-
-        # append last point of normalized chord distribution
-        self.controlPoints.append((1.0, 0.0))
-
-    def get_controlPoints(self):
-        return self.controlPoints
-
-    def set_controlPoints(self, controlPoints):
-        self.controlPoints = controlPoints
-
     # calculate a chord-distribution, which is normalized to root_chord = 1.0
     # half wingspan = 1
     def calculate_grid(self, shape, shapeParams):
         self.normalizedGridPoints.clear()
+
         # calculate interval for setting up the grid
         grid_delta = 1 / (self.num_gridPoints-1)
         self.normalizedGrid = []
@@ -768,17 +679,13 @@ class chordDistribution:
 
         ax.annotate('Root',
             xy=(0.0, 0.0), xycoords='data',
-            xytext=(2, 5), textcoords='offset points', color = cl_legend,
+            xytext=(0, 5), textcoords='offset points', color = cl_legend,
             fontsize=fs_legend, rotation='vertical')
 
         ax.annotate('Tip',
             xy=(1.0, 0.0), xycoords='data',
-            xytext=(2, 5), textcoords='offset points', color = cl_legend,
+            xytext=(5, 5), textcoords='offset points', color = cl_legend,
             fontsize=fs_legend, rotation='vertical')
-##        # plot control points
-##        pts = np.vstack([self.controlPoints])
-##        x, y = pts.T
-##        ax.scatter(x, y, color=cl_normalizedChord)
 
         # place legend
         ax.legend(loc='upper right', fontsize=fs_legend, labelcolor=cl_legend,
@@ -808,24 +715,29 @@ class planform:
         center_x = 0.0
         center_y = 0.0
         self.wingArea = 0.0
+        self.flapArea = 0.0
 
         for element in self.grid:
-            # sum up area of the grid elements
-            area = (grid_delta_y*10 * element.chord*10)
+            # sum up area of the grid elements.
+            area = grid_delta_y * element.chord
+            flapArea = grid_delta_y * element.flapDepth
             center_y = center_y + element.centerLine*area
             center_x = center_x + element.y*area
 
             # sum up area of the grid elements, which in the end will be half of
-            # the wing area
-            self.wingArea = self.wingArea + area
+            # the total wing area / flap area
+            self.wingArea += area
+            self.flapArea += flapArea
 
         # Calculate geometrical center of the halfwing
-        center_x = center_x / self.wingArea
-        center_y = center_y / self.wingArea
+        center_x /= self.wingArea
+        center_y /= self.wingArea
         self.geometricalCenter = (center_x, center_y)
 
-        # calculate area of the whole wing
-        self.wingArea = self.wingArea * 2.0
+        # calculate area/ flap area of the whole wing
+        self.wingArea *= 2.0
+        self.flapArea *= 2.0
+
 
     # calculate planform-shape of the half-wing (high-resolution wing planform)
     def calculate(self, params:params, chordDistribution:chordDistribution):
@@ -853,15 +765,6 @@ class planform:
 
         # calculate interval for setting up the grid
         grid_delta_y = (params.halfwingspan / (self.num_gridPoints-1))
-
-        # init areaCenter
-        area_Center = 0.0
-
-        # track maximum value of leading edge derivative
-        LE_derivative_max = 0.0
-
-        # track maximum value of hingeDepth
-        hingeDepthPercent_max = 0.0
 
         # calculate all Grid-chords
         for i in range(1, (self.num_gridPoints + 1)):
@@ -899,24 +802,6 @@ class planform:
             grid.centerLine = grid.leadingEdge + (grid.chord/2)
             grid.quarterChordLine = grid.leadingEdge + (grid.trailingEdge-grid.leadingEdge)/4
 
-            # Calculate derivative of Leading edge
-            if (i>3):
-                grid.LE_derivative = -1.0*(self.grid[i-2].leadingEdge - self.grid[i-3].leadingEdge) / (self.grid[i-2].y - self.grid[i-3].y)
-            else:
-                grid.LE_derivative = 0.0
-
-            # Tracking of LE-derative Maximum-value
-            if (grid.LE_derivative < LE_derivative_max):
-                LE_derivative_max = grid.LE_derivative
-
-            # calculate percentual hingeDepth
-            grid.flapDepthPercent = ((grid.trailingEdge - grid.hingeLine) / grid.chord) * 100.0
-
-            # Tracking of hingeDepth maximum value
-            if (grid.flapDepthPercent > hingeDepthPercent_max):
-                hingeDepthPercent_max = grid.flapDepthPercent
-
-
             # append section to section-list of wing
             self.grid.append(grid)
 
@@ -926,16 +811,10 @@ class planform:
         # calculate aspect ratio of the wing
         self.aspectRatio = params.wingspan*params.wingspan / (self.wingArea/100)
 
-        # get geometrical center
-        (center_x, center_y) = self.geometricalCenter
-
         # add offset of half of the fuselage-width to the y-coordinates
         for element in self.grid:
             element.y = element.y + params.fuselageWidth/2
 
-        #self.draw_LE_derivative() #FIXME Debug-plot
-
-        return (LE_derivative_max, hingeDepthPercent_max)
 
 
     def find_grid(self, chord):
@@ -1141,17 +1020,6 @@ class wing:
 
         # read initial parameters from dictionary
         params.read_fromDict(dictData)
-
-        # are there control-points?
-        if (params.chordDistribution != None):
-            self.chordDistribution.set_controlPoints(params.chordDistribution)
-        else:
-            # get basic shape parameters and init control points
-            (shape, shapeParams) = params.get_shapeParams()
-            self.chordDistribution.init_controlPoints(shape, shapeParams)
-            # writeback control points to params
-            controlPoints = self.chordDistribution.get_controlPoints()
-            params.chordDistribution = controlPoints[:]
 
         # export initial params to dictionary
         params.write_toDict(self.paramsDict)
@@ -1571,16 +1439,14 @@ class wing:
                            (params.flapDepthRoot, params.flapDepthTip))
 
         # plot quarter-chord-line
-        if (params.showQuarterChordLine == True):
-            ax.plot(xValues, quarterChordLine, color=cl_quarterChordLine,
-              linestyle = ls_quarterChordLine, linewidth = lw_quarterChordLine,
-              solid_capstyle="round", label = "quarter-chord line")
+        ax.plot(xValues, quarterChordLine, color=cl_quarterChordLine,
+          linestyle = ls_quarterChordLine, linewidth = lw_quarterChordLine,
+          solid_capstyle="round", label = "quarter-chord line")
 
         # plot hinge-line
-        if (params.showHingeLine == True):
-            ax.plot(xValues, hingeLine, color=cl_hingeLine,
-              linestyle = ls_hingeLine, linewidth = lw_hingeLine,
-              solid_capstyle="round", label = labelHingeLine)
+        ax.plot(xValues, hingeLine, color=cl_hingeLine,
+          linestyle = ls_hingeLine, linewidth = lw_hingeLine,
+          solid_capstyle="round", label = labelHingeLine)
 
         # plot geometrical center
         (center_x, center_y) = self.planform.geometricalCenter
@@ -1984,12 +1850,6 @@ class wing:
         if (params.leadingEdgeOrientation == 'up'):
             ax.set_ylim(ax.get_ylim()[::-1])
 
-        # plot hinge-line
-##        if (self.showHingeLine == 'true'):
-##            ax.plot(xValuesLeft, hingeLine, color=cl_hingeLine,
-##              linestyle = ls_hingeLine, linewidth = lw_hingeLine,
-##              solid_capstyle="round")
-
         # fill the wing
         ax.fill_between(xValuesLeft, leadingEdgeLeft, hingeLineLeft, color=cl_planformFill, alpha=0.4)
         ax.fill_between(xValuesLeft, hingeLineLeft, trailingEdgeLeft, color=cl_flapFill, alpha=0.4)
@@ -2019,65 +1879,6 @@ class wing:
         # set new fontsize of the y-tick labels
         for tick in ax.yaxis.get_major_ticks():
             tick.label.set_fontsize(fs_ticks)
-
-    def draw_LE_derivative(self):
-        # set background style
-        plt.style.use(cl_background)
-
-        # customize grid
-        plt.grid(True, color='dimgrey',  linestyle='dotted', linewidth=0.4)
-
-        x = []
-        y = []
-
-        for element in self.grid:
-            x.append(element.y)
-            if (element.LE_derivative > 0.0):
-                y.append(element.LE_derivative)
-            else:
-                y.append(0.0)
-
-
-        plt.plot(x, y, color=cl_normalizedChord,
-                linewidth = lw_planform, solid_capstyle="round",
-                label = "LE derivative")
-
-        # maximize window
-        figManager = plt.get_current_fig_manager()
-        try:
-            figManager.window.Maximize(True)
-        except:
-            try:
-                figManager.window.state('zoomed')
-            except:
-                pass
-
-        # show diagram
-        plt.show()
-
-
-
-##    def getFigure(self):
-##        # set 'dark' style
-##        plt.style.use('dark_background')
-##
-##        # setup subplots
-##        fig, (upper,lower) = plt.subplots(2,1)
-##
-##        # compose diagram-title
-##        wingspan_mm = int(round(self.wingspan*1000))
-##        text = "\"%s\"\n wingspan: %d mm, area: %.2f dm², aspect ratio: %.2f, root-tip sweep: %.2f°\n"\
-##         % (self.planformName, wingspan_mm, self.area, self.aspectRatio, self.rootTipSweep)
-##
-##        fig.suptitle(text, fontsize = 12, color="darkgrey", **csfont)
-##
-##        # first figure, display detailed half-wing
-##        self.plot_AirfoilDistribution(upper)
-##
-##        # second figure, display
-##        self.plot_AirfoilDistribution(lower)
-##
-##        return fig
 
     def draw_diagram(self, diagramType, ax, x_limits, y_limits):
         if diagramType == diagTypes[0]:
@@ -2616,15 +2417,6 @@ class planform_creator:
 
         return 0
 
-    def __exit_action(self, value):
-        global print_disabled
-        print_disabled = True
-
-        return value
-
-    def __entry_action(self, airfoilIdx):
-        global print_disabled
-        print_disabled = False
 
     def __set_AxesAndLabels(self, ax, title):
         global cl_grid
