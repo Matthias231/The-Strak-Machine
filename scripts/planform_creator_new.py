@@ -1219,20 +1219,21 @@ class wing:
 
         # check all sections
         for idx in range (0, numSections):
+            section = sections[idx]
+
             # Change of Flap-Group or last section? -->separation line
-            if ((actualFlapGroup != sections[idx].flapGroup) or
-               ((idx == (numSections-1)) and (sections[idx].flapGroup !=0))):
+            if ((actualFlapGroup != section.flapGroup) or
+               ((idx == (numSections-1)) and (section.flapGroup !=0))):
                 # determine normalized x_pos and flapDepth
-                x = sections[idx].y / (params.wingspan/2)
-                flapDepth = sections[idx].trailingEdge - sections[idx].hingeLine
-                flapDepthPercent = (flapDepth / sections[idx].chord) * 100
+                x = section.y / sections[-1].y
+                flapDepthPercent = (section.flapDepth / section.chord) * 100
 
                 # append tupel to lists
                 flapPositions_x.append((x,x))
                 flapPositions_y.append((0,flapDepthPercent))
 
             # store actual flapGroup for comparison
-            actualFlapGroup = sections[idx].flapGroup
+            actualFlapGroup = section.flapGroup
 
         return (flapPositions_x, flapPositions_y)
 
@@ -1472,6 +1473,7 @@ class wing:
         # set new fontsize of the y-tick labels
         for tick in ax.yaxis.get_major_ticks():
             tick.label.set_fontsize(fs_ticks)
+
         # place legend
         ax.legend(loc='upper right', fontsize=fs_legend, labelcolor=cl_legend,
          frameon=False)
@@ -1488,29 +1490,8 @@ class wing:
 
 
     def plot_FlapDistribution(self, ax):
-        '''plots a diagram that shows distribution of flaps and also hinge depth'''
+        '''plots a diagram that shows distribution of flaps and also depth of flaps'''
         params = self.params
-
-        # create empty lists
-        xValues = []
-        zeroLine = []
-        flapDepth = []
-
-        # setup empty lists for new tick locations
-        x_tick_locations = []
-
-        # build up list of x- and y-values
-        grid = self.planform.grid
-        for element in grid:
-            zeroLine.append(0.0)
-            x = element.y / (params.wingspan/2)
-            xValues.append(x)
-            flapDepthPercent = (element.flapDepth / element.chord) * 100
-            flapDepth.append(flapDepthPercent)
-
-        ax.plot(xValues, zeroLine, color=cl_hingeLine,
-          linestyle = ls_hingeLine, linewidth = lw_hingeLine,
-          solid_capstyle="round", label = "Flap depth (%)")
 
         # get flap separation lines
         (flapPositions_x, flapPositions_y) = self.getFlapSeparationLines()
@@ -1519,6 +1500,9 @@ class wing:
         controlPoints_x = []
         controlPoints_y = []
         numLines = len(flapPositions_x)
+
+        # setup empty lists for new tick locations
+        x_tick_locations = []
 
         for idx in range(numLines):
             (dummy, x) = flapPositions_x[idx]
@@ -1547,8 +1531,24 @@ class wing:
             ax.plot(flapPositions_x[idx], flapPositions_y[idx],
             color=cl_hingeLine, linewidth = lw_hingeLine, solid_capstyle="round")
 
+        # create empty lists
+        xValues = []
+        flapDepth = []
+
+        # build up list of x- and y-values
+        grid = self.planform.grid
+        for idx in range(len(grid)-1):
+            x = grid[idx].y / grid[-1].y
+            xValues.append(x)
+            flapDepth.append((grid[idx].flapDepth / grid[idx].chord) * 100)
+
+        # plot flap depth in percent
+        ax.plot(xValues, flapDepth, color=cl_hingeLine,
+          linestyle = ls_hingeLine, linewidth = lw_hingeLine,
+          solid_capstyle="round", label = "Flap depth (%)")
+
         # fill between zero line and flapDepth
-        ax.fill_between(xValues, zeroLine, flapDepth, color=cl_flapFill, alpha=0.4)
+        ax.fill_between(xValues, flapDepth, color=cl_flapFill, alpha=0.4)
 
         # helper texts, Root and Tip
         (dummy, y) = flapPositions_y[0]
@@ -1732,7 +1732,7 @@ class wing:
     def plot_WingPlanform(self, ax):
         params = self.params
 
-        #create empty lists
+        # create empty lists
         xValues = []
         xValuesLeft = []
         xValuesRight = []
@@ -1858,7 +1858,7 @@ class wing:
 
         # plot geometrical center, left and right halfwing
         (y_min,y_max) = ax.get_ylim()
-        radius = (y_max-y_min)/10
+        radius = (y_max-y_min)/15
         bullseye_BW(center_left, radius, ax)
         bullseye_BW(center_right, radius, ax)
 
