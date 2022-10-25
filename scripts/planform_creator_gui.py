@@ -36,7 +36,7 @@ from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg,
                            bs, ressourcesPath)
 
 # imports from planform creator
-from planform_creator_new import (planform_creator, diagTypes, planformShapes)
+from planform_creator_new import (planform_creator, diagTypes, planformShapes, main_font)
 
 # some global variables
 num_diagrams = len(diagTypes)
@@ -54,7 +54,7 @@ bg_color_dark =  "#222222"
 # class control frame, change the input-variables / parameters of the
 # planform creator
 class control_frame():
-    def __init__(self, master, side, Buttons, creatorInstances, scaleFactor):
+    def __init__(self, master, side, labelsAndButtons, creatorInstances, scaleFactor):
         # store some variables in own class data structure
         self.master = master
         self.creatorInstances = creatorInstances
@@ -110,8 +110,9 @@ class control_frame():
         self.nextRow = 0
 
         # add different widgets to upper frame (not scrollable)
-        self.__add_labels(self.frame_left)
-        self.__add_buttons(self.frame_left, Buttons)
+        (labels, buttons) = labelsAndButtons
+        self.__add_labels(self.frame_left, labels)
+        self.__add_buttons(self.frame_left, buttons)
         self.__add_appearanceModeMenu(self.frame_left)
 
         # right frame (scrollable)
@@ -152,13 +153,16 @@ class control_frame():
     def get_unsavedChangesFlags(self):
         return (self.unsavedChangesFlags)
 
-    def __add_labels(self, frame):
-        # Label
-        label1 = self.__create_label(frame, "Select diagram", -16)
-        label2 = self.__create_label(frame, "Planform operations", -16)
-        label3 = self.__create_label(frame, "Data operations", -16)
 
-        self.__place_widgets([label1, label2, label3])
+    def __add_labels(self, frame, labels):
+        labelList = []
+
+        for label in labels:
+            newLabel = self.__create_label(frame, label, -16)
+            labelList.append(newLabel)
+
+        self.__place_widgets(labelList)
+
 
     def __get_buttonWidgetsRow(self, buttonWidgetsArray, rowIdx):
         row = []
@@ -205,7 +209,7 @@ class control_frame():
 
     def __create_label(self, frame, text, size):
         label = customtkinter.CTkLabel(master=frame,
-                text=text, text_font=("Roboto Medium", size), anchor="e")
+                text=text, text_font=(main_font, size), anchor="e")
         return label
 
     def __get_paramTable(self):
@@ -246,7 +250,7 @@ class control_frame():
 
             # create entry for param value
             value_entry = customtkinter.CTkEntry(frame, show=None,
-             textvariable = value_txt, text_font=('Roboto Medium', 11),
+             textvariable = value_txt, text_font=(main_font, 11),
              width=80, height=16)
 
              # bind to "Enter"-Message
@@ -257,13 +261,13 @@ class control_frame():
 
             # Add Label
             param_label = customtkinter.CTkLabel(master=frame,
-                  text=paramTableEntry["txt"], text_font=("Roboto Medium", 13),
+                  text=paramTableEntry["txt"], text_font=(main_font, 13),
                    anchor="e")
 
             unit = paramTableEntry["unit"]
             if unit != None:
                 unit_label = customtkinter.CTkLabel(master=frame,
-                  text=unit, text_font=("Roboto Medium", 13), anchor="w")
+                  text=unit, text_font=(main_font, 13), anchor="w")
             else:
                 unit_label = None
 
@@ -1168,31 +1172,42 @@ class App(customtkinter.CTk):
         controlFrame = self.frame_bottom
 
     def get_Buttons(self):
+        headlines = []
         buttons = []
         buttonsColumn = []
 
         # 1st column
+        headlines.append("Choose diagram")
         for diagType in diagTypes:
             buttonsColumn.append({"txt": diagType, "cmd" : self.set_diagram, "param" : diagType})
-
         buttons.append(buttonsColumn)
 
         # 2nd column
-        buttonsColumn = [{"txt": "Add planform",    "cmd" : self.add_planform,  "param" : None},
-                         {"txt": "Remove planform", "cmd" : self.remove_planform,  "param" : None}
+        headlines.append("Planform actions")
+        buttonsColumn = [{"txt": "Add planform",     "cmd" : self.add_planform,     "param" : None},
+                         {"txt": "Remove planform",  "cmd" : self.remove_planform,  "param" : None},
+                         {"txt": "Export planforms", "cmd" : self.export_planforms, "param" : None}
                         ]
-
         buttons.append(buttonsColumn)
 
         # 3nd column
+        headlines.append("Airfoil actions")
+        buttonsColumn = [{"txt": "Add airfoil",     "cmd" : self.add_airfoil,     "param" : None},
+                         {"txt": "Remove airfoil",  "cmd" : self.remove_airfoil,  "param" : None},
+                         {"txt": "Export airfoils", "cmd" : self.export_airfoils, "param" : None}
+                        ]
+        buttons.append(buttonsColumn)
+
+        # 4th column
+        headlines.append("Parameter actions")
         buttonsColumn = [{"txt": "Load",  "cmd" : self.load,  "param" : None},
                          {"txt": "Save",  "cmd" : self.save,  "param" : None},
                          {"txt": "Reset", "cmd" : self.reset, "param" : None}
                         ]
-
         buttons.append(buttonsColumn)
 
-        return buttons
+
+        return (headlines, buttons)
 
     def set_updateNeeded(self):
         self.updateNeeded = True
@@ -1220,6 +1235,18 @@ class App(customtkinter.CTk):
         return #FIXME implement
 
     def remove_planform(self, dummy):
+        return #FIXME implement
+
+    def export_planforms(self, dummy):
+        return #FIXME implement
+
+    def add_airfoil(self, dummy):
+        return #FIXME implement
+
+    def remove_airfoil(self, dummy):
+        return #FIXME implement
+
+    def export_airfoils(self, dummy):
         return #FIXME implement
 
     def save(self, dummy):

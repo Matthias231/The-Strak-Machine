@@ -18,6 +18,7 @@
 #  Copyright (C) 2020-2022 Matthias Boese
 
 import ctypes
+import customtkinter
 import re
 import xml.etree.ElementTree as ET
 from copy import deepcopy
@@ -68,15 +69,9 @@ planformsPath = '02_planforms'
 # folder containing the output / result-files
 outputFolder = buildPath + bs + planformsPath
 
-# fonts
-csfont = {'fontname':'DejaVu Sans'}
-
-# fontsizes
-fs_infotext = 7
-fs_legend = 7
-
 # colours, lineStyles
 cl_background = None
+cl_grid = None
 cl_quarterChordLine = None
 cl_geometricalCenterLine = None
 cl_geoCenter = None
@@ -88,29 +83,48 @@ cl_sections = None
 cl_userAirfoil = None
 cl_optAirfoil = None
 cl_infotext = None
+cl_diagramTitle = None
+cl_legend = None
 cl_chordlengths = None
 cl_referenceChord = None
 cl_normalizedChord = None
 cl_controlPoints = None
 
+# linestyles
+ls_grid = 'dotted'
 ls_quarterChordLine = 'solid'
-lw_quarterChordLine  = 0.8
 ls_geometricalCenterLine = 'solid'
-lw_geometricalCenterLine = 0.8
 ls_hingeLine = 'solid'
-lw_hingeLine = 0.6
 ls_planform = 'solid'
-lw_planform = 1.0
 ls_sections = 'solid'
-lw_sections = 0.4
-fs_tick = 7
 
+# linewidths
+lw_grid = 0.3
+lw_quarterChordLine  = 0.8
+lw_geometricalCenterLine = 0.8
+lw_hingeLine = 0.6
+lw_planform = 1.0
+lw_sections = 0.4
+
+# fontsizes
+fs_diagramTitle = 20
+fs_infotext = 9
+fs_legend = 9
+fs_axes = 20
+fs_ticks = 10
+
+# fonts
+main_font = "Roboto Medium"
+
+# scaling information
 scaled = False
 scaleFactor = 1.0
 
 # types of diagrams
-diagTypes = "Chord distribution", "Planform shape", "Airfoil distribution", "Wing"
-planformShapes = 'elliptical', 'trapezoidal'
+diagTypes = ["Chord distribution", "Planform shape", "Flap distribution",
+             "Airfoil distribution", "Wing"]
+
+planformShapes = ['elliptical', 'trapezoidal']
 
 xfoilWorkerCall = "..\\..\\bin\\" + xfoilWorkerName + '.exe'
 inputFilename = "..\\..\\ressources\\" + smoothInputFile
@@ -639,14 +653,6 @@ class chordDistribution:
 
         return totalDistance
 
-    def __set_AxesAndLabels(self, ax, title):
-
-        # set title of the plot
-        text = (title)
-        #ax.set_title(text, fontsize = 30, color="darkgrey")
-
-        # customize grid
-        ax.grid(True, color='dimgrey',  linestyle='dotted', linewidth=0.4)
 
     def init_controlPoints(self, shape, shapeParams):
         # get total distance along shape
@@ -730,12 +736,6 @@ class chordDistribution:
         return None
 
     def plot(self, ax):
-        # set axes and labels
-        self.__set_AxesAndLabels(ax, "Chord distribution")
-
-        # set background style
-        #ax.style.use(cl_background)
-
         # generate lists of x and y-coordinates
         normalizedHalfwingspan = []
         normalizedChord = []
@@ -761,9 +761,9 @@ class chordDistribution:
 ##        x, y = pts.T
 ##        ax.scatter(x, y, color=cl_normalizedChord)
 
-        # place title and legend
-        #ax.title("Normalized chord distribution")
-        ax.legend(loc='upper right', fontsize = fs_legend)
+        # place legend
+        ax.legend(loc='upper right', fontsize=fs_legend, labelcolor=cl_legend,
+         frameon=False)
 
 
 ################################################################################
@@ -952,6 +952,7 @@ class wing:
 
     def set_colours(self):
         global cl_background
+        global cl_grid
         global cl_quarterChordLine
         global cl_geometricalCenterLine
         global cl_geoCenter
@@ -963,6 +964,8 @@ class wing:
         global cl_userAirfoil
         global cl_optAirfoil
         global cl_infotext
+        global cl_diagramTitle
+        global cl_legend
         global cl_controlPoints
         global cl_normalizedChord
         params = self.params
@@ -970,6 +973,7 @@ class wing:
         if params.theme == 'Light':
             # black and white theme
             cl_background = 'lightgray'
+            cl_grid = 'black'
             cl_quarterChordLine = 'blue'
             cl_geometricalCenterLine = 'black'
             cl_geoCenter = 'black'
@@ -983,11 +987,14 @@ class wing:
             cl_infotext = 'black'
             cl_chordlengths = 'darkgray'
             cl_referenceChord = 'dark'
+            cl_diagramTitle = 'darkgray'
+            cl_legend = 'black'
             cl_normalizedChord = 'black'
             cl_controlPoints = 'red'
         elif params.theme == 'Dark':
             # dark theme
             cl_background = 'black'
+            cl_grid = 'ghostwhite'
             cl_quarterChordLine = 'orange'
             cl_geometricalCenterLine = 'blue'
             cl_geoCenter = 'lightgray'
@@ -1001,6 +1008,8 @@ class wing:
             cl_infotext = 'DeepSkyBlue'
             cl_chordlengths = 'darkgray'
             cl_referenceChord = 'gray'
+            cl_diagramTitle = 'dimgray'
+            cl_legend = 'ghostwhite'
             cl_normalizedChord = 'orange'
             cl_controlPoints = 'red'
         else:
@@ -1506,8 +1515,79 @@ class wing:
         x_tick_locations = []
         y_tick_locations = [params.rootchord]
 
-        # set axes and labels
-        self.set_AxesAndLabels(ax, "Planform shape")
+        grid = self.planform.grid
+        for element in grid:
+            # build up list of x-values
+            xValues.append(element.y)
+
+            # build up lists of y-values
+            leadingEdge.append(element.leadingEdge)
+            quarterChordLine.append(element.quarterChordLine)
+            geometricalCenterLine.append(element.geometricalCenterLine)
+            hingeLine.append(element.hingeLine)
+            trailingeEge.append(element.trailingEdge)
+
+        # setup root- and tip-joint
+        trailingeEge[0] = leadingEdge[0]
+        trailingeEge[-1] = leadingEdge[-1]
+
+        # compose labels for legend
+        labelHingeLine = ("hinge line (%.1f %% / %.1f %%)" %
+                           (params.hingeDepthRoot, params.hingeDepthTip))
+
+        # plot quarter-chord-line
+        if (params.showQuarterChordLine == True):
+            ax.plot(xValues, quarterChordLine, color=cl_quarterChordLine,
+              linestyle = ls_quarterChordLine, linewidth = lw_quarterChordLine,
+              solid_capstyle="round", label = "quarter-chord line")
+
+        # plot hinge-line
+        if (params.showHingeLine == True):
+            ax.plot(xValues, hingeLine, color=cl_hingeLine,
+              linestyle = ls_hingeLine, linewidth = lw_hingeLine,
+              solid_capstyle="round", label = labelHingeLine)
+
+        # plot geometrical center
+        center = self.planform.geometricalCenter
+        radius = params.rootchord/20
+        bullseye(center, radius, cl_geoCenter, ax)
+
+        # plot the planform last
+        ax.plot(xValues, leadingEdge, color=cl_planform,
+                linewidth = lw_planform, solid_capstyle="round")
+        ax.plot(xValues, trailingeEge, color=cl_planform,
+                linewidth = lw_planform, solid_capstyle="round")
+
+        # place legend
+        ax.legend(loc='upper right', fontsize=fs_legend, labelcolor=cl_legend,
+         frameon=False)
+
+        # show grid
+        ax.grid(True)
+
+        # both axes shall be equal
+        ax.axis('equal')
+
+        # revert y-axis on demand
+        if (params.leadingEdgeOrientation == 'up'):
+            ax.set_ylim(ax.get_ylim()[::-1])
+
+
+    def plot_FlapDistribution(self, ax):
+        '''plots a diagram that shows distribution of flaps and also hinge depth'''
+        params = self.params
+
+        # create empty lists
+        xValues = []
+        leadingEdge = []
+        trailingeEge = []
+        hingeLine = []
+        quarterChordLine = []
+        geometricalCenterLine = []
+
+        # setup empty lists for new tick locations
+        x_tick_locations = []
+        y_tick_locations = [params.rootchord]
 
         grid = self.planform.grid
         for element in grid:
@@ -1535,11 +1615,6 @@ class wing:
               linestyle = ls_quarterChordLine, linewidth = lw_quarterChordLine,
               solid_capstyle="round", label = "quarter-chord line")
 
-        if (params.showTipLine == True):
-            ax.plot(xValues, geometricalCenterLine, color=cl_geometricalCenterLine,
-              linestyle = ls_geometricalCenterLine, linewidth = lw_geometricalCenterLine,
-              solid_capstyle="round", label = "area CoG line")
-
         # plot hinge-line
         if (params.showHingeLine == True):
             ax.plot(xValues, hingeLine, color=cl_hingeLine,
@@ -1556,17 +1631,10 @@ class wing:
                 linewidth = lw_planform, solid_capstyle="round")
         ax.plot(xValues, trailingeEge, color=cl_planform,
                 linewidth = lw_planform, solid_capstyle="round")
-        try:
-            airfoilType = params.airfoilTypes[0]
-        except:
-             airfoilType = 'blend'
 
-        # plot additional point (invisible) to expand the y-axis and
-        # get the labels inside the diagram
-        ax.plot(xValues[0], -1*(params.rootchord/2))
-
-        # place legend inside subplot
-        ax.legend(loc='lower right', fontsize = fs_legend)
+        # place legend
+        ax.legend(loc='upper right', fontsize=fs_legend, labelcolor=cl_legend,
+           frameon=False)
 
         # show grid
         ax.grid(True)
@@ -1586,16 +1654,9 @@ class wing:
         xValues = []
         leadingEdge = []
         trailingeEge = []
-        #hingeLine = []
-        #quarterChordLine = []
-        #geometricalCenterLine = []
 
         # setup empty lists for new tick locations
         x_tick_locations = []
-        y_tick_locations = [params.rootchord]
-
-        # set axes and labels
-        self.set_AxesAndLabels(ax, "Half-wing planform")
 
         # plot sections in reverse order
         idx = len(params.airfoilTypes) - 1
@@ -1608,6 +1669,11 @@ class wing:
             # plot all sections
             sectionsList = self.sections
 
+        # compose labels for airfoil types
+        label_user =  'airfoiltype \'user\''
+        label_blend = 'airfoiltype \'blend\''
+        label_opt = 'airfoiltype \'opt\''
+
         for element in reversed(sectionsList):
             # determine type of airfoil of this section
             try:
@@ -1615,11 +1681,32 @@ class wing:
             except:
                 airfoilType = 'blend'
 
+            # get labeltext
+            if (airfoilType == 'user'):
+                if label_user != None:
+                    labelText = label_user[:]
+                    label_user = None
+                else:
+                    labelText = None
+            elif (airfoilType == 'opt'):
+                if label_opt != None:
+                    labelText = label_opt[:]
+                    label_opt = None
+                else:
+                    labelText = None
+            else:
+                if label_blend != None:
+                    labelText = label_blend[:]
+                    label_blend = None
+                else:
+                    labelText = None
+
+            # get labelcolor, which will also be the color of the plotted line
             labelColor = self.get_colorFromAirfoilType(airfoilType)
 
             ax.plot([element.y, element.y] ,[element.leadingEdge, element.trailingEdge],
             color=labelColor, linestyle = ls_sections, linewidth = lw_sections,
-            solid_capstyle="round")
+            solid_capstyle="round", label = labelText)
 
             # determine x and y Positions of the labels
             xPos = element.y
@@ -1647,86 +1734,56 @@ class wing:
 
             # plot label for airfoil-name / section-name
             text = ("%s" % (remove_suffix(element.airfoilName,'.dat')))
-            props=dict(arrowstyle="-", connectionstyle= "angle,angleA=-90,angleB=30,rad=10", color=labelColor)
+            props=dict(arrowstyle="-", connectionstyle= "angle,angleA=-90,angleB=30,rad=10",
+             color=labelColor)
 
             ax.annotate(text,
             xy=(xPos, yPosSectionLabel), xycoords='data',
-            xytext=(8, yPosOffsetSectionLabel), textcoords='offset points', color = labelColor,fontsize=fs_infotext, rotation='vertical', arrowprops=props)
-           # bbox=dict(boxstyle="round", facecolor = "white", alpha=0.2), fontsize=fs_infotext, rotation='vertical', arrowprops=props)
+            xytext=(8, yPosOffsetSectionLabel), textcoords='offset points',
+            color = labelColor,fontsize=fs_infotext, rotation='vertical', arrowprops=props)
 
             # append position of section to x-axis ticks
             x_tick_locations.append(xPos)
-
-            # append position of leading edge and trailing edge to y-axis-ticks
-            y_tick_locations.append(element.leadingEdge)
-            #y_tick_locations.append(element.trailingEdge)
             idx = idx - 1
 
         # set new ticks for the x-axis according to the positions of the sections
         ax.set_xticks(x_tick_locations)
-        ax.set_yticks(y_tick_locations)
 
         # set new fontsize of the x-tick labels
         for tick in ax.xaxis.get_major_ticks():
-            tick.label.set_fontsize(fs_tick)
+            tick.label.set_fontsize(fs_ticks)
             tick.label.set_rotation('vertical')
 
         # set new fontsize of the y-tick labels
         for tick in ax.yaxis.get_major_ticks():
-            tick.label.set_fontsize(fs_tick)
+            tick.label.set_fontsize(fs_ticks)
 
         grid = self.planform.grid
         for element in grid:
-            #build up list of x-values
+            # build up list of x-values
             xValues.append(element.y)
-            #build up lists of y-values
+
+            # build up lists of y-values
             leadingEdge.append(element.leadingEdge)
-##            quarterChordLine.append(element.quarterChordLine)
-##            geometricalCenterLine.append(element.geometricalCenterLine)
-##            hingeLine.append(element.hingeLine)
             trailingeEge.append(element.trailingEdge)
 
         # setup root- and tip-joint
         trailingeEge[0] = leadingEdge[0]
         trailingeEge[-1] = leadingEdge[-1]
 
-        # compose labels for legend
-        labelHingeLine = ("hinge line (%.1f %% / %.1f %%)" %
-                           (params.hingeDepthRoot, params.hingeDepthTip))
-
-##        # plot quarter-chord-line
-##        if (params.showQuarterChordLine == True):
-##            ax.plot(xValues, quarterChordLine, color=cl_quarterChordLine,
-##              linestyle = ls_quarterChordLine, linewidth = lw_quarterChordLine,
-##              solid_capstyle="round", label = "quarter-chord line")
-##
-##        if (params.showTipLine == True):
-##            ax.plot(xValues, geometricalCenterLine, color=cl_geometricalCenterLine,
-##              linestyle = ls_geometricalCenterLine, linewidth = lw_geometricalCenterLine,
-##              solid_capstyle="round", label = "area CoG line")
-##
-##        # plot hinge-line
-##        if (params.showHingeLine == True):
-##            ax.plot(xValues, hingeLine, color=cl_hingeLine,
-##              linestyle = ls_hingeLine, linewidth = lw_hingeLine,
-##              solid_capstyle="round", label = labelHingeLine)
-
         # plot the planform last
         ax.plot(xValues, leadingEdge, color=cl_planform,
                 linewidth = lw_planform, solid_capstyle="round")
         ax.plot(xValues, trailingeEge, color=cl_planform,
                 linewidth = lw_planform, solid_capstyle="round")
-        try:
-            airfoilType = params.airfoilTypes[0]
-        except:
-             airfoilType = 'blend'
 
         # plot additional point (invisible) to expand the y-axis and
         # get the labels inside the diagram
         ax.plot(xValues[0], -1*(params.rootchord/2))
 
-        # place legend inside subplot
-        ax.legend(loc='lower right', fontsize = fs_legend)
+        # place legend
+        ax.legend(loc='upper right', fontsize=fs_legend, labelcolor=cl_legend,
+         frameon=False)
 
         # show grid
         ax.grid(True)
@@ -1765,9 +1822,6 @@ class wing:
 
         # Caution, fuselageWidth does not change due to projection
         proj_wingspan = (2*proj_halfwingSpan) + params.fuselageWidth
-
-        # set axes and labels
-        self.set_AxesAndLabels(ax, "Full-wing planform")
 
         # build up list of x-values,
         # first left half-wing
@@ -1878,23 +1932,12 @@ class wing:
 
         # set new fontsize of the x-tick labels
         for tick in ax.xaxis.get_major_ticks():
-            tick.label.set_fontsize(fs_tick)
+            tick.label.set_fontsize(fs_ticks)
             tick.label.set_rotation('vertical')
 
         # set new fontsize of the y-tick labels
         for tick in ax.yaxis.get_major_ticks():
-            tick.label.set_fontsize(fs_tick)
-
-
-    def set_AxesAndLabels(self, ax, title):
-
-        # set title of the plot
-        text = (title)
-        #ax.set_title(text, fontsize = 30, color="darkgrey")
-
-        # customize grid
-        ax.grid(True, color='dimgrey',  linestyle='dotted', linewidth=0.4)
-
+            tick.label.set_fontsize(fs_ticks)
 
     def draw_LE_derivative(self):
         # set background style
@@ -1932,68 +1975,28 @@ class wing:
         plt.show()
 
 
-    # draw the graph
-    def draw(self):
-        params = self.params
 
-        # set background style
-        plt.style.use(cl_background)
-
-        # setup subplots
-        fig, (upper,lower) = plt.subplots(2,1)
-
-        # compose diagram-title
-        wingspan_mm = int(round(self.wingspan*1000))
-        rootchord_mm = int(round(self.rootchord*1000))
-        proj_area = self.area * cos(self.dihedral*pi/180.0)
-
-        text = "\"%s\"\n wingspan: %d mm, rootchord: %d mm, area: %.2f dm², proj. area: %.2f dm²\n"\
-         "aspect ratio: %.2f, hinge line angle: %.2f°\n"\
-         % (params.planformName, wingspan_mm, rootchord_mm, params.area, proj_area,
-         params.aspectRatio, params.hingeLineAngle)
-
-        fig.suptitle(text, fontsize = 12, color="darkgrey", **csfont)
-
-        # first figure, display detailed half-wing
-        self.plot_AirfoilDistribution(upper)
-
-        # second figure, display
-        self.plot_WingPlanform(lower)
-
-        # maximize window
-        figManager = plt.get_current_fig_manager()
-        try:
-            figManager.window.Maximize(True)
-        except:
-            try:
-                figManager.window.state('zoomed')
-            except:
-                pass
-
-        # show diagram
-        plt.show()
-
-    def getFigure(self):
-        # set 'dark' style
-        plt.style.use('dark_background')
-
-        # setup subplots
-        fig, (upper,lower) = plt.subplots(2,1)
-
-        # compose diagram-title
-        wingspan_mm = int(round(self.wingspan*1000))
-        text = "\"%s\"\n wingspan: %d mm, area: %.2f dm², aspect ratio: %.2f, root-tip sweep: %.2f°\n"\
-         % (self.planformName, wingspan_mm, self.area, self.aspectRatio, self.rootTipSweep)
-
-        fig.suptitle(text, fontsize = 12, color="darkgrey", **csfont)
-
-        # first figure, display detailed half-wing
-        self.plot_AirfoilDistribution(upper)
-
-        # second figure, display
-        self.plot_AirfoilDistribution(lower)
-
-        return fig
+##    def getFigure(self):
+##        # set 'dark' style
+##        plt.style.use('dark_background')
+##
+##        # setup subplots
+##        fig, (upper,lower) = plt.subplots(2,1)
+##
+##        # compose diagram-title
+##        wingspan_mm = int(round(self.wingspan*1000))
+##        text = "\"%s\"\n wingspan: %d mm, area: %.2f dm², aspect ratio: %.2f, root-tip sweep: %.2f°\n"\
+##         % (self.planformName, wingspan_mm, self.area, self.aspectRatio, self.rootTipSweep)
+##
+##        fig.suptitle(text, fontsize = 12, color="darkgrey", **csfont)
+##
+##        # first figure, display detailed half-wing
+##        self.plot_AirfoilDistribution(upper)
+##
+##        # second figure, display
+##        self.plot_AirfoilDistribution(lower)
+##
+##        return fig
 
     def draw_diagram(self, diagramType, ax, x_limits, y_limits):
         if diagramType == diagTypes[0]:
@@ -2001,8 +2004,10 @@ class wing:
         elif diagramType == diagTypes[1]:
             self.plot_PlanformShape(ax)
         elif diagramType == diagTypes[2]:
-            self.plot_AirfoilDistribution(ax)
+            self.plot_FlapDistribution(ax)
         elif diagramType == diagTypes[3]:
+            self.plot_AirfoilDistribution(ax)
+        elif diagramType == diagTypes[4]:
             self.plot_WingPlanform(ax)
 
         else:
@@ -2540,16 +2545,67 @@ class planform_creator:
         global print_disabled
         print_disabled = False
 
+    def __set_AxesAndLabels(self, ax, title):
+        global cl_grid
+        global cl_diagramTitle
+        global ls_grid
+        global lw_grid
+        global fs_diagramTitle
+        global main_font
+
+        # set title of the plot
+        text = (title)
+        ax.set_title(text, font = main_font, fontsize = fs_diagramTitle,
+           color=cl_diagramTitle)
+
+        # customize grid
+        ax.grid(True, color=cl_grid,  linestyle=ls_grid, linewidth=lw_grid)
+
     def set_screenParams(self, width, height):
-        '''set scalings for fonts etc. depending on screen resolution'''
+        '''set scalings for fonts and linewidths depending on screen resolution'''
         global scaled
         global scaleFactor
+
+        # linewidths
+        global lw_grid
+        global lw_quarterChordLine
+        global lw_geometricalCenterLine
+        global lw_hingeLine
+        global lw_planform
+        global lw_sections
+
+        # fontsizes
+        global fs_diagramTitle
+        global fs_infotext
+        global fs_legend
+        global fs_axes
+        global fs_ticks
 
         if (scaled == False):
             # scale font sizes (1920 being default screen width)
             scaleFactor = int(width/1920)
             if (scaleFactor < 1):
                 scaleFactor = 1
+
+            # linewidths
+            lw_grid *= scaleFactor
+            lw_quarterChordLine *= scaleFactor
+            lw_geometricalCenterLine *= scaleFactor
+            lw_hingeLine *= scaleFactor
+            lw_planform *= scaleFactor
+            lw_sections *= scaleFactor
+
+            # fontsizes
+            fs_diagramTitle *= scaleFactor
+            fs_infotext *= scaleFactor
+            fs_legend *= scaleFactor
+            fs_axes *= scaleFactor
+            fs_ticks *= scaleFactor
+
+            fs_infotext *= scaleFactor
+            fs_legend *= scaleFactor
+            fs_axes *= scaleFactor
+            fs_ticks *= scaleFactor
 
             scaled = True
 
@@ -2592,6 +2648,9 @@ class planform_creator:
 
         # set background first (dark or light)
         ax.set_facecolor(cl_background)
+
+        # set axes and labels
+        self.__set_AxesAndLabels(ax, diagramType)
 
         # draw the graph
         self.newWing.draw_diagram(diagramType, ax, x_limits, y_limits)
