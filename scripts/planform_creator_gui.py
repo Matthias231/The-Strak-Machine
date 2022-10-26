@@ -36,7 +36,8 @@ from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg,
                            bs, ressourcesPath)
 
 # imports from planform creator
-from planform_creator_new import (planform_creator, diagTypes, planformShapes, main_font)
+from planform_creator_new import (planform_creator, diagTypes, airfoilTypes,
+                                  planformShapes, main_font)
 
 # some global variables
 num_diagrams = len(diagTypes)
@@ -131,6 +132,7 @@ class control_frame():
 
         # second column, start at row 1
         nextRow = self.__add_airfoilChoiceMenu(self.frame_right, 3, 1)
+        nextRow = self.__add_airfoilTypeMenu(self.frame_right, 3, nextRow)
 
         # add entries
         nextRow = self.__add_airfoilParams(self.frame_right, 3, nextRow)
@@ -238,36 +240,33 @@ class control_frame():
         return label
 
     def __get_basicParamsTable(self):
-        table = [#{"txt": "Planform name",               "options" : None,           "variable" : params.planformName,     "unit" : None, "scaleFactor" : None},
-                 #{"txt": "Planform shape",              "options" : planformShapes, "variable" : params.planformShape,    "unit" : None, "scaleFactor" : None },
-                  {"txt": "Airfoils basic name",          "options" : None, "variable" : 'airfoilBasicName', "idx": None, "unit" : None, "scaleFactor" : None},
-                  {"txt": "wingspan",                     "options" : None, "variable" : 'wingspan',              "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
-                  {"txt": "Root chord",                   "options" : None, "variable" : 'rootchord',             "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
-                  {"txt": "Tip chord",                    "options" : None, "variable" : 'tipchord',              "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
-                  {"txt": "Tip sharpness",                "options" : None, "variable" : 'tipSharpness',          "idx": None, "unit" : None, "scaleFactor" : None},
-                  {"txt": "Ellipse correction",           "options" : None, "variable" : 'ellipseCorrection',     "idx": None, "unit" : None, "scaleFactor" : 100.0},
-                  {"txt": "Leading edge correction",      "options" : None, "variable" : 'leadingEdgeCorrection', "idx": None, "unit" : None, "scaleFactor" : 100.0},
-                  {"txt": "Dihedral",                     "options" : None, "variable" : 'dihedral',              "idx": None, "unit" : "°",  "scaleFactor" : None},
-                  {"txt": "Width of fuselage",            "options" : None, "variable" : 'fuselageWidth',         "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
-                  {"txt": "Hingeline angle @root",        "options" : None, "variable" : 'hingeLineAngle',        "idx": None, "unit" : "°",  "scaleFactor" : None},
-                  {"txt": "Flap depth @root",             "options" : None, "variable" : 'flapDepthRoot',         "idx": None, "unit" : "%",  "scaleFactor" : None},
-                  {"txt": "Flap depth @tip",              "options" : None, "variable" : 'flapDepthTip',          "idx": None, "unit" : "%",  "scaleFactor" : None},
-                  #{"txt": "NCrit",                        "options" : None, "variable" : 'polar_Ncrit',           "idx": None, "unit" : None, "scaleFactor" : None},
-                  #{"txt": "Interpolation Segments",       "options" : None, "variable" : 'interpolationSegments', "idx": None, "unit" : None,  "scaleFactor" : None},
+        table = [#{"txt": "Planform name",                "variable" : params.planformName,     "unit" : None, "scaleFactor" : None},
+                 #{"txt": "Planform shape",               "variable" : params.planformShape,    "unit" : None, "scaleFactor" : None },
+                  {"txt": "Airfoils basic name",          "variable" : 'airfoilBasicName', "idx": None, "unit" : None, "scaleFactor" : None},
+                  {"txt": "wingspan",                     "variable" : 'wingspan',              "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
+                  {"txt": "Root chord",                   "variable" : 'rootchord',             "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
+                  {"txt": "Tip chord",                    "variable" : 'tipchord',              "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
+                  {"txt": "Tip sharpness",                "variable" : 'tipSharpness',          "idx": None, "unit" : None, "scaleFactor" : None},
+                  {"txt": "Ellipse correction",           "variable" : 'ellipseCorrection',     "idx": None, "unit" : None, "scaleFactor" : 100.0},
+                  {"txt": "Leading edge correction",      "variable" : 'leadingEdgeCorrection', "idx": None, "unit" : None, "scaleFactor" : 100.0},
+                  {"txt": "Dihedral",                     "variable" : 'dihedral',              "idx": None, "unit" : "°",  "scaleFactor" : None},
+                  {"txt": "Width of fuselage",            "variable" : 'fuselageWidth',         "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
+                  {"txt": "Hingeline angle @root",        "variable" : 'hingeLineAngle',        "idx": None, "unit" : "°",  "scaleFactor" : None},
+                  {"txt": "Flap depth @root",             "variable" : 'flapDepthRoot',         "idx": None, "unit" : "%",  "scaleFactor" : None},
+                  {"txt": "Flap depth @tip",              "variable" : 'flapDepthTip',          "idx": None, "unit" : "%",  "scaleFactor" : None},
+                  #{"txt": "NCrit",                        "variable" : 'polar_Ncrit',           "idx": None, "unit" : None, "scaleFactor" : None},
+                  #{"txt": "Interpolation Segments",       "variable" : 'interpolationSegments', "idx": None, "unit" : None,  "scaleFactor" : None},
                 ]
         return table
 
     def __get_airfoilParamsTable(self):
-        airfoilTypes = ['user', 'blend', 'opt']
         idx = self.airfoilIdx[self.master.planformIdx]
-
         table = [
-                 #{"txt": "Root airfoil: Re*Sqrt(Cl)",     "options" : None,         "variable" : 'rootReynolds',     "idx": None, "unit" : None, "scaleFactor" : None},
-                 #{"txt": "choose airfoil",      "options" : None, "variable" : 'airfoilChoice',     "unit" : None, "scaleFactor" : None},
-                 {"txt": "selected Airfoil: Type",        "options" : airfoilTypes, "variable" : 'airfoilTypes',     "idx": idx, "unit" : None, "scaleFactor" : None},
-                 {"txt": "selected Airfoil: Position",    "options" : None,         "variable" : 'airfoilPositions', "idx": idx, "unit" : None, "scaleFactor" : None},
-                 {"txt": "selected Airfoil: Re*Sqrt(Cl)", "options" : None,         "variable" : 'airfoilReynolds',  "idx": idx, "unit" : None, "scaleFactor" : None},
-                 {"txt": "selected Airfoil: flap group",  "options" : None,         "variable" : 'flapGroup',        "idx": idx, "unit" : None, "scaleFactor" : None},
+                 {"txt": "selected (user) Airfoil: .dat file",    "variable" : 'userAirfoils',     "idx": idx, "unit" : None, "scaleFactor" : None},
+                 {"txt": "selected Airfoil: Position",            "variable" : 'airfoilPositions', "idx": idx, "unit" : None, "scaleFactor" : None},
+                 {"txt": "selected Airfoil: Re*Sqrt(Cl)",         "variable" : 'airfoilReynolds',  "idx": idx, "unit" : None, "scaleFactor" : None},
+                 {"txt": "selected Airfoil: flap group",          "variable" : 'flapGroup',        "idx": idx, "unit" : None, "scaleFactor" : None},
+                # {"txt": "selected Airfoil: user defined name",   "variable" : 'airfoilNames',     "idx": idx, "unit" : None, "scaleFactor" : None},
                 ]
         return table
 
@@ -293,28 +292,16 @@ class control_frame():
             value_txt = tk.StringVar(frame, value=value)
             textVars.append(value_txt)
 
-            # are there discrete values specified (=options)?
-            options = paramTableEntry["options"]
-            if (options != None):
-                optionMenu = customtkinter.CTkOptionMenu(master=frame,
-                                                        values=options,
-                                                        command=self.__change_airfoilType)
-                # initialize
-                optionMenu.set(value)
+            # create entry for param value
+            value_entry = customtkinter.CTkEntry(frame, show=None,
+                textvariable = value_txt, text_font=(main_font, 11),
+                width=80, height=16)
 
-                # append entry to list
-                entries.append(optionMenu)
-            else:
-                # create entry for param value
-                value_entry = customtkinter.CTkEntry(frame, show=None,
-                    textvariable = value_txt, text_font=(main_font, 11),
-                    width=80, height=16)
+            # bind to "Enter"-Message
+            value_entry.bind('<Return>', update_function)
 
-                # bind to "Enter"-Message
-                value_entry.bind('<Return>', update_function)
-
-                # append entry to list
-                entries.append(value_entry)
+            # append entry to list
+            entries.append(value_entry)
 
             unit = paramTableEntry["unit"]
             if unit != None:
@@ -325,7 +312,7 @@ class control_frame():
             unit_labels.append(unit_label)
 
         widgets = [param_labels, entries, unit_labels]
-        return (widgets, textVars)
+        return (widgets, textVars, entries)
 
     def __add_basicParams(self, frame, column, startRow):
         # init some structures to store data locally
@@ -336,10 +323,10 @@ class control_frame():
         basicParams = self.__get_basicParamsTable()
 
         # create widgets
-        (widgets, textVars) = self.__create_widgets(basicParams, frame,
+        (widgets, textVars, entries) = self.__create_widgets(basicParams, frame,
                                           self.update_basicParams)
 
-        self.basicParamsEntries = widgets[1]
+        self.basicParamsEntries = entries
         self.basicParamsTextVars = textVars
 
         # place widgets column by column
@@ -360,10 +347,10 @@ class control_frame():
         airfoilParams = self.__get_airfoilParamsTable()
 
         # create widgets
-        (widgets, textVars) = self.__create_widgets(airfoilParams, frame,
+        (widgets, textVars, entries) = self.__create_widgets(airfoilParams, frame,
                                           self.update_airfoilParams)
 
-        self.airfoilParamsEntries = widgets[1]
+        self.airfoilParamsEntries = entries
         self.airfoilParamsTextVars = textVars
 
         # place widgets column by column
@@ -404,7 +391,9 @@ class control_frame():
             value_param = str(int_value)
             value_entry = entry.get()
         else:
-            ErrorMsg("__get_Values(): unimplemented handling of parameter %s" % tableEntry["text"])
+            value_param = None
+            value_entry = entry.get()
+            #ErrorMsg("__get_Values(): unimplemented handling of parameter %s" % tableEntry["text"])
 
         return (value_param, value_entry)
 
@@ -450,26 +439,42 @@ class control_frame():
         var = params[variable]
 
         # check, if variable is a list
-        if isinstance(variable, list):
+        if isinstance(var, list):
             idx = tableEntry["idx"]
             # get list element
             variable = variable[idx]
             var = var[idx]
 
-        if isinstance(var, str):
-            params[variable] = value
-        elif isinstance(var, float):
-            float_value = float(value)
-            if (scaleFactor != None):
-                float_value = float_value / scaleFactor
-            params[variable] = float_value
-        elif isinstance(var, int):
-            int_value = int(value)
-            if (scaleFactor != None):
-                int_value = int(int_value * scaleFactor)
-            params[variable] = int_value
-        else:
-            ErrorMsg("__set_paramValue(): unimplemented handling of parameter %s" % tableEntry["text"])
+        # check new value
+        if value == 'None':
+            # just write None to the variable, no need to check datatype etc.
+            params[variable] = None
+            return
+
+        # check content of var, workaround
+        if var == None:
+            # unfortunately we cannot determine the target datatype from var
+            for element in params[tableEntry["variable"]]:
+                if element != None:
+                    var = element
+                    break
+        try:
+            if isinstance(var, str):
+                params[variable] = value
+            elif isinstance(var, float):
+                float_value = float(value)
+                if (scaleFactor != None):
+                    float_value = float_value / scaleFactor
+                params[variable] = float_value
+            elif isinstance(var, int):
+                int_value = int(value)
+                if (scaleFactor != None):
+                    int_value = int(int_value * scaleFactor)
+                params[variable] = int_value
+            else:
+                ErrorMsg("__set_paramValue(): unimplemented handling of parameter %s" % tableEntry["txt"])
+        except:
+            ErrorMsg("__set_paramValue(): unable to write parameter %s (exception)" % tableEntry["txt"])
 
     def __update_Entries(self, paramTable, textVars, planformIdx):
         # get parameters for active planform
@@ -495,6 +500,10 @@ class control_frame():
 
         # update entries for basic parameters
         self.__update_Entries(table, textVars, planformIdx)
+
+        # update option menues
+        self.__update_OM_airfoilType(planformIdx)
+        self.__update_OM_airfoilChoice(planformIdx)
 
         # update entries for airfoil parameters
         self.update_airfoilEntries(planformIdx)
@@ -528,28 +537,45 @@ class control_frame():
             self.master.set_updateNeeded()
 
     def update_basicParams(self, command):
+        planformIdx = self.master.planformIdx
+
         # get parameter table for active planform
-        paramTable = self.__get_paramTable()
-        params = self.params[self.master.planformIdx]
+        paramTable = self.__get_basicParamsTable()
+        params = self.params[planformIdx]
 
         try:
-            entries = self.basicParamsEntries[self.master.planformIdx]
-            self.__update_params(paramTable, params, entries)
+            self.__update_params(paramTable, params, self.basicParamsEntries)
         except:
-            ErrorMsg("no basicParamsEntries available")
+            ErrorMsg("update_basicParams() failed")
             pass
 
     def update_airfoilParams(self, command):
+        planformIdx = self.master.planformIdx
+
         # get parameter table for active planform
         paramTable = self.__get_airfoilParamsTable()
-        params = self.params[self.master.planformIdx]
+        params = self.params[planformIdx]
 
         try:
-            entries = self.airfoilParamsEntries[self.master.planformIdx]
-            self.__update_params(paramTable, params, entries)
+            self.__update_params(paramTable, params, self.airfoilParamsEntries)
         except:
-            ErrorMsg("no airfoilParamsEntries available")
+            ErrorMsg("update_airfoilParams() failed")
             pass
+
+    def __update_OM_airfoilType(self, planformIdx):
+        params = self.params[planformIdx]
+        airfoilIdx = self.airfoilIdx[planformIdx]
+        airfoilType = params["airfoilTypes"][airfoilIdx]
+
+        self.OM_airfoilType.set(airfoilType)
+
+    def __update_OM_airfoilChoice(self, planformIdx):
+        params = self.params[planformIdx]
+        airfoilIdx = self.airfoilIdx[planformIdx]
+        airfoilNames = self.airfoilNames[planformIdx]
+
+        self.OM_airfoilChoice.configure(values = airfoilNames)
+        self.OM_airfoilChoice.set(airfoilNames[airfoilIdx])
 
     def change_controlPoint(self, x, y, idx):
         if idx == None:
@@ -609,6 +635,14 @@ class control_frame():
         self.__place_widgetsInRow([self.label_airfoilChoice, self.OM_airfoilChoice] ,column, row)
         return (row + 1)
 
+    def __add_airfoilTypeMenu(self, frame, column, row):
+        self.label_airfoilType = self.__create_label(frame, "Selected airfoil: type", -16)
+        self.OM_airfoilType = customtkinter.CTkOptionMenu(master=frame,
+                                                        values=airfoilTypes,
+                                                        command=self.__change_airfoilType)
+        self.__place_widgetsInRow([self.label_airfoilType, self.OM_airfoilType] ,column, row)
+        return (row + 1)
+
     def __change_appearance_mode(self, new_appearanceMode):
         customtkinter.set_appearance_mode(new_appearanceMode)
 
@@ -663,7 +697,10 @@ class control_frame():
             return
 
         # set new idx
-        self.airfoilIdx[planformIdx] == airfoilIdx
+        self.airfoilIdx[planformIdx] = airfoilIdx
+
+        # update option menu
+        self.__update_OM_airfoilType(planformIdx)
 
         # update only airfoil entries
         self.update_airfoilEntries(planformIdx)
@@ -674,13 +711,10 @@ class control_frame():
         airfoilIdx = self.airfoilIdx[planformIdx]
 
         # set new type
-        params["airfoilTypes"][airfoilIdx] = airfoilIdx
-
-        # update only airfoil entries
-        self.update_airfoilEntries(planformIdx)#FIXME necessary?
+        params["airfoilTypes"][airfoilIdx] = airfoilType
 
         # notify the diagram frame about the change
-        self.master.set_updateNeeded()#FIXME necessary?
+        self.master.set_updateNeeded()
 
 
 

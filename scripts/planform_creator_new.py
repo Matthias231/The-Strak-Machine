@@ -120,7 +120,7 @@ scaleFactor = 1.0
 # types of diagrams
 diagTypes = ["Chord distribution", "Planform shape", "Flap distribution",
              "Airfoil distribution", "Projected wingplan"]
-
+airfoilTypes = ['user', 'blend', 'opt']
 planformShapes = ['elliptical', 'trapezoidal']
 
 xfoilWorkerCall = "..\\..\\bin\\" + xfoilWorkerName + '.exe'
@@ -386,7 +386,11 @@ class params:
         self.userAirfoils = dictData["userAirfoils"]
 
         # check userAirfoil names against number
-        numDefinedUserAirfoils = len(self.userAirfoils)
+        numDefinedUserAirfoils = 0
+        for element in self.userAirfoils:
+            if element != None:
+                numDefinedUserAirfoils += 1
+
         if (numDefinedUserAirfoils < numUserAirfoils):
             ErrorMsg("%d airfoils have type \"user\", but only %d user-airfoils"\
             " were defined in \"user-airfoils\""\
@@ -396,7 +400,6 @@ class params:
             WarningMsg("%d airfoils have type \"user\", but %d user-airfoils"\
             " were defined in \"user-airfoils\""\
              % (numUserAirfoils, numDefinedUserAirfoils))
-            self.userAirfoils = self.userAirfoils[0:numUserAirfoils]
 
         # -------------- get optional parameters --------------------
         try:
@@ -1086,7 +1089,16 @@ class wing:
         return self.paramsDict
 
     def get_airfoilNames(self):
-        return self.params.airfoilNames
+        newList = self.params.airfoilNames[:]
+
+        # remove duplicate tip airfoil (last element)
+        newList.pop()
+
+        if self.fuselageIsPresent():
+            # remove duplicate root airfoil
+            newList.pop(0)
+
+        return newList
 
     def get_distributionParams(self):
         distributionParams = (self.params.planformShape,

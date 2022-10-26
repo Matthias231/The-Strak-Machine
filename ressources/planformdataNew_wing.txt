@@ -55,8 +55,13 @@
   ],
   "userAirfoils":[
     ".\\airfoil_library\\F3B_F3F\\JX\\JX-GT\\JX-GT-15.dat",
+    null,
+    null,
+    null,
     ".\\airfoil_library\\F3B_F3F\\JX\\JX-GT\\JX-GT-10.dat",
-    ".\\airfoil_library\\F3B_F3F\\JX\\JX-GT\\JX-GT-05.dat"
+    null,
+    ".\\airfoil_library\\F3B_F3F\\JX\\JX-GT\\JX-GT-05.dat",
+    null
   ],
   "leadingEdgeOrientation":"up",
   "interpolationSegments":5,

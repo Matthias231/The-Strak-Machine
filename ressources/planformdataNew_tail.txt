@@ -47,6 +47,10 @@
   ],
   "userAirfoils":[
     ".\\airfoil_library\\Tail\\JX\\\\JX-Fe\\JX-Fe-250.dat",
+    null,
+    null,
+    null,
+    null,
     ".\\airfoil_library\\Tail\\JX\\\\JX-Fe\\JX-Fe-150.dat"
   ],
   "leadingEdgeOrientation":"up",
