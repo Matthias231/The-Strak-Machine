@@ -64,6 +64,10 @@ class control_frame():
         self.label_unsavedChanges = []
         self.planformNames = []
         self.params = []
+        self.airfoilNames = []
+        self.airfoilIdx = []
+        self.basicParamsTextVars = []
+        self.airfoilParamsTextVars = []
 
         # determine screen size
         self.width = self.master.winfo_screenwidth()
@@ -106,21 +110,30 @@ class control_frame():
             # append planformname to list of planformnames (option menu)
             self.planformNames.append(params["planformName"])
 
-        # init nextRow (where to place next widget)
-        self.nextRow = 0
+            # get airfoil names
+            airfoilNames = self.creatorInstances[i].get_airfoilNames()
+            self.airfoilNames.append(airfoilNames)
+
+            # select root airfoil
+            self.airfoilIdx.append(0)
 
         # add different widgets to upper frame (not scrollable)
         (labels, buttons) = labelsAndButtons
-        self.__add_labels(self.frame_left, labels)
-        self.__add_buttons(self.frame_left, buttons)
-        self.__add_appearanceModeMenu(self.frame_left)
+        nextRow = self.__add_labels(self.frame_left, labels, 0, 0)
+        nextRow = self.__add_buttons(self.frame_left, buttons, 0, nextRow)
+        nextRow = self.__add_appearanceModeMenu(self.frame_left, 0, nextRow)
 
         # right frame (scrollable)
-        self.nextRow = 0
-        self.__add_planformChoiceMenu(self.frame_right)
+        nextRow = self.__add_planformChoiceMenu(self.frame_right, 0, 0)
 
         # add entries
-        self.__add_entries(self.frame_right)
+        nextRow = self.__add_basicParams(self.frame_right, 0, nextRow)
+
+        # second column, start at row 1
+        nextRow = self.__add_airfoilChoiceMenu(self.frame_right, 3, 1)
+
+        # add entries
+        nextRow = self.__add_airfoilParams(self.frame_right, 3, nextRow)
 
         # show left frame
         self.frame_left.pack(side = 'left', fill=tk.BOTH)
@@ -154,15 +167,15 @@ class control_frame():
         return (self.unsavedChangesFlags)
 
 
-    def __add_labels(self, frame, labels):
+    def __add_labels(self, frame, labels, column, row):
         labelList = []
 
         for label in labels:
             newLabel = self.__create_label(frame, label, -16)
             labelList.append(newLabel)
 
-        self.__place_widgets(labelList)
-
+        self.__place_widgetsInRow(labelList, column, row)
+        return (row + 1)
 
     def __get_buttonWidgetsRow(self, buttonWidgetsArray, rowIdx):
         row = []
@@ -173,25 +186,34 @@ class control_frame():
                 row.append(buttonWidgetsArray[columnIdx][rowIdx])
             except:
                 row.append(None)
-
         return row
 
-    def __place_widgets(self, widgetsRow):
-        columnIdx = 0
+    def __place_widgetsInColumn(self, widgets, column, startRow):
+        '''place widgets in the list \'widgets\' in the same column'''
+        row = startRow
 
-        for widget in widgetsRow:
+        for widget in widgets:
             if widget != None:
-                widget.grid(row=self.nextRow, column=columnIdx, pady=5, padx=5, sticky="e")
-            columnIdx += 1
-        self.nextRow += 1
+                widget.grid(row=row, column=column, pady=5, padx=5, sticky="e")
+            row += 1
+        return row
 
+    def __place_widgetsInRow(self, widgets, startColumn, row):
+        '''place widgets in the list \'widgets\' in the same row'''
+        column = startColumn
 
-    def __add_buttons(self, frame, buttonArray):
+        for widget in widgets:
+            if widget != None:
+                widget.grid(row=row, column=column, pady=5, padx=5, sticky="e")
+            column += 1
+        return column
+
+    def __add_buttons(self, frame, buttonArray, column, row):
         buttonWidgetsArray = []
         max_rows = 0
 
         # build up array of button widgets, also store number of entries for
-        # each coluumn
+        # each column
         for buttonColumn in buttonArray:
             buttonWidgetsColumn = []
 
@@ -205,65 +227,94 @@ class control_frame():
         # place buttons, row after row
         for rowIdx in range(max_rows):
             buttonWidgetsRow = self.__get_buttonWidgetsRow(buttonWidgetsArray, rowIdx)
-            self.__place_widgets(buttonWidgetsRow)
+            self.__place_widgetsInRow(buttonWidgetsRow, column, row)
+            row += 1
+
+        return row
 
     def __create_label(self, frame, text, size):
         label = customtkinter.CTkLabel(master=frame,
                 text=text, text_font=(main_font, size), anchor="e")
         return label
 
-    def __get_paramTable(self):
+    def __get_basicParamsTable(self):
         table = [#{"txt": "Planform name",               "options" : None,           "variable" : params.planformName,     "unit" : None, "scaleFactor" : None},
                  #{"txt": "Planform shape",              "options" : planformShapes, "variable" : params.planformShape,    "unit" : None, "scaleFactor" : None },
-                 {"txt": "Airfoils basic name",         "options" : None, "variable" : 'airfoilBasicName', "unit" : None, "scaleFactor" : None},
-                 {"txt": "wingspan",                    "options" : None, "variable" : 'wingspan',         "unit" : "mm", "scaleFactor" : 1000.0},
-                 {"txt": "Root chord",                  "options" : None, "variable" : 'rootchord',        "unit" : "mm", "scaleFactor" : 1000.0},
-                 {"txt": "Tip chord",                   "options" : None, "variable" : 'tipchord',         "unit" : "mm", "scaleFactor" : 1000.0},
-                 {"txt": "Tip sharpness",               "options" : None, "variable" : 'tipSharpness',     "unit" : None, "scaleFactor" : None},
-                 {"txt": "Ellipse correction",          "options" : None, "variable" : 'ellipseCorrection', "unit" : None, "scaleFactor" : 100.0},
-                 {"txt": "Leading edge correction",     "options" : None, "variable" : 'leadingEdgeCorrection', "unit" : None, "scaleFactor" : 100.0},
-                 {"txt": "Dihedral",                    "options" : None, "variable" : 'dihedral',         "unit" : "°",  "scaleFactor" : None},
-                 {"txt": "Re*Sqrt(Cl) of root airfoil", "options" : None, "variable" : 'rootReynolds',     "unit" : None, "scaleFactor" : None},
-                 {"txt": "Width of fuselage",           "options" : None, "variable" : 'fuselageWidth',    "unit" : "mm", "scaleFactor" : 1000.0},
-                 {"txt": "Hingeline angle @root",       "options" : None, "variable" : 'hingeLineAngle',   "unit" : "°",  "scaleFactor" : None},
-                 {"txt": "Flap depth @root",            "options" : None, "variable" : 'flapDepthRoot',   "unit" : "%",  "scaleFactor" : None},
-                 {"txt": "Flap depth @tip",             "options" : None, "variable" : 'flapDepthTip',    "unit" : "%",  "scaleFactor" : None},
-                 {"txt": "NCrit",                       "options" : None, "variable" : 'polar_Ncrit',      "unit" : None, "scaleFactor" : None},
-                 {"txt": "Interpolation Segments",      "options" : None, "variable" : 'interpolationSegments', "unit" :None,  "scaleFactor" : None},
+                  {"txt": "Airfoils basic name",          "options" : None, "variable" : 'airfoilBasicName', "idx": None, "unit" : None, "scaleFactor" : None},
+                  {"txt": "wingspan",                     "options" : None, "variable" : 'wingspan',              "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
+                  {"txt": "Root chord",                   "options" : None, "variable" : 'rootchord',             "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
+                  {"txt": "Tip chord",                    "options" : None, "variable" : 'tipchord',              "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
+                  {"txt": "Tip sharpness",                "options" : None, "variable" : 'tipSharpness',          "idx": None, "unit" : None, "scaleFactor" : None},
+                  {"txt": "Ellipse correction",           "options" : None, "variable" : 'ellipseCorrection',     "idx": None, "unit" : None, "scaleFactor" : 100.0},
+                  {"txt": "Leading edge correction",      "options" : None, "variable" : 'leadingEdgeCorrection', "idx": None, "unit" : None, "scaleFactor" : 100.0},
+                  {"txt": "Dihedral",                     "options" : None, "variable" : 'dihedral',              "idx": None, "unit" : "°",  "scaleFactor" : None},
+                  {"txt": "Width of fuselage",            "options" : None, "variable" : 'fuselageWidth',         "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
+                  {"txt": "Hingeline angle @root",        "options" : None, "variable" : 'hingeLineAngle',        "idx": None, "unit" : "°",  "scaleFactor" : None},
+                  {"txt": "Flap depth @root",             "options" : None, "variable" : 'flapDepthRoot',         "idx": None, "unit" : "%",  "scaleFactor" : None},
+                  {"txt": "Flap depth @tip",              "options" : None, "variable" : 'flapDepthTip',          "idx": None, "unit" : "%",  "scaleFactor" : None},
+                  #{"txt": "NCrit",                        "options" : None, "variable" : 'polar_Ncrit',           "idx": None, "unit" : None, "scaleFactor" : None},
+                  #{"txt": "Interpolation Segments",       "options" : None, "variable" : 'interpolationSegments', "idx": None, "unit" : None,  "scaleFactor" : None},
                 ]
         return table
 
-    def __add_entries(self, frame):
-        # init some structures to store data locally
-        self.entries = []
-        self.textVars = []
+    def __get_airfoilParamsTable(self):
+        airfoilTypes = ['user', 'blend', 'opt']
+        idx = self.airfoilIdx[self.master.planformIdx]
 
-        # get parameter table for active planform
-        paramTable = self.__get_paramTable()
+        table = [
+                 #{"txt": "Root airfoil: Re*Sqrt(Cl)",     "options" : None,         "variable" : 'rootReynolds',     "idx": None, "unit" : None, "scaleFactor" : None},
+                 #{"txt": "choose airfoil",      "options" : None, "variable" : 'airfoilChoice',     "unit" : None, "scaleFactor" : None},
+                 {"txt": "selected Airfoil: Type",        "options" : airfoilTypes, "variable" : 'airfoilTypes',     "idx": idx, "unit" : None, "scaleFactor" : None},
+                 {"txt": "selected Airfoil: Position",    "options" : None,         "variable" : 'airfoilPositions', "idx": idx, "unit" : None, "scaleFactor" : None},
+                 {"txt": "selected Airfoil: Re*Sqrt(Cl)", "options" : None,         "variable" : 'airfoilReynolds',  "idx": idx, "unit" : None, "scaleFactor" : None},
+                 {"txt": "selected Airfoil: flap group",  "options" : None,         "variable" : 'flapGroup',        "idx": idx, "unit" : None, "scaleFactor" : None},
+                ]
+        return table
+
+
+    def __create_widgets(self, paramTable, frame, update_function):
+        param_labels = []
+        entries = []
+        unit_labels = []
+        textVars = []
+
         params = self.params[self.master.planformIdx]
 
         # create entries and assign values
         for paramTableEntry in paramTable:
-            # create text-Vars to interact with entries
-            value = self.__get_paramValue(params, paramTableEntry)
-            value_txt = tk.StringVar(frame, value=value)
-            self.textVars.append(value_txt)
-
-            # create entry for param value
-            value_entry = customtkinter.CTkEntry(frame, show=None,
-             textvariable = value_txt, text_font=(main_font, 11),
-             width=80, height=16)
-
-             # bind to "Enter"-Message
-            value_entry.bind('<Return>', self.update_params)
-
-            # append entry to list
-            self.entries.append(value_entry)
-
-            # Add Label
+            # Add Label (display name of the parameter)
             param_label = customtkinter.CTkLabel(master=frame,
                   text=paramTableEntry["txt"], text_font=(main_font, 13),
                    anchor="e")
+            param_labels.append(param_label)
+
+            # create text-Vars to interact with entries
+            value = self.__get_paramValue(params, paramTableEntry)
+            value_txt = tk.StringVar(frame, value=value)
+            textVars.append(value_txt)
+
+            # are there discrete values specified (=options)?
+            options = paramTableEntry["options"]
+            if (options != None):
+                optionMenu = customtkinter.CTkOptionMenu(master=frame,
+                                                        values=options,
+                                                        command=self.__change_airfoilType)
+                # initialize
+                optionMenu.set(value)
+
+                # append entry to list
+                entries.append(optionMenu)
+            else:
+                # create entry for param value
+                value_entry = customtkinter.CTkEntry(frame, show=None,
+                    textvariable = value_txt, text_font=(main_font, 11),
+                    width=80, height=16)
+
+                # bind to "Enter"-Message
+                value_entry.bind('<Return>', update_function)
+
+                # append entry to list
+                entries.append(value_entry)
 
             unit = paramTableEntry["unit"]
             if unit != None:
@@ -271,8 +322,58 @@ class control_frame():
                   text=unit, text_font=(main_font, 13), anchor="w")
             else:
                 unit_label = None
+            unit_labels.append(unit_label)
 
-            self.__place_widgets([param_label, value_entry, unit_label])
+        widgets = [param_labels, entries, unit_labels]
+        return (widgets, textVars)
+
+    def __add_basicParams(self, frame, column, startRow):
+        # init some structures to store data locally
+        self.basicParamsTextVars = []
+        self.basicParamsEntries = []
+
+        # get table with basic parameters for active planform
+        basicParams = self.__get_basicParamsTable()
+
+        # create widgets
+        (widgets, textVars) = self.__create_widgets(basicParams, frame,
+                                          self.update_basicParams)
+
+        self.basicParamsEntries = widgets[1]
+        self.basicParamsTextVars = textVars
+
+        # place widgets column by column
+        endRow = 0
+        for widgetRow in widgets:
+            row = self.__place_widgetsInColumn(widgetRow, column, startRow)
+            column += 1
+            endRow = max(endRow, row)
+
+        return endRow
+
+    def __add_airfoilParams(self, frame, column, startRow):
+        # init some structures to store data locally
+        self.airfoilParamsTextVars = []
+        self.airfoilParamsEntries = []
+
+        # get table with airfoil parameters for active planform
+        airfoilParams = self.__get_airfoilParamsTable()
+
+        # create widgets
+        (widgets, textVars) = self.__create_widgets(airfoilParams, frame,
+                                          self.update_airfoilParams)
+
+        self.airfoilParamsEntries = widgets[1]
+        self.airfoilParamsTextVars = textVars
+
+        # place widgets column by column
+        endRow = 0
+        for widgetColumn in widgets:
+            row = self.__place_widgetsInColumn(widgetColumn, column, startRow)
+            endRow = max(endRow, row)
+            column += 1
+
+        return endRow
 
     def __get_Values(self, params, tableEntry, entry):
         variable = tableEntry["variable"]
@@ -280,6 +381,12 @@ class control_frame():
 
         # get param value from dictionary
         value = params[variable]
+
+        # check, if variable is a list
+        if isinstance(value, list):
+            idx = tableEntry["idx"]
+            # get list element
+            value = value[idx]
 
         if isinstance(value, str):
             value_param = value
@@ -308,6 +415,15 @@ class control_frame():
         # get param value from dictionary
         value = params[variable]
 
+        # check, if variable is a list
+        if isinstance(value, list):
+            idx = tableEntry["idx"]
+            # get list element
+            value = value[idx]
+
+        if value == None:
+            return value
+
         if isinstance(value, str):
             value_param = value
         elif isinstance(value, float):
@@ -321,7 +437,7 @@ class control_frame():
                 int_value = int(int_value * scaleFactor)
             value_param = str(int_value)
         else:
-            ErrorMsg("__get_Values(): unimplemented handling of parameter %s" % tableEntry["text"])
+            ErrorMsg("__get_Values(): unimplemented handling of parameter %s" % tableEntry["variable"])
 
         return value_param
 
@@ -332,6 +448,13 @@ class control_frame():
 
         # get param variable from dictionary
         var = params[variable]
+
+        # check, if variable is a list
+        if isinstance(variable, list):
+            idx = tableEntry["idx"]
+            # get list element
+            variable = variable[idx]
+            var = var[idx]
 
         if isinstance(var, str):
             params[variable] = value
@@ -348,33 +471,42 @@ class control_frame():
         else:
             ErrorMsg("__set_paramValue(): unimplemented handling of parameter %s" % tableEntry["text"])
 
-    def update_Entries(self, planformIdx):
-        # get parameter table for active planform
-        paramTable = self.__get_paramTable()
-        params = self.params[self.master.planformIdx]
-        textVars = self.textVars
-
-        num = len(paramTable)
-        if (num != len(textVars)):
-            ErrorMsg("num_params %d != num_txtVars %d" % (num_params, num_txtVars))
+    def __update_Entries(self, paramTable, textVars, planformIdx):
+        # get parameters for active planform
+        params = self.params[planformIdx]
+        num = len(textVars)
 
         # copy all param values to textvars
         for idx in range(num):
             textVars[idx].set(self.__get_paramValue(params, paramTable[idx]))
 
+    def update_airfoilEntries(self, planformIdx):
+        # get airfoil parameter table for active planform
+        table = self.__get_airfoilParamsTable()
+        textVars = self.airfoilParamsTextVars
 
-    def update_params(self, command):
+        # update entries for airfoil parameters
+        self.__update_Entries(table, textVars, planformIdx)
+
+    def update_Entries(self, planformIdx):
+        # get basic parameter table for active planform
+        table = self.__get_basicParamsTable()
+        textVars = self.basicParamsTextVars
+
+        # update entries for basic parameters
+        self.__update_Entries(table, textVars, planformIdx)
+
+        # update entries for airfoil parameters
+        self.update_airfoilEntries(planformIdx)
+
+    def __update_params(self, paramTable, params, entries):
         # get instance of planform-creator
         creatorInst:planform_creator = self.creatorInstances[self.master.planformIdx]
         change_detected = False
 
-        # get parameter table for active planform
-        paramTable = self.__get_paramTable()
-        params = self.params[self.master.planformIdx]
-
         for idx in range(len(paramTable)):
             paramTableEntry = paramTable[idx]
-            entry = self.entries[idx]
+            entry = entries[idx]
             (value_param, value_entry) = self.__get_Values(params, paramTableEntry, entry)
 
             # compare if something has changed
@@ -394,6 +526,30 @@ class control_frame():
 
             # notify the diagram frame about the change
             self.master.set_updateNeeded()
+
+    def update_basicParams(self, command):
+        # get parameter table for active planform
+        paramTable = self.__get_paramTable()
+        params = self.params[self.master.planformIdx]
+
+        try:
+            entries = self.basicParamsEntries[self.master.planformIdx]
+            self.__update_params(paramTable, params, entries)
+        except:
+            ErrorMsg("no basicParamsEntries available")
+            pass
+
+    def update_airfoilParams(self, command):
+        # get parameter table for active planform
+        paramTable = self.__get_airfoilParamsTable()
+        params = self.params[self.master.planformIdx]
+
+        try:
+            entries = self.airfoilParamsEntries[self.master.planformIdx]
+            self.__update_params(paramTable, params, entries)
+        except:
+            ErrorMsg("no airfoilParamsEntries available")
+            pass
 
     def change_controlPoint(self, x, y, idx):
         if idx == None:
@@ -429,23 +585,29 @@ class control_frame():
                                             command= lambda ztemp=param : callback(ztemp))
         return button
 
-    def __add_appearanceModeMenu(self, frame):
+    def __add_appearanceModeMenu(self, frame, column, row):
         self.label_mode = customtkinter.CTkLabel(master=frame, text="Appearance Mode:")
-        self.optionmenu_1 = customtkinter.CTkOptionMenu(master=frame,
+        self.OM_apperanceMode = customtkinter.CTkOptionMenu(master=frame,
                                                         values=["Dark", "Light"],
                                                         command=self.__change_appearance_mode)
-        self.__place_widgets([self.label_mode, self.optionmenu_1])
+        self.__place_widgetsInRow([self.label_mode, self.OM_apperanceMode], column, row)
+        return (row + 1)
 
-    def __add_planformChoiceMenu(self, frame):
+    def __add_planformChoiceMenu(self, frame, column, row):
         self.label_planformChoice = self.__create_label(frame, "Choose planform:", -16)
-        self.optionmenu_2 = customtkinter.CTkOptionMenu(master=frame,
+        self.OM_planformChoice = customtkinter.CTkOptionMenu(master=frame,
                                                         values=self.planformNames,
                                                         command=self.__change_planform)
-        self.__place_widgets([self.label_planformChoice, self.optionmenu_2])
+        self.__place_widgetsInRow([self.label_planformChoice, self.OM_planformChoice], column, row)
+        return (row + 1)
 
-    def add_blankRow(self):
-        self.nextRow = self.nextRow + 1
-
+    def __add_airfoilChoiceMenu(self, frame, column, row):
+        self.label_airfoilChoice = self.__create_label(frame, "Choose airfoil:", -16)
+        self.OM_airfoilChoice = customtkinter.CTkOptionMenu(master=frame,
+                                                        values=self.airfoilNames[self.master.planformIdx],
+                                                        command=self.__change_airfoil)
+        self.__place_widgetsInRow([self.label_airfoilChoice, self.OM_airfoilChoice] ,column, row)
+        return (row + 1)
 
     def __change_appearance_mode(self, new_appearanceMode):
         customtkinter.set_appearance_mode(new_appearanceMode)
@@ -486,6 +648,41 @@ class control_frame():
 
         # notify the diagram frame about the change
         self.master.set_updateNeeded()
+
+
+    def __change_airfoil(self, airfoilName):
+        planformIdx = self.master.planformIdx
+        params = self.params[planformIdx]
+        airfoilNames = self.airfoilNames[planformIdx]
+
+        # convert planformName to an index
+        airfoilIdx = airfoilNames.index(airfoilName)
+
+        # check if idx has been changed
+        if (self.airfoilIdx[planformIdx] == airfoilIdx):
+            return
+
+        # set new idx
+        self.airfoilIdx[planformIdx] == airfoilIdx
+
+        # update only airfoil entries
+        self.update_airfoilEntries(planformIdx)
+
+    def __change_airfoilType(self, airfoilType):
+        planformIdx = self.master.planformIdx
+        params = self.params[planformIdx]
+        airfoilIdx = self.airfoilIdx[planformIdx]
+
+        # set new type
+        params["airfoilTypes"][airfoilIdx] = airfoilIdx
+
+        # update only airfoil entries
+        self.update_airfoilEntries(planformIdx)#FIXME necessary?
+
+        # notify the diagram frame about the change
+        self.master.set_updateNeeded()#FIXME necessary?
+
+
 
     def on_closing(self, event=0):
         self.destroy()

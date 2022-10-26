@@ -119,7 +119,7 @@ scaleFactor = 1.0
 
 # types of diagrams
 diagTypes = ["Chord distribution", "Planform shape", "Flap distribution",
-             "Airfoil distribution", "Wing"]
+             "Airfoil distribution", "Projected wingplan"]
 
 planformShapes = ['elliptical', 'trapezoidal']
 
@@ -1084,6 +1084,9 @@ class wing:
 
     def get_params(self):
         return self.paramsDict
+
+    def get_airfoilNames(self):
+        return self.params.airfoilNames
 
     def get_distributionParams(self):
         distributionParams = (self.params.planformShape,
@@ -2508,6 +2511,10 @@ class planform_creator:
     def get_params(self):
         '''gets parameters as a dictionary'''
         return self.newWing.get_params()
+
+    def get_airfoilNames(self):
+        '''gets airfoilnames as a list of strings'''
+        return self.newWing.get_airfoilNames()
 
     def update_planform(self, paramDict):
         '''applies parameters coming with paramDict'''
