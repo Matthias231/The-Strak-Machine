@@ -52,6 +52,48 @@ planformFiles = ["planformdataNew_wing.txt", "planformdataNew_tail.txt"]
 bg_color_light = "#DDDDDD"
 bg_color_dark =  "#222222"
 
+################################################################################
+#
+# helper functions
+#
+################################################################################
+def is_List(obj):
+    if obj == None:
+        return False
+    return isinstance(obj, list)
+
+def is_str(obj):
+    if obj == None:
+        return False
+    return isinstance(obj, str)
+
+def is_float(obj):
+    if obj == None:
+        return False
+    return isinstance(obj, float)
+
+def is_int(obj):
+    if obj == None:
+        return False
+    return isinstance(obj, int)
+
+def get_dataType(obj):
+    '''returns the dataType of an object as a string'''
+    if obj == None:
+        return None
+
+    if is_str(obj):
+        return 'str'
+    elif is_int(obj):
+        return 'int'
+    elif is_float(obj):
+        return 'float'
+    elif is_list(obj):
+        return 'list'
+    else:
+        ErrorMsg("get_dataType, unknown dataType")
+        return None
+
 # class control frame, change the input-variables / parameters of the
 # planform creator
 class control_frame():
@@ -242,30 +284,34 @@ class control_frame():
     def __get_basicParamsTable(self):
         table = [#{"txt": "Planform name",                "variable" : params.planformName,     "unit" : None, "scaleFactor" : None},
                  #{"txt": "Planform shape",               "variable" : params.planformShape,    "unit" : None, "scaleFactor" : None },
-                  {"txt": "Airfoils basic name",          "variable" : 'airfoilBasicName', "idx": None, "unit" : None, "scaleFactor" : None},
-                  {"txt": "wingspan",                     "variable" : 'wingspan',              "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
-                  {"txt": "Root chord",                   "variable" : 'rootchord',             "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
-                  {"txt": "Tip chord",                    "variable" : 'tipchord',              "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
-                  {"txt": "Tip sharpness",                "variable" : 'tipSharpness',          "idx": None, "unit" : None, "scaleFactor" : None},
-                  {"txt": "Ellipse correction",           "variable" : 'ellipseCorrection',     "idx": None, "unit" : None, "scaleFactor" : 100.0},
-                  {"txt": "Leading edge correction",      "variable" : 'leadingEdgeCorrection', "idx": None, "unit" : None, "scaleFactor" : 100.0},
-                  {"txt": "Dihedral",                     "variable" : 'dihedral',              "idx": None, "unit" : "°",  "scaleFactor" : None},
-                  {"txt": "Width of fuselage",            "variable" : 'fuselageWidth',         "idx": None, "unit" : "mm", "scaleFactor" : 1000.0},
-                  {"txt": "Hingeline angle @root",        "variable" : 'hingeLineAngle',        "idx": None, "unit" : "°",  "scaleFactor" : None},
-                  {"txt": "Flap depth @root",             "variable" : 'flapDepthRoot',         "idx": None, "unit" : "%",  "scaleFactor" : None},
-                  {"txt": "Flap depth @tip",              "variable" : 'flapDepthTip',          "idx": None, "unit" : "%",  "scaleFactor" : None},
+                  {"txt": "Airfoils basic name",          "variable" : 'airfoilBasicName',      "idx": None, "unit" : None, "scaleFactor" : None,   "decimals": None},
+                  {"txt": "wingspan",                     "variable" : 'wingspan',              "idx": None, "unit" : "mm", "scaleFactor" : 1000.0, "decimals": 1},
+                  {"txt": "Root chord",                   "variable" : 'rootchord',             "idx": None, "unit" : "mm", "scaleFactor" : 1000.0, "decimals": 1},
+                  {"txt": "Tip chord",                    "variable" : 'tipchord',              "idx": None, "unit" : "mm", "scaleFactor" : 1000.0, "decimals": 1},
+                  {"txt": "Tip sharpness",                "variable" : 'tipSharpness',          "idx": None, "unit" : None, "scaleFactor" : None,   "decimals": 1},
+                  {"txt": "Ellipse correction",           "variable" : 'ellipseCorrection',     "idx": None, "unit" : None, "scaleFactor" : 100.0,  "decimals": 1},
+                  {"txt": "Leading edge correction",      "variable" : 'leadingEdgeCorrection', "idx": None, "unit" : None, "scaleFactor" : 100.0,  "decimals": 1},
+                  {"txt": "Dihedral",                     "variable" : 'dihedral',              "idx": None, "unit" : "°",  "scaleFactor" : None,   "decimals": 1},
+                  {"txt": "Width of fuselage",            "variable" : 'fuselageWidth',         "idx": None, "unit" : "mm", "scaleFactor" : 1000.0, "decimals": 1},
+                  {"txt": "Hingeline angle @root",        "variable" : 'hingeLineAngle',        "idx": None, "unit" : "°",  "scaleFactor" : None,   "decimals": 1},
+                  {"txt": "Flap depth @root",             "variable" : 'flapDepthRoot',         "idx": None, "unit" : "%",  "scaleFactor" : None,   "decimals": 1},
+                  {"txt": "Flap depth @tip",              "variable" : 'flapDepthTip',          "idx": None, "unit" : "%",  "scaleFactor" : None,   "decimals": 1},
                   #{"txt": "NCrit",                        "variable" : 'polar_Ncrit',           "idx": None, "unit" : None, "scaleFactor" : None},
                   #{"txt": "Interpolation Segments",       "variable" : 'interpolationSegments', "idx": None, "unit" : None,  "scaleFactor" : None},
                 ]
         return table
 
     def __get_airfoilParamsTable(self):
-        idx = self.airfoilIdx[self.master.planformIdx]
+        planformIdx = self.master.planformIdx
+        params = self.params[planformIdx]
+        idx = self.airfoilIdx[planformIdx]
+        sf_position = params['wingspan']/2*1000.0
+
         table = [
-                 {"txt": "selected (user) Airfoil: .dat file",    "variable" : 'userAirfoils',     "idx": idx, "unit" : None, "scaleFactor" : None},
-                 {"txt": "selected Airfoil: Position",            "variable" : 'airfoilPositions', "idx": idx, "unit" : None, "scaleFactor" : None},
-                 {"txt": "selected Airfoil: Re*Sqrt(Cl)",         "variable" : 'airfoilReynolds',  "idx": idx, "unit" : None, "scaleFactor" : None},
-                 {"txt": "selected Airfoil: flap group",          "variable" : 'flapGroup',        "idx": idx, "unit" : None, "scaleFactor" : None},
+                 {"txt": "selected (user) Airfoil: .dat file",    "variable" : 'userAirfoils',     "idx": idx, "unit" : None, "scaleFactor" : None,        "decimals": None},
+                 {"txt": "selected Airfoil: Position",            "variable" : 'airfoilPositions', "idx": idx, "unit" : 'mm', "scaleFactor" : sf_position, "decimals": 1},
+                 {"txt": "selected Airfoil: Re*Sqrt(Cl)",         "variable" : 'airfoilReynolds',  "idx": idx, "unit" : 'K', "scaleFactor" : 0.001,        "decimals": 0},
+                 {"txt": "selected Airfoil: flap group",          "variable" : 'flapGroup',        "idx": idx, "unit" : None, "scaleFactor" : None,        "decimals": 0},
                 # {"txt": "selected Airfoil: user defined name",   "variable" : 'airfoilNames',     "idx": idx, "unit" : None, "scaleFactor" : None},
                 ]
         return table
@@ -362,119 +408,99 @@ class control_frame():
 
         return endRow
 
-    def __get_Values(self, params, tableEntry, entry):
-        variable = tableEntry["variable"]
-        scaleFactor = tableEntry["scaleFactor"]
+    def  __getDictValueAndDataType(self, dictionary, key, idx):
+        '''get value and datatype of a dictionary member, specified by key and index'''
+        # check, if dictionary entry is a list
+        if is_List(dictionary[key]):
+            # yes, get value of a list element
+            dictValue = dictionary[key][idx]
 
-        # get param value from dictionary
-        value = params[variable]
-
-        # check, if variable is a list
-        if isinstance(value, list):
-            idx = tableEntry["idx"]
-            # get list element
-            value = value[idx]
-
-        if isinstance(value, str):
-            value_param = value
-            value_entry = entry.get()
-        elif isinstance(value, float):
-            float_value = value
-            if (scaleFactor != None):
-                float_value = float_value * scaleFactor
-            value_param = str(float_value)
-            value_entry = str(float(entry.get()))
-        elif isinstance(value, int):
-            int_value = value
-            if (scaleFactor != None):
-                int_value = int(int_value * scaleFactor)
-            value_param = str(int_value)
-            value_entry = entry.get()
+            # get data type, search for first valid element being not 'None'
+            for obj in dictionary[key]:
+                dataType = get_dataType(obj)
+                if dataType != None:
+                    # we found the data type
+                    break
         else:
-            value_param = None
-            value_entry = entry.get()
-            #ErrorMsg("__get_Values(): unimplemented handling of parameter %s" % tableEntry["text"])
+            # no, get value directly
+            dictValue = dictionary[key]
+            dataType = get_dataType(dictValue)
 
-        return (value_param, value_entry)
+        return (dictValue, dataType)
 
     def __get_paramValue(self, params, tableEntry):
-        variable = tableEntry["variable"]
+        '''get value of a parameter which is specified by tableEntry'''
+        # get additional information from param tableEntry
+        variableName = tableEntry["variable"]
+        idx = tableEntry["idx"]
         scaleFactor = tableEntry["scaleFactor"]
+        decimals = tableEntry["decimals"]
 
-        # get param value from dictionary
-        value = params[variable]
-
-        # check, if variable is a list
-        if isinstance(value, list):
-            idx = tableEntry["idx"]
-            # get list element
-            value = value[idx]
-
+        # get actual parameter value and -type
+        value, dataType = self.__getDictValueAndDataType(params,
+                                        variableName, idx)
+        # check value
         if value == None:
+            # nothing more to do
             return value
 
-        if isinstance(value, str):
+        # convert and optionally scale value
+        if dataType == 'str':
             value_param = value
-        elif isinstance(value, float):
+        elif dataType == 'float':
             float_value = value
             if (scaleFactor != None):
                 float_value = float_value * scaleFactor
-            value_param = str(float_value)
-        elif isinstance(value, int):
+            value_param = str(round(float_value, decimals))
+        elif dataType == 'int':
             int_value = value
             if (scaleFactor != None):
                 int_value = int(int_value * scaleFactor)
             value_param = str(int_value)
         else:
-            ErrorMsg("__get_Values(): unimplemented handling of parameter %s" % tableEntry["variable"])
+            ErrorMsg("__get_Values(): unimplemented handling of parameter %s" % variableName)
 
         return value_param
 
+    def  __setDictValue(self, dictionary, key, idx, value):
+        # check, if dictionary entry is a list
+        if is_List(dictionary[key]):
+            # yes, set value of a list element
+            dictionary[key][idx] = value
+        else:
+            # no, set value directly
+            dictionary[key] = value
 
     def __set_paramValue(self, params, tableEntry, value:str):
-        variable = tableEntry["variable"]
+        # get additional information from param tableEntry
+        variableName = tableEntry["variable"]
+        idx = tableEntry["idx"]
         scaleFactor = tableEntry["scaleFactor"]
 
-        # get param variable from dictionary
-        var = params[variable]
-
-        # check, if variable is a list
-        if isinstance(var, list):
-            idx = tableEntry["idx"]
-            # get list element
-            variable = variable[idx]
-            var = var[idx]
-
-        # check new value
-        if value == 'None':
-            # just write None to the variable, no need to check datatype etc.
-            params[variable] = None
+        # check value
+        if (value == 'None') or (value == ''):
+            # just write None to the variable in the dictionary and return, no
+            # need to check datatype etc.
+            self.__setDictValue(params, variableName, idx, None)
             return
 
-        # check content of var, workaround
-        if var == None:
-            # unfortunately we cannot determine the target datatype from var
-            for element in params[tableEntry["variable"]]:
-                if element != None:
-                    var = element
-                    break
-        try:
-            if isinstance(var, str):
-                params[variable] = value
-            elif isinstance(var, float):
-                float_value = float(value)
-                if (scaleFactor != None):
-                    float_value = float_value / scaleFactor
-                params[variable] = float_value
-            elif isinstance(var, int):
-                int_value = int(value)
-                if (scaleFactor != None):
-                    int_value = int(int_value * scaleFactor)
-                params[variable] = int_value
-            else:
-                ErrorMsg("__set_paramValue(): unimplemented handling of parameter %s" % tableEntry["txt"])
-        except:
-            ErrorMsg("__set_paramValue(): unable to write parameter %s (exception)" % tableEntry["txt"])
+        # get actual parameter value and -type
+        paramValue, dataType = self.__getDictValueAndDataType(params,
+                                        variableName, idx)
+        if dataType == 'str':
+            self.__setDictValue(params, variableName, idx, value)
+        elif dataType == 'float':
+            float_value = float(value)
+            if (scaleFactor != None):
+                float_value = float_value / scaleFactor
+            self.__setDictValue(params, variableName, idx, float_value)
+        elif dataType == 'int':
+            int_value = int(value)
+            if (scaleFactor != None):
+                int_value = int(int_value * scaleFactor)
+            self.__setDictValue(params, variableName, idx, int_value)
+        else:
+            ErrorMsg("__set_paramValue(): unimplemented handling of parameter %s" % variableName)
 
     def __update_Entries(self, paramTable, textVars, planformIdx):
         # get parameters for active planform
@@ -490,6 +516,13 @@ class control_frame():
         table = self.__get_airfoilParamsTable()
         textVars = self.airfoilParamsTextVars
 
+        # update airfoil names, as they could have been changed
+        self.airfoilNames[planformIdx] = self.creatorInstances[planformIdx].get_airfoilNames()
+
+        # update option menues
+        self.__update_OM_airfoilType(planformIdx)
+        self.__update_OM_airfoilChoice(planformIdx)
+
         # update entries for airfoil parameters
         self.__update_Entries(table, textVars, planformIdx)
 
@@ -500,10 +533,6 @@ class control_frame():
 
         # update entries for basic parameters
         self.__update_Entries(table, textVars, planformIdx)
-
-        # update option menues
-        self.__update_OM_airfoilType(planformIdx)
-        self.__update_OM_airfoilChoice(planformIdx)
 
         # update entries for airfoil parameters
         self.update_airfoilEntries(planformIdx)
@@ -516,7 +545,8 @@ class control_frame():
         for idx in range(len(paramTable)):
             paramTableEntry = paramTable[idx]
             entry = entries[idx]
-            (value_param, value_entry) = self.__get_Values(params, paramTableEntry, entry)
+            value_param = self.__get_paramValue(params, paramTableEntry)
+            value_entry = entry.get()
 
             # compare if something has changed
             if (value_entry != value_param):
@@ -548,6 +578,14 @@ class control_frame():
         except:
             ErrorMsg("update_basicParams() failed")
             pass
+
+         # update option menues
+        self.__update_OM_airfoilType(planformIdx)
+        self.__update_OM_airfoilChoice(planformIdx)
+
+        # update entries for airfoil parameters
+        self.update_airfoilEntries(planformIdx)
+
 
     def update_airfoilParams(self, command):
         planformIdx = self.master.planformIdx
