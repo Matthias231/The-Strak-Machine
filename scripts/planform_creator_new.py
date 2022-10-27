@@ -1097,8 +1097,13 @@ class wing:
         if self.fuselageIsPresent():
             # remove duplicate root airfoil
             newList.pop(0)
+        #newList.sort()#FIXME
 
-        return newList
+        airfoilNames = []
+        for element in newList:
+            airfoilNames.append(re.sub('.dat', '', element))
+
+        return airfoilNames
 
     def get_distributionParams(self):
         distributionParams = (self.params.planformShape,
