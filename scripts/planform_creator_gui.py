@@ -52,6 +52,11 @@ planformFiles = ["planformdataNew_wing.txt", "planformdataNew_tail.txt"]
 bg_color_light = "#DDDDDD"
 bg_color_dark =  "#222222"
 
+# font sizes #FIXME: scaling for screen resolution
+fs_label = 13
+fs_entry = 11
+fs_unit = 13
+
 ################################################################################
 #
 # helper functions
@@ -148,6 +153,7 @@ class control_frame():
 
             # get params
             params = self.creatorInstances[i].get_params()
+            self.__adjust_userAirfoilNames(params)
             self.params.append(params)
 
             # append planformname to list of planformnames (option menu)
@@ -285,14 +291,14 @@ class control_frame():
         table = [#{"txt": "Planform name",                "variable" : params.planformName,     "unit" : None, "scaleFactor" : None},
                  #{"txt": "Planform shape",               "variable" : params.planformShape,    "unit" : None, "scaleFactor" : None },
                   {"txt": "Airfoils basic name",          "variable" : 'airfoilBasicName',      "idx": None, "unit" : None, "scaleFactor" : None,   "decimals": None},
-                  {"txt": "wingspan",                     "variable" : 'wingspan',              "idx": None, "unit" : "mm", "scaleFactor" : 1000.0, "decimals": 1},
-                  {"txt": "Root chord",                   "variable" : 'rootchord',             "idx": None, "unit" : "mm", "scaleFactor" : 1000.0, "decimals": 1},
-                  {"txt": "Tip chord",                    "variable" : 'tipchord',              "idx": None, "unit" : "mm", "scaleFactor" : 1000.0, "decimals": 1},
+                  {"txt": "wingspan",                     "variable" : 'wingspan',              "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0},
+                  {"txt": "Width of fuselage",            "variable" : 'fuselageWidth',         "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0},
+                  {"txt": "Root chord",                   "variable" : 'rootchord',             "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0},
+                  {"txt": "Tip chord",                    "variable" : 'tipchord',              "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0},
                   {"txt": "Tip sharpness",                "variable" : 'tipSharpness',          "idx": None, "unit" : None, "scaleFactor" : None,   "decimals": 1},
                   {"txt": "Ellipse correction",           "variable" : 'ellipseCorrection',     "idx": None, "unit" : None, "scaleFactor" : 100.0,  "decimals": 1},
                   {"txt": "Leading edge correction",      "variable" : 'leadingEdgeCorrection', "idx": None, "unit" : None, "scaleFactor" : 100.0,  "decimals": 1},
                   {"txt": "Dihedral",                     "variable" : 'dihedral',              "idx": None, "unit" : "°",  "scaleFactor" : None,   "decimals": 1},
-                  {"txt": "Width of fuselage",            "variable" : 'fuselageWidth',         "idx": None, "unit" : "mm", "scaleFactor" : 1000.0, "decimals": 1},
                   {"txt": "Hingeline angle @root",        "variable" : 'hingeLineAngle',        "idx": None, "unit" : "°",  "scaleFactor" : None,   "decimals": 1},
                   {"txt": "Flap depth @root",             "variable" : 'flapDepthRoot',         "idx": None, "unit" : "%",  "scaleFactor" : None,   "decimals": 1},
                   {"txt": "Flap depth @tip",              "variable" : 'flapDepthTip',          "idx": None, "unit" : "%",  "scaleFactor" : None,   "decimals": 1},
@@ -308,8 +314,8 @@ class control_frame():
         sf_position = params['wingspan']/2*1000.0
 
         table = [
-                 {"txt": "selected (user) Airfoil: .dat file",    "variable" : 'userAirfoils',     "idx": idx, "unit" : None, "scaleFactor" : None,        "decimals": None},
-                 {"txt": "selected Airfoil: Position",            "variable" : 'airfoilPositions', "idx": idx, "unit" : 'mm', "scaleFactor" : sf_position, "decimals": 1},
+                 {"txt": "selected (user) Airfoil: .dat file",    "variable" : 'datFiles',         "idx": idx, "unit" : None, "scaleFactor" : None,        "decimals": None},
+                 {"txt": "selected Airfoil: Position",            "variable" : 'airfoilPositions', "idx": idx, "unit" : 'mm', "scaleFactor" : sf_position, "decimals": 0},
                  {"txt": "selected Airfoil: Re*Sqrt(Cl)",         "variable" : 'airfoilReynolds',  "idx": idx, "unit" : 'K', "scaleFactor" : 0.001,        "decimals": 0},
                  {"txt": "selected Airfoil: flap group",          "variable" : 'flapGroup',        "idx": idx, "unit" : None, "scaleFactor" : None,        "decimals": 0},
                 # {"txt": "selected Airfoil: user defined name",   "variable" : 'airfoilNames',     "idx": idx, "unit" : None, "scaleFactor" : None},
@@ -340,8 +346,8 @@ class control_frame():
 
             # create entry for param value
             value_entry = customtkinter.CTkEntry(frame, show=None,
-                textvariable = value_txt, text_font=(main_font, 11),
-                width=80, height=16)
+                textvariable = value_txt, text_font=(main_font, fs_entry),
+                width=140, height=16, justify='right')
 
             # bind to "Enter"-Message
             value_entry.bind('<Return>', update_function)
@@ -352,7 +358,7 @@ class control_frame():
             unit = paramTableEntry["unit"]
             if unit != None:
                 unit_label = customtkinter.CTkLabel(master=frame,
-                  text=unit, text_font=(main_font, 13), anchor="w")
+                  text=unit, text_font=(main_font, fs_unit), anchor="w")
             else:
                 unit_label = None
             unit_labels.append(unit_label)
@@ -451,7 +457,10 @@ class control_frame():
             float_value = value
             if (scaleFactor != None):
                 float_value = float_value * scaleFactor
-            value_param = str(round(float_value, decimals))
+            if (decimals > 0):
+                value_param = str(round(float_value, decimals))
+            else:
+                value_param = str(int(float_value))
         elif dataType == 'int':
             int_value = value
             if (scaleFactor != None):
@@ -470,6 +479,18 @@ class control_frame():
         else:
             # no, set value directly
             dictionary[key] = value
+
+    def __adjust_userAirfoilNames(self, params):
+        adjustedNames = []
+        names = params["userAirfoils"]
+
+        for name in names:
+            if (name != None):
+                name = os.path.basename(name)
+            adjustedNames.append(name)
+
+        # insert into params dictionary
+        params["datFiles"] = adjustedNames
 
     def __set_paramValue(self, params, tableEntry, value:str):
         # get additional information from param tableEntry
@@ -658,7 +679,7 @@ class control_frame():
         return (row + 1)
 
     def __add_planformChoiceMenu(self, frame, column, row):
-        self.label_planformChoice = self.__create_label(frame, "Choose planform:", -16)
+        self.label_planformChoice = self.__create_label(frame, "Choose planform:", fs_label)
         self.OM_planformChoice = customtkinter.CTkOptionMenu(master=frame,
                                                         values=self.planformNames,
                                                         command=self.__change_planform)
@@ -666,7 +687,7 @@ class control_frame():
         return (row + 1)
 
     def __add_airfoilChoiceMenu(self, frame, column, row):
-        self.label_airfoilChoice = self.__create_label(frame, "Choose airfoil:", -16)
+        self.label_airfoilChoice = self.__create_label(frame, "Choose airfoil:", fs_label)
         self.OM_airfoilChoice = customtkinter.CTkOptionMenu(master=frame,
                                                         values=self.airfoilNames[self.master.planformIdx],
                                                         command=self.__change_airfoil)
@@ -674,7 +695,7 @@ class control_frame():
         return (row + 1)
 
     def __add_airfoilTypeMenu(self, frame, column, row):
-        self.label_airfoilType = self.__create_label(frame, "Selected airfoil: type", -16)
+        self.label_airfoilType = self.__create_label(frame, "Selected airfoil: type", fs_label)
         self.OM_airfoilType = customtkinter.CTkOptionMenu(master=frame,
                                                         values=airfoilTypes,
                                                         command=self.__change_airfoilType)

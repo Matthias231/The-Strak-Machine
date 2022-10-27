@@ -660,6 +660,9 @@ class chordDistribution:
         return None
 
     def plot(self, ax):
+        global cl_referenceChord
+        global cl_normalizedChord
+
         # generate lists of x and y-coordinates
         normalizedHalfwingspan = []
         normalizedChord = []
@@ -867,27 +870,28 @@ class wing:
         global cl_legend
         global cl_controlPoints
         global cl_normalizedChord
+        global cl_referenceChord
         params = self.params
 
         if params.theme == 'Light':
             # black and white theme
-            cl_background = 'lightgray'
+            cl_background = 'dimgray'
             cl_grid = 'black'
-            cl_quarterChordLine = 'blue'
+            cl_quarterChordLine = 'darkblue'
             cl_geoCenter = 'black'
             cl_hingeLine = 'DeepSkyBlue'
-            cl_planform = 'black'
+            cl_planform = 'white'
             cl_flapFill = 'DeepSkyBlue'
             cl_planformFill = 'darkgray'
-            cl_sections = 'black'
-            cl_userAirfoil = 'black'
+            cl_sections = 'darkgray'
+            cl_userAirfoil = 'gray'
             cl_optAirfoil = 'black'
             cl_infotext = 'black'
             cl_chordlengths = 'darkgray'
-            cl_referenceChord = 'dark'
             cl_diagramTitle = 'darkgray'
             cl_legend = 'black'
-            cl_normalizedChord = 'black'
+            cl_referenceChord = 'lightgray'
+            cl_normalizedChord = 'DeepSkyBlue'
             cl_controlPoints = 'red'
         elif params.theme == 'Dark':
             # dark theme
@@ -904,9 +908,9 @@ class wing:
             cl_optAirfoil = 'orange'
             cl_infotext = 'DeepSkyBlue'
             cl_chordlengths = 'darkgray'
-            cl_referenceChord = 'gray'
             cl_diagramTitle = 'dimgray'
             cl_legend = 'ghostwhite'
+            cl_referenceChord = 'gray'
             cl_normalizedChord = 'orange'
             cl_controlPoints = 'red'
         else:
