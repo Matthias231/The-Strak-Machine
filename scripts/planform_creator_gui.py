@@ -153,7 +153,11 @@ class control_frame():
 
             # get params
             params = self.creatorInstances[i].get_params()
-            self.__adjust_userAirfoilNames(params)
+
+             # insert .dat filenames into params dictionary
+            params["datFiles"] = self.__getDatFileNames(params)
+
+            # append to list
             self.params.append(params)
 
             # append planformname to list of planformnames (option menu)
@@ -181,6 +185,7 @@ class control_frame():
         # second column, start at row 1
         nextRow = self.__add_airfoilChoiceMenu(self.frame_right, 3, 1)
         nextRow = self.__add_airfoilTypeMenu(self.frame_right, 3, nextRow)
+        nextRow = self.__add_userAirfoilWidgets(self.frame_right, 3, nextRow)
 
         # add entries
         nextRow = self.__add_airfoilParams(self.frame_right, 3, nextRow)
@@ -314,7 +319,7 @@ class control_frame():
         sf_position = params['wingspan']/2*1000.0
 
         table = [
-                 {"txt": "selected (user) Airfoil: .dat file",    "variable" : 'datFiles',         "idx": idx, "unit" : None, "scaleFactor" : None,        "decimals": None},
+                 #{"txt": "selected (user) Airfoil: .dat file",    "variable" : 'datFiles',         "idx": idx, "unit" : None, "scaleFactor" : None,        "decimals": None},
                  {"txt": "selected Airfoil: Position",            "variable" : 'airfoilPositions', "idx": idx, "unit" : 'mm', "scaleFactor" : sf_position, "decimals": 0},
                  {"txt": "selected Airfoil: Re*Sqrt(Cl)",         "variable" : 'airfoilReynolds',  "idx": idx, "unit" : 'K', "scaleFactor" : 0.001,        "decimals": 0},
                  {"txt": "selected Airfoil: flap group",          "variable" : 'flapGroup',        "idx": idx, "unit" : None, "scaleFactor" : None,        "decimals": 0},
@@ -480,17 +485,16 @@ class control_frame():
             # no, set value directly
             dictionary[key] = value
 
-    def __adjust_userAirfoilNames(self, params):
-        adjustedNames = []
+    def __getDatFileNames(self, params):
+        datFileNames = []
         names = params["userAirfoils"]
 
         for name in names:
             if (name != None):
                 name = os.path.basename(name)
-            adjustedNames.append(name)
+            datFileNames.append(name)
 
-        # insert into params dictionary
-        params["datFiles"] = adjustedNames
+        return datFileNames
 
     def __set_paramValue(self, params, tableEntry, value:str):
         # get additional information from param tableEntry
@@ -615,6 +619,9 @@ class control_frame():
         paramTable = self.__get_airfoilParamsTable()
         params = self.params[planformIdx]
 
+        # Update label showing the name of the datFile
+        self.__update_datFileName(params, planformIdx)
+
         try:
             self.__update_params(paramTable, params, self.airfoilParamsEntries)
         except:
@@ -702,6 +709,18 @@ class control_frame():
         self.__place_widgetsInRow([self.label_airfoilType, self.OM_airfoilType] ,column, row)
         return (row + 1)
 
+    def __add_userAirfoilWidgets(self, frame, column, row):
+        self.label_userAirfoil = self.__create_label(frame, "Selected (user) airfoil: datFile", fs_label)
+        self.label_datFile = self.__create_label(frame, "None", fs_entry)
+        self.label_datFile.configure(bg_color='gray')
+
+        button = {"txt": "Choose .dat file", "cmd" : self.__choose_datFile, "param" : None}
+        self.button_datFile = self.__create_button(frame,button)
+
+        self.__place_widgetsInRow([self.label_userAirfoil, self.label_datFile, self.button_datFile]
+                                  ,column, row)
+        return (row + 1)
+
     def __change_appearance_mode(self, new_appearanceMode):
         customtkinter.set_appearance_mode(new_appearanceMode)
 
@@ -775,7 +794,19 @@ class control_frame():
         # notify the diagram frame about the change
         self.master.set_updateNeeded()
 
+    def __choose_datFile(self, dummy):
+        planformIdx = self.master.planformIdx
+        params = self.params[planformIdx]
+        airfoilIdx = self.airfoilIdx[planformIdx]
 
+        file_path_string = tk.filedialog.askopenfilename()
+        params["userAirfoils"][airfoilIdx] = file_path_string
+        self.__update_datFileName(params, planformIdx)
+
+    def __update_datFileName(self, params, planformIdx):
+        airfoilIdx = self.airfoilIdx[planformIdx]
+        datFiles = self.__getDatFileNames(params)
+        self.label_datFile.configure(text = datFiles[airfoilIdx])
 
     def on_closing(self, event=0):
         self.destroy()
