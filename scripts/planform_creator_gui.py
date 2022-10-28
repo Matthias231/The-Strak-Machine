@@ -120,6 +120,7 @@ class control_frame():
         self.basicParamsTextVars = []
         self.airfoilParamsTextVars = []
         self.latestPath = []
+        self.postponeUpdate = False
 
         # determine screen size
         self.width = self.master.winfo_screenwidth()
@@ -249,6 +250,13 @@ class control_frame():
             except:
                 row.append(None)
         return row
+
+    def __get_bg_color(self, theme):
+        '''get background color according to \'theme\''''
+        if (theme == 'Dark'):
+            return bg_color_dark
+        else:
+            return bg_color_light
 
     def __place_widgetsInColumn(self, widgets, column, startRow):
         '''place widgets in the list \'widgets\' in the same column'''
@@ -546,6 +554,26 @@ class control_frame():
         for idx in range(num):
             textVars[idx].set(self.__get_paramValue(params, paramTable[idx]))
 
+    def __perform_update(self):
+        if (self.postponeUpdate == True):
+            return
+
+        planformIdx = self.master.planformIdx
+        params = self.params[planformIdx]
+
+        # notify the unsaved changes
+        self.set_unsavedChangesFlag(planformIdx)
+        if params == {}:
+            ErrorMsg("empty dictionary detected!")
+            exit(-1)
+
+        # perform update of the planform
+        self.creatorInstances[planformIdx].update_planform(params)
+
+        # notify the diagram frame about the change
+        self.master.set_updateNeeded()
+
+
     def update_airfoilEntries(self, planformIdx):
         # Set Flag to avoid recursive calls
         self.update_airfoilEntries_active = True
@@ -605,14 +633,7 @@ class control_frame():
             idx = idx + 1
 
         if (change_detected):
-            # notify the unsaved changes
-            self.set_unsavedChangesFlag(self.master.planformIdx)
-
-            # perform update of the planform
-            creatorInst.update_planform(params)
-
-            # notify the diagram frame about the change
-            self.master.set_updateNeeded()
+            self.__perform_update()
 
     def update_basicParams(self, command):
         planformIdx = self.master.planformIdx
@@ -682,14 +703,9 @@ class control_frame():
         # set control-point
         controlPoints[idx] = (x,y)
 
-        # notify about the unsaved changes
-        self.set_unsavedChangesFlag(self.master.planformIdx)
+        # carry out functions needed for update
+        self.__perform_update()
 
-        # perform update of the planform
-        creatorInst.update_planform(params)
-
-        # notify the diagram frame about the change
-        self.master.set_updateNeeded()
 
     def __create_button(self, frame, button):
         text = button["txt"]
@@ -748,15 +764,13 @@ class control_frame():
 
     def __change_appearance_mode(self, new_appearanceMode):
         customtkinter.set_appearance_mode(new_appearanceMode)
+        self.master.appearance_mode = new_appearanceMode
 
         # change the color of the scrollable frame manually,as this is not a
         # customtkinter frame
-        if (new_appearanceMode == 'Dark'):
-            self.frame_right.configure(bg = bg_color_dark)
-            self.canvas.configure(bg = bg_color_dark)
-        else:
-            self.frame_right.configure(bg = bg_color_light)
-            self.canvas.configure(bg = bg_color_light)
+        bg_color = self.__get_bg_color(new_appearanceMode)
+        self.frame_right.configure(bg = bg_color)
+        self.canvas.configure(bg = bg_color)
 
         # change appearance mode in planform-creator
         for idx in range (len(self.creatorInstances)):
@@ -779,12 +793,14 @@ class control_frame():
 
         # set new idx
         self.master.planformIdx = planformIdx
+        self.postponeUpdate = True
 
         # update entry-frame
         self.update_Entries(planformIdx)
+        self.postponeUpdate = False
 
-        # notify the diagram frame about the change
-        self.master.set_updateNeeded()
+        # carry out functions needed for update
+        self.__perform_update()
 
 
     def __change_airfoil(self, airfoilName):
@@ -801,11 +817,17 @@ class control_frame():
 
         # set new idx
         self.airfoilIdx[planformIdx] = airfoilIdx
+        self.postponeUpdate = True
 
         # Check for recursion
         if self.update_airfoilEntries_active == False:
             # update only airfoil entries, not basic parameter entries
             self.update_airfoilEntries(planformIdx)
+
+        # carry out functions needed for update
+        self.postponeUpdate = False
+        self.__perform_update()
+
 
     def __change_airfoilType(self, airfoilType):
         planformIdx = self.master.planformIdx
@@ -814,19 +836,25 @@ class control_frame():
 
         # set new type
         params["airfoilTypes"][airfoilIdx] = airfoilType
+        self.postponeUpdate = True
 
         # Check for recursion
         if self.update_airfoilEntries_active == False:
             # update only airfoil entries, not basic parameter entries
             self.update_airfoilEntries(planformIdx)
 
-        # notify the diagram frame about the change
-        self.master.set_updateNeeded()
+        # carry out functions needed for update
+        self.postponeUpdate = False
+        self.__perform_update()
+
 
     def __choose_datFile(self, dummy):
         planformIdx = self.master.planformIdx
         params = self.params[planformIdx]
         airfoilIdx = self.airfoilIdx[planformIdx]
+
+        # clear old filename
+        params["userAirfoils"][airfoilIdx] = None
 
         filetypes = (('.dat files', '*.dat'),
                      ('All files', '*.*'))
@@ -836,13 +864,16 @@ class control_frame():
                     initialdir=self.latestPath[planformIdx],
                     filetypes=filetypes)
 
-        if filename != None:
-            # update name of .dat file in params
-            params["userAirfoils"][airfoilIdx] = filename
-            self.__update_datFileName(params, planformIdx)
+        # update name of .dat file in params (None is allowed value)
+        params["userAirfoils"][airfoilIdx] = filename
+        self.__update_datFileName(params, planformIdx)
 
-            # store latest path
-            self.latestPath[planformIdx] = os.path.dirname(filename)
+        # store latest path
+        self.latestPath[planformIdx] = os.path.dirname(filename)
+
+        # carry out functions needed for update
+        self.__perform_update()
+
 
     def __update_datFileName(self, params, planformIdx):
         params = self.params[planformIdx]
@@ -873,6 +904,9 @@ class control_frame():
 
             # no .dat file possible
             self.label_datFile.configure(text='')
+
+            # hide the label by configuring it to background color
+            bg_color = self.__get_bg_color(self.master.appearance_mode)
             self.label_datFile.configure(bg_color=bg_color_dark)
 
 
@@ -1524,9 +1558,10 @@ class App(customtkinter.CTk):
 
         # index of active planform
         self.planformIdx = 0
+        self.appearance_mode = "Dark" # Modes: "System" (standard), "Dark", "Light"
 
         # configure customtkinter
-        customtkinter.set_appearance_mode("Dark")    # Modes: "System" (standard), "Dark", "Light"
+        customtkinter.set_appearance_mode(self.appearance_mode)    # Modes: "System" (standard), "Dark", "Light"
         customtkinter.set_default_color_theme("blue") # Themes: "blue" (standard), "green", "dark-blue"
 
         # set window title

@@ -315,7 +315,7 @@ class params:
         if ((self.planformShape != 'elliptical') and\
             (self.planformShape != 'trapezoidal')):
             ErrorMsg("planformshape must be elliptical or trapezoidal")
-            sys.exit(-1)
+            exit(-1)
 
         if self.planformShape == 'elliptical':
             self.leadingEdgeCorrection = self.__get_MandatoryParameterFromDict(dictData, "leadingEdgeCorrection")
@@ -393,10 +393,9 @@ class params:
                 numDefinedUserAirfoils += 1
 
         if (numDefinedUserAirfoils < numUserAirfoils):
-            ErrorMsg("%d airfoils have type \"user\", but only %d user-airfoils"\
+            WarningMsg("%d airfoils have type \"user\", but only %d user-airfoils"\
             " were defined in \"user-airfoils\""\
              % (numUserAirfoils, numDefinedUserAirfoils))
-            exit(-1)
         elif (numDefinedUserAirfoils > numUserAirfoils):
             WarningMsg("%d airfoils have type \"user\", but %d user-airfoils"\
             " were defined in \"user-airfoils\""\
@@ -816,7 +815,7 @@ class planform:
         self.__calculate_wingArea()
 
         # calculate aspect ratio of the wing
-        self.aspectRatio = params.wingspan*params.wingspan / (self.wingArea/100)
+        self.aspectRatio = params.wingspan*params.wingspan / self.wingArea
 
         # add offset of half of the fuselage-width to the y-coordinates
         for element in self.grid:
@@ -1110,7 +1109,6 @@ class wing:
         if self.fuselageIsPresent():
             # remove duplicate root airfoil
             newList.pop(0)
-        #newList.sort()#FIXME
 
         airfoilNames = []
         for element in newList:
@@ -1455,6 +1453,7 @@ class wing:
                 color = cl_userAirfoil
             else:
                 color = cl_userAirfoil_unassigned
+                airfoilType = 'user_unassigned'
         elif (airfoilType == 'opt'):
             color = cl_optAirfoil
         else:
@@ -1462,6 +1461,25 @@ class wing:
 
         return (airfoilType, color)
 
+    def __plot_planformDataLabel(self, ax, x):
+        params = self.params
+        planform = self.planform
+
+        wingArea_dm = planform.wingArea*100
+
+        proj_fact = cos(params.dihedral*pi/180.0)
+        proj_wingArea_dm = proj_fact * planform.wingArea*100
+        flapToWingAreaRatio = (planform.flapArea / planform.wingArea)*100
+
+        # plot label containing basic planform data
+        text = ("Wing Area: %.1f dm² / proj. wing area: %.1f dm²\nAspect ratio: %.1f\nFlap area / wing area ratio: %.1f %%" %\
+                (wingArea_dm, proj_wingArea_dm, planform.aspectRatio, flapToWingAreaRatio))
+
+        (y_min,y_max) = ax.get_ylim()
+        y_off = -1 * (fs_legend * 4)
+
+        ax.annotate(text, xy=(x, y_min), xycoords='data', xytext=(0, y_off),
+         textcoords='offset points', color = cl_legend,fontsize=fs_legend)
 
     def plot_PlanformShape(self, ax):
         params = self.params
@@ -1514,8 +1532,9 @@ class wing:
         ax.plot(xValues, trailingeEge, color=cl_planform,
                 linewidth = lw_planform, solid_capstyle="round")
 
+        x_min = params.fuselageWidth/2
         # set new ticks for the x-axis according to the positions of the sections
-        ax.set_xticks([params.fuselageWidth/2, center_x, params.wingspan])
+        ax.set_xticks([x_min, center_x, params.wingspan/2])
         ax.set_yticks([0.0, center_y, params.rootchord])
 
         # set new fontsize of the x-tick labels
@@ -1541,6 +1560,8 @@ class wing:
         if (params.leadingEdgeOrientation == 'up'):
             ax.set_ylim(ax.get_ylim()[::-1])
 
+        # label with additional information concerning planform
+        #self.__plot_planformDataLabel(ax, x_min) #FIXME is this necessary ?
 
     def plot_FlapDistribution(self, ax):
         '''plots a diagram that shows distribution of flaps and also depth of flaps'''
@@ -1653,7 +1674,7 @@ class wing:
             sectionsList = self.sections
 
         # compose labels for airfoil types
-        label_user_unassigned = 'airfoiltype \'user\', not assigned yet'
+        label_user_unassigned = 'airfoiltype \'user\', not assigned yet (!)'
         label_user =  'airfoiltype \'user\''
         label_blend = 'airfoiltype \'blend\''
         label_opt = 'airfoiltype \'opt\''
@@ -1934,6 +1955,9 @@ class wing:
         # set new fontsize of the y-tick labels
         for tick in ax.yaxis.get_major_ticks():
             tick.label.set_fontsize(fs_ticks)
+
+        # label with additional information concerning planform
+        self.__plot_planformDataLabel(ax, 0)
 
     def draw_diagram(self, diagramType, ax, x_limits, y_limits):
         if diagramType == diagTypes[0]:
