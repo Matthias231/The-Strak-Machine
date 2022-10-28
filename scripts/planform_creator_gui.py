@@ -43,7 +43,7 @@ from planform_creator_new import (planform_creator, diagTypes, airfoilTypes,
 num_diagrams = len(diagTypes)
 diagram_width = 10
 diagram_height = 7
-controlFrame = None
+ctrlFrame = None
 creatorInstances:planform_creator = []
 
 # path to airfoils library
@@ -689,23 +689,39 @@ class control_frame():
         self.OM_airfoilChoice.configure(values = airfoilNames)
         self.OM_airfoilChoice.set(airfoilNames[airfoilIdx])
 
-    def change_controlPoint(self, x, y, idx):
+    def __changeFlap(self, x, y, idx):
         if idx == None:
             return
 
         # get instance of planform-creator
         creatorInst:planform_creator = self.creatorInstances[self.master.planformIdx]
         params = self.params[self.master.planformIdx]
+        depth = (round(y,1))
 
-        # get control points
-        controlPoints = params["chordDistribution"]
-
-        # set control-point
-        controlPoints[idx] = (x,y)
+        # FIXME : also flapDepth of intermediate flap separation lines
+        # FIXME : also change Flap position
+        if (idx == 0):
+            params["flapDepthRoot"] = depth
+        else:
+            params["flapDepthTip"] = depth
 
         # carry out functions needed for update
         self.__perform_update()
 
+    def __change_airfoilPosition(self, x, y, idx):
+        if idx == None:
+            return
+
+        # get instance of planform-creator
+        creatorInst:planform_creator = self.creatorInstances[self.master.planformIdx]
+        params = self.params[self.master.planformIdx]
+        position = round(x,3)
+
+        # set new position (use only x-value)
+        params["airfoilPositions"] = position
+
+        # carry out functions needed for update
+        self.__perform_update()
 
     def __create_button(self, frame, button):
         text = button["txt"]
@@ -937,7 +953,8 @@ class diagram(customtkinter.CTkFrame):
         Return the index of the point closest to the event position or *None*
         if no point is within catching range to the event position.
         """
-        global controlFrame
+        global ctrlFrame
+        params = ctrlFrame.params[self.controller.master.planformIdx]
 
         # set ranges to catch points, consider zoomfactor
         zoom_factor = self.controller.get_zoom_factor()
@@ -948,27 +965,33 @@ class diagram(customtkinter.CTkFrame):
         mouse_oppoint = event.ydata
 
         # check type of active diagram
-        if (self.controller.activeDiagram == diagTypes[2]):
+        if ((self.controller.activeDiagram == diagTypes[2]) or
+            (self.controller.activeDiagram == diagTypes[3])):
             mouse_x = event.xdata
             mouse_y = event.ydata
         else:
-            print("not implemented yet")
+            #print("not implemented yet") #FIXME
             return None
 
         # search entry with closest coordinates
         idx = 0
+        if (self.controller.activeDiagram == diagTypes[2]):
+            # change of FlapDepth requested
+            flapPositions = [0.0, 1.0] #FIXME use __get_flapPositions()
+            for idx in range(len(flapPositions)):
+                x = flapPositions[idx]
+                if ((abs(mouse_x - x) < catching_range_x)):
+                    return idx
+        elif (self.controller.activeDiagram == diagTypes[3]):
+            # change of airfoil-position requested
+            airfoilPositions = params["airfoilPositions"] #FIXME use __get_airfoilPositions()
+            for idx in range(len(airfoilPositions)):
+                x = airfoilPositions[idx]
+                if x != None:
+                    if ((abs(mouse_x - x) < catching_range_x)):
+                        return idx
 
-        controlPoints = self.controller.get_controlPoints()
-        for point in controlPoints:
-            # unpack tuple
-            (x, y) = point
-
-            # check catching range
-            if ((abs(mouse_x - x) < catching_range_x) and
-                (abs(mouse_y - y) < catching_range_y)):
-                return idx
-
-            idx = idx + 1
+        # nothing was found
         return None
 
 
@@ -1008,7 +1031,7 @@ class diagram(customtkinter.CTkFrame):
 
     def on_mouse_move(self, event):
         """Callback for mouse movements."""
-        global controlFrame
+        global ctrlFrame
         if event.inaxes is None:
             return
         if event.button == 1:
@@ -1016,9 +1039,15 @@ class diagram(customtkinter.CTkFrame):
                 return
             # check type of active diagram
             if (self.controller.activeDiagram == diagTypes[2]):
+                # Flap distribution
                 x, y = event.xdata, event.ydata
-                # set new control point
-                controlFrame.change_controlPoint(x,y,self._ind)
+                # set new flap depth
+                ctrlFrame.__changeFlap(x,y,self._ind)
+            elif (self.controller.activeDiagram == diagTypes[3]):
+                # airfoil distribution
+                x, y = event.xdata, event.ydata
+                # set new airfoil position
+                ctrlFrame.__change_airfoilPosition(x,y,self._ind)
         elif event.button == 3: # right mouse button
             # move visible area of the window
             self.controller.move_visibleArea(event)
@@ -1551,7 +1580,7 @@ class diagram_frame():
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
-        global controlFrame
+        global ctrlFrame
         global creatorInstances
 
         self.app_running = False
@@ -1588,13 +1617,13 @@ class App(customtkinter.CTk):
         self.frame_top = diagram_frame(self, tk.TOP, creatorInstances,
          scaleFactor)
 
-        # create control frame, which is on the left
+        # create control frame, which is on the bottom
         self.frame_bottom = control_frame(self, tk.BOTTOM,
          self.get_Buttons(), creatorInstances,
           scaleFactor)
 
         # set global variable
-        controlFrame = self.frame_bottom
+        ctrlFrame = self.frame_bottom
 
     def get_Buttons(self):
         headlines = []
