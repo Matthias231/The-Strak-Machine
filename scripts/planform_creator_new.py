@@ -815,7 +815,8 @@ class planform:
         self.__calculate_wingArea()
 
         # calculate aspect ratio of the wing
-        self.aspectRatio = params.wingspan*params.wingspan / self.wingArea
+        # use "halfwingspan", as the fuselage-width has already been substracted
+        self.aspectRatio = ((params.halfwingspan*2)**2) / self.wingArea
 
         # add offset of half of the fuselage-width to the y-coordinates
         for element in self.grid:
