@@ -46,6 +46,9 @@ diagram_height = 7
 controlFrame = None
 creatorInstances:planform_creator = []
 
+# path to airfoils library
+airfoilLibrary_path = 'airfoil_library'
+
 # names of the planformfiles
 planformFiles = ["planformdataNew_wing.txt", "planformdataNew_tail.txt"]
 
@@ -116,6 +119,7 @@ class control_frame():
         self.airfoilIdx = []
         self.basicParamsTextVars = []
         self.airfoilParamsTextVars = []
+        self.latestPath = []
 
         # determine screen size
         self.width = self.master.winfo_screenwidth()
@@ -154,9 +158,6 @@ class control_frame():
             # get params
             params = self.creatorInstances[i].get_params()
 
-             # insert .dat filenames into params dictionary
-            params["datFiles"] = self.__getDatFileNames(params)
-
             # append to list
             self.params.append(params)
 
@@ -169,6 +170,9 @@ class control_frame():
 
             # select root airfoil
             self.airfoilIdx.append(0)
+
+            # append latest path
+            self.latestPath.append(os.getcwd() + bs + airfoilLibrary_path)
 
         # add different widgets to upper frame (not scrollable)
         (labels, buttons) = labelsAndButtons
@@ -189,6 +193,9 @@ class control_frame():
 
         # add entries
         nextRow = self.__add_airfoilParams(self.frame_right, 3, nextRow)
+
+        # update alle entries
+        self.update_Entries(self.master.planformIdx)
 
         # show left frame
         self.frame_left.pack(side = 'left', fill=tk.BOTH)
@@ -400,6 +407,9 @@ class control_frame():
         self.airfoilParamsTextVars = []
         self.airfoilParamsEntries = []
 
+        # add Flag for recursion-check
+        self.update_airfoilEntries_active = False
+
         # get table with airfoil parameters for active planform
         airfoilParams = self.__get_airfoilParamsTable()
 
@@ -537,9 +547,13 @@ class control_frame():
             textVars[idx].set(self.__get_paramValue(params, paramTable[idx]))
 
     def update_airfoilEntries(self, planformIdx):
+        # Set Flag to avoid recursive calls
+        self.update_airfoilEntries_active = True
+
         # get airfoil parameter table for active planform
         table = self.__get_airfoilParamsTable()
         textVars = self.airfoilParamsTextVars
+        params = self.params[planformIdx]
 
         # update airfoil names, as they could have been changed
         self.airfoilNames[planformIdx] = self.creatorInstances[planformIdx].get_airfoilNames()
@@ -548,8 +562,15 @@ class control_frame():
         self.__update_OM_airfoilType(planformIdx)
         self.__update_OM_airfoilChoice(planformIdx)
 
+        # update name of .dat file
+        self.__update_datFileName(params, planformIdx)
+
         # update entries for airfoil parameters
         self.__update_Entries(table, textVars, planformIdx)
+
+        # Clear Flag to avoid recursive calls
+        self.update_airfoilEntries_active = False
+
 
     def update_Entries(self, planformIdx):
         # get basic parameter table for active planform
@@ -559,8 +580,10 @@ class control_frame():
         # update entries for basic parameters
         self.__update_Entries(table, textVars, planformIdx)
 
-        # update entries for airfoil parameters
-        self.update_airfoilEntries(planformIdx)
+        # Check for recursion
+        if self.update_airfoilEntries_active == False:
+            # update entries for airfoil parameters
+            self.update_airfoilEntries(planformIdx)
 
     def __update_params(self, paramTable, params, entries):
         # get instance of planform-creator
@@ -608,8 +631,10 @@ class control_frame():
         self.__update_OM_airfoilType(planformIdx)
         self.__update_OM_airfoilChoice(planformIdx)
 
-        # update entries for airfoil parameters
-        self.update_airfoilEntries(planformIdx)
+        # Check for recursion
+        if self.update_airfoilEntries_active == False:
+            # update entries for airfoil parameters
+            self.update_airfoilEntries(planformIdx)
 
 
     def update_airfoilParams(self, command):
@@ -710,11 +735,11 @@ class control_frame():
         return (row + 1)
 
     def __add_userAirfoilWidgets(self, frame, column, row):
-        self.label_userAirfoil = self.__create_label(frame, "Selected (user) airfoil: datFile", fs_label)
-        self.label_datFile = self.__create_label(frame, "None", fs_entry)
+        self.label_userAirfoil = self.__create_label(frame, "Selected (user) airfoil: .dat file", fs_label)
+        self.label_datFile = self.__create_label(frame, '', fs_entry)
         self.label_datFile.configure(bg_color='gray')
 
-        button = {"txt": "Choose .dat file", "cmd" : self.__choose_datFile, "param" : None}
+        button = {"txt": "Choose file", "cmd" : self.__choose_datFile, "param" : None}
         self.button_datFile = self.__create_button(frame,button)
 
         self.__place_widgetsInRow([self.label_userAirfoil, self.label_datFile, self.button_datFile]
@@ -777,11 +802,10 @@ class control_frame():
         # set new idx
         self.airfoilIdx[planformIdx] = airfoilIdx
 
-        # update option menu
-        self.__update_OM_airfoilType(planformIdx)
-
-        # update only airfoil entries
-        self.update_airfoilEntries(planformIdx)
+        # Check for recursion
+        if self.update_airfoilEntries_active == False:
+            # update only airfoil entries, not basic parameter entries
+            self.update_airfoilEntries(planformIdx)
 
     def __change_airfoilType(self, airfoilType):
         planformIdx = self.master.planformIdx
@@ -791,6 +815,11 @@ class control_frame():
         # set new type
         params["airfoilTypes"][airfoilIdx] = airfoilType
 
+        # Check for recursion
+        if self.update_airfoilEntries_active == False:
+            # update only airfoil entries, not basic parameter entries
+            self.update_airfoilEntries(planformIdx)
+
         # notify the diagram frame about the change
         self.master.set_updateNeeded()
 
@@ -799,14 +828,53 @@ class control_frame():
         params = self.params[planformIdx]
         airfoilIdx = self.airfoilIdx[planformIdx]
 
-        file_path_string = tk.filedialog.askopenfilename()
-        params["userAirfoils"][airfoilIdx] = file_path_string
-        self.__update_datFileName(params, planformIdx)
+        filetypes = (('.dat files', '*.dat'),
+                     ('All files', '*.*'))
+
+        filename = tk.filedialog.askopenfilename(
+                    title='Open a file',
+                    initialdir=self.latestPath[planformIdx],
+                    filetypes=filetypes)
+
+        if filename != None:
+            # update name of .dat file in params
+            params["userAirfoils"][airfoilIdx] = filename
+            self.__update_datFileName(params, planformIdx)
+
+            # store latest path
+            self.latestPath[planformIdx] = os.path.dirname(filename)
 
     def __update_datFileName(self, params, planformIdx):
+        params = self.params[planformIdx]
         airfoilIdx = self.airfoilIdx[planformIdx]
-        datFiles = self.__getDatFileNames(params)
-        self.label_datFile.configure(text = datFiles[airfoilIdx])
+        types = params['airfoilTypes']
+
+        # is it a 'user' airfoil ?
+        if (types[airfoilIdx] == airfoilTypes[0]):
+            # activate file selection button
+            self.button_datFile.configure(state = "normal")
+
+            # name of the .dat file shall be shown
+            datFiles = self.__getDatFileNames(params)
+            filename = datFiles[airfoilIdx]
+
+            # check valid filename
+            if (filename == None) or (filename == 'None') or (filename == ''):
+                # no valid filename, this is an undesired state
+                self.label_datFile.configure(text='')
+                self.label_datFile.configure(bg_color='red')
+            else:
+                # valid filename, everything o.k.
+                self.label_datFile.configure(text=filename)
+                self.label_datFile.configure(bg_color='dim gray')
+        else:
+            # deactivate file selection button
+            self.button_datFile.configure(state = "disabled")
+
+            # no .dat file possible
+            self.label_datFile.configure(text='')
+            self.label_datFile.configure(bg_color=bg_color_dark)
+
 
     def on_closing(self, event=0):
         self.destroy()
@@ -1655,6 +1723,14 @@ if __name__ == "__main__":
 
      # init planform creator instances
     NoteMsg("Starting Planform Creator...")
+
+    # check working-directory, have we been started from "scripts"-dir? (Debugging)
+    currentDir = os.getcwd()
+    if (currentDir.find("scripts")>=0):
+        startedFromScriptsFolder = True
+        os.chdir("..")
+    else:
+        startedFromScriptsFolder = False
 
     try:
         for fileName in planformFiles:

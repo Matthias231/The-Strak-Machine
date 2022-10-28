@@ -80,6 +80,7 @@ cl_planform = None
 cl_planformFill = None
 cl_sections = None
 cl_userAirfoil = None
+cl_userAirfoil_unassigned = None
 cl_optAirfoil = None
 cl_infotext = None
 cl_diagramTitle = None
@@ -864,6 +865,7 @@ class wing:
         global cl_planformFill
         global cl_sections
         global cl_userAirfoil
+        global cl_userAirfoil_unassigned
         global cl_optAirfoil
         global cl_infotext
         global cl_diagramTitle
@@ -873,6 +875,10 @@ class wing:
         global cl_referenceChord
         params = self.params
 
+        # common colors
+        cl_userAirfoil_unassigned = 'red'
+
+        # theme specific colors
         if params.theme == 'Light':
             # black and white theme
             cl_background = 'dimgray'
@@ -964,6 +970,9 @@ class wing:
         if params.airfoilTypes[-1] == "user":
             # yes, so append user-airfoil
             params.userAirfoils.append(params.userAirfoils[-1])
+        elif params.airfoilTypes[-1] == "opt":
+            # append 'None'
+            params.userAirfoils.append(None)
 
         reynolds = (params.tipchord / self.chords[-1]) * params.airfoilReynolds[-1]
         params.airfoilReynolds.append(int(round(reynolds,0)))
@@ -1423,15 +1432,35 @@ class wing:
                 self.sections[idx].flapGroup = params.flapGroups[idx]
 
     # get color for plotting
-    def get_colorFromAirfoilType(self, airfoilType):
+    def get_AirfoilTypeAndColor(self, idx):
+        global cl_userAirfoil_unassigned
+        global cl_userAirfoil
+        global cl_optAirfoil
+        global cl_sections
+
+        # get type of airfoil
+        try:
+            airfoilType = self.params.airfoilTypes[idx]
+        except:
+            airfoilType = 'blend'
+        try:
+            filename = self.params.userAirfoils[idx]
+            if (filename == 'None') or (filename == ''):
+                filename == None
+        except:
+            filename = None
+
         if (airfoilType == 'user'):
-            color = cl_userAirfoil
+            if (filename != None):
+                color = cl_userAirfoil
+            else:
+                color = cl_userAirfoil_unassigned
         elif (airfoilType == 'opt'):
             color = cl_optAirfoil
         else:
             color = cl_sections
 
-        return color
+        return (airfoilType, color)
 
 
     def plot_PlanformShape(self, ax):
@@ -1624,22 +1653,27 @@ class wing:
             sectionsList = self.sections
 
         # compose labels for airfoil types
+        label_user_unassigned = 'airfoiltype \'user\', not assigned yet'
         label_user =  'airfoiltype \'user\''
         label_blend = 'airfoiltype \'blend\''
         label_opt = 'airfoiltype \'opt\''
 
         for element in reversed(sectionsList):
-            # determine type of airfoil of this section
-            try:
-                airfoilType = params.airfoilTypes[idx]
-            except:
-                airfoilType = 'blend'
+            # determine type of airfoil of this section,
+            # get labelcolor, which will also be the color of the plotted line
+            airfoilType, labelColor = self.get_AirfoilTypeAndColor(idx)
 
             # get labeltext
             if (airfoilType == 'user'):
                 if label_user != None:
                     labelText = label_user[:]
                     label_user = None
+                else:
+                    labelText = None
+            elif (airfoilType == 'user_unassigned'):
+                if label_user_unassigned != None:
+                    labelText = label_user_unassigned[:]
+                    label_user_unassigned = None
                 else:
                     labelText = None
             elif (airfoilType == 'opt'):
@@ -1654,9 +1688,6 @@ class wing:
                     label_blend = None
                 else:
                     labelText = None
-
-            # get labelcolor, which will also be the color of the plotted line
-            labelColor = self.get_colorFromAirfoilType(airfoilType)
 
             ax.plot([element.y, element.y] ,[element.leadingEdge, element.trailingEdge],
             color=labelColor, linestyle = ls_sections, linewidth = lw_sections,
