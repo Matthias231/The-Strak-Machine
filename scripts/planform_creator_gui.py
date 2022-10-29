@@ -30,6 +30,7 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+import numpy as np
 
 # imports from strak machine
 from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg,
@@ -717,6 +718,11 @@ class control_frame():
         # get instance of planform-creator
         creatorInst:planform_creator = self.creatorInstances[self.master.planformIdx]
         params = self.params[self.master.planformIdx]
+
+        # limit to possible range
+        y = np.clip(y, 0.0, 100.0)
+
+        # round number of decimals
         depth = (round(y,1))
 
         # FIXME : also flapDepth of intermediate flap separation lines
@@ -740,6 +746,9 @@ class control_frame():
         # calculate position from x value (normalize)
         position = float(x/1000.0) # mm -> m
         position = creatorInst.normalize_position(position)
+
+        # limit to possible range
+        position = np.clip(position, 0.0, 1.0)
 
         # set new position in dictionary
         params["airfoilPositions"][idx] = position
@@ -990,10 +999,6 @@ class diagram(customtkinter.CTkFrame):
             (self.controller.activeDiagram == diagTypes[3])):
             mouse_x = event.xdata
             mouse_y = event.ydata
-
-            # set ranges to catch points, consider zoomfactor
-            # wingspan (m -->  mm) / 50 --> * 20.0
-            catching_range = params["wingspan"] * 20.0 * zoom_factor
         else:
             #print("not implemented yet") #FIXME
             return None
@@ -1001,6 +1006,9 @@ class diagram(customtkinter.CTkFrame):
         # search entry with closest coordinates
         # change of FlapDepth requested ?
         if (self.controller.activeDiagram == diagTypes[2]):
+            # set ranges to catch points, consider zoomfactor
+            # wingspan (m -->  mm) / 50 --> * 20.0
+            catching_range = 0.03 * zoom_factor
             flapPositions = [0.0, 1.0] #FIXME use __get_flapPositions()
             for idx in range(len(flapPositions)):
                 x = flapPositions[idx]
@@ -1009,6 +1017,9 @@ class diagram(customtkinter.CTkFrame):
 
         # change of airfoil-position requested ?
         elif (self.controller.activeDiagram == diagTypes[3]):
+            # set ranges to catch points, consider zoomfactor
+            # wingspan (m -->  mm) / 50 --> * 20.0
+            catching_range = params["wingspan"] * 20.0 * zoom_factor
             airfoilPositions = creatorInst.get_airfoilPositions()
             airfoilReynolds = params["airfoilReynolds"]
 
