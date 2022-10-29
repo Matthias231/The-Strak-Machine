@@ -342,7 +342,7 @@ class control_frame():
         table = [
                  {"txt": "selected Airfoil: Position",            "variable" : 'airfoilPositions', "idx": idx, "unit" : 'mm', "scaleFactor" : 1000.0, "decimals": 0, "f_read" : f_read, "f_write" :f_write},
                  {"txt": "selected Airfoil: Re*Sqrt(Cl)",         "variable" : 'airfoilReynolds',  "idx": idx, "unit" : 'K',  "scaleFactor" : 0.001,  "decimals": 0, "f_read" : None,   "f_write" :None},
-                 {"txt": "selected Airfoil: flap group",          "variable" : 'flapGroup',        "idx": idx, "unit" : None, "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
+                 {"txt": "selected Airfoil: assign to flap",      "variable" : 'flapGroup',        "idx": idx, "unit" : None, "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
                 ]
         return table
 
@@ -999,27 +999,31 @@ class diagram(customtkinter.CTkFrame):
             (self.controller.activeDiagram == diagTypes[3])):
             mouse_x = event.xdata
             mouse_y = event.ydata
+
+            # set ranges to catch points, consider zoomfactor
+            # wingspan (m -->  mm) / 50 --> * 20.0
+            catching_range = params["wingspan"] * 20.0 * zoom_factor
         else:
             #print("not implemented yet") #FIXME
             return None
 
-        # search entry with closest coordinates
+        # search entry with closest coordinates.
+
         # change of FlapDepth requested ?
         if (self.controller.activeDiagram == diagTypes[2]):
-            # set ranges to catch points, consider zoomfactor
-            # wingspan (m -->  mm) / 50 --> * 20.0
-            catching_range = 0.03 * zoom_factor
-            flapPositions = [0.0, 1.0] #FIXME use __get_flapPositions()
-            for idx in range(len(flapPositions)):
-                x = flapPositions[idx]
+            # get flap positions (x-coordinate and depth)
+            flapPositions_x, flapPositions_y = creatorInst.get_flapPositions()
+            num = len(flapPositions_x)
+            for idx in range(num):
+                x = flapPositions_x[idx]
                 if ((abs(mouse_x - x) < catching_range)):
-                    return idx
+                    # found idx. BUT: at the moment, we only support changing
+                    # flap depth at root and tip
+                    if ((idx==0) or (idx==(num-1))):
+                        return idx
 
         # change of airfoil-position requested ?
         elif (self.controller.activeDiagram == diagTypes[3]):
-            # set ranges to catch points, consider zoomfactor
-            # wingspan (m -->  mm) / 50 --> * 20.0
-            catching_range = params["wingspan"] * 20.0 * zoom_factor
             airfoilPositions = creatorInst.get_airfoilPositions()
             airfoilReynolds = params["airfoilReynolds"]
 

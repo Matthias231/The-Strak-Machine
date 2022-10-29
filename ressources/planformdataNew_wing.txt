@@ -48,10 +48,10 @@
     1,
     2,
     2,
-    2,
-    2,
-    2,
-    2
+    3,
+    3,
+    3,
+    3
   ],
   "userAirfoils":[
     ".\\airfoil_library\\F3B_F3F\\JX\\JX-GT\\JX-GT-15.dat",

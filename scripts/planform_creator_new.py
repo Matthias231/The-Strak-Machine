@@ -89,6 +89,7 @@ cl_chordlengths = None
 cl_referenceChord = None
 cl_normalizedChord = None
 cl_controlPoints = None
+cl_flapGroup = None
 
 # linestyles
 ls_grid = 'dotted'
@@ -110,6 +111,7 @@ fs_infotext = 9
 fs_legend = 9
 fs_axes = 20
 fs_ticks = 10
+fs_flapGroup = 20
 
 # fonts
 main_font = "Roboto Medium"
@@ -953,6 +955,7 @@ class wing:
         global cl_controlPoints
         global cl_normalizedChord
         global cl_referenceChord
+        global cl_flapGroup
         params = self.params
 
         # common colors
@@ -979,6 +982,7 @@ class wing:
             cl_referenceChord = 'lightgray'
             cl_normalizedChord = 'DeepSkyBlue'
             cl_controlPoints = 'red'
+            cl_flapGroup = 'darkgray'
         elif params.theme == 'Dark':
             # dark theme
             cl_background = 'black'
@@ -999,6 +1003,7 @@ class wing:
             cl_referenceChord = 'gray'
             cl_normalizedChord = 'orange'
             cl_controlPoints = 'red'
+            cl_flapGroup = 'gray'
         else:
             ErrorMsg("undefined Theme: %s" %params.theme)
 
@@ -1237,6 +1242,21 @@ class wing:
 
         return airfoilPositions
 
+    def get_flapPositions(self):
+        flapPos_x = []
+        flapPos_y = []
+        # get flap groups, separation lines and airfoil names at the separation lines
+        (flap_groups, flapPositions_x, flapPositions_y, airfoilNames) = self.get_flapGroups()
+
+        num = len(flapPositions_x)
+        for idx in range(num):
+            (dummy, x) = flapPositions_x[idx]
+            (dummy, y) = flapPositions_y[idx]
+            flapPos_x.append(x)
+            flapPos_y.append(y)
+
+        return (flapPos_x, flapPos_y)
+
     def get_distributionParams(self):
         distributionParams = (self.params.planformShape,
         self.params.tipDepthPercent, self.params.tipSharpness,
@@ -1369,12 +1389,14 @@ class wing:
 
         return (flapPositions_x, flapPositions_y)
 
-    def getFlapSeparationLines(self):
+    def get_flapGroups(self):
         params = self.params
         sections = self.sections
         numSections = len(sections)
+        flapGroups = []
         flapPositions_x = []
-        flapPositions_y =[]
+        flapPositions_y = []
+        airfoilNames = []
         actualFlapGroup = 0
 
         # check all sections
@@ -1384,18 +1406,20 @@ class wing:
             # Change of Flap-Group or last section? -->separation line
             if ((actualFlapGroup != section.flapGroup) or
                ((idx == (numSections-1)) and (section.flapGroup !=0))):
-                # determine normalized x_pos and flapDepth
-                x = section.y / sections[-1].y
+                # determine x_pos and flapDepth
+                x = section.y * 1000.0 # m --> mm
                 flapDepthPercent = (section.flapDepth / section.chord) * 100
 
                 # append tupel to lists
                 flapPositions_x.append((x,x))
                 flapPositions_y.append((0,flapDepthPercent))
+                flapGroups.append(section.flapGroup)
+                airfoilNames.append(re.sub('.dat', '', section.airfoilName))
 
             # store actual flapGroup for comparison
             actualFlapGroup = section.flapGroup
 
-        return (flapPositions_x, flapPositions_y)
+        return (flapGroups, flapPositions_x, flapPositions_y, airfoilNames)
 
     # adds a section using given grid-values
     def add_sectionFromGrid(self, grid):
@@ -1696,8 +1720,8 @@ class wing:
         '''plots a diagram that shows distribution of flaps and also depth of flaps'''
         params = self.params
 
-        # get flap separation lines
-        (flapPositions_x, flapPositions_y) = self.getFlapSeparationLines()
+        # get flap groups, separation lines and airfoil names at the separation lines
+        (flap_groups, flapPositions_x, flapPositions_y, airfoilNames) = self.get_flapGroups()
 
         # control points for flaps
         controlPoints_x = []
@@ -1726,13 +1750,50 @@ class wing:
         # separation lines
         ax.set_xticks(x_tick_locations)
 
-        # plot control-points
-        ax.scatter(controlPoints_x, controlPoints_y, color=cl_hingeLine)
+        # get control points for root and tip only
+        x = [controlPoints_x[0], controlPoints_x[-1]]
+        y = [controlPoints_y[0], controlPoints_y[-1]]
+
+        # plot control-points (root / tip)
+        ax.scatter(x, y, color=cl_hingeLine)
 
         # plot the flap separation lines
         for idx in range(numLines):
             ax.plot(flapPositions_x[idx], flapPositions_y[idx],
             color=cl_hingeLine, linewidth = lw_hingeLine, solid_capstyle="round")
+
+        # plot the airfoil names
+        num = len(airfoilNames)
+        for idx in range (num):
+            (dummy, x) = flapPositions_x[idx]
+
+           # last element or not
+            if idx < (num-1):
+                # no, text position right beside line
+                ha = 'left'
+                xOff = 4
+            else:
+                # yes, text position left beside line
+                ha = 'right'
+                xOff = -1
+
+            ax.annotate(airfoilNames[idx],  xy=(x, 0), xycoords='data',
+            xytext=(xOff, -1*fs_legend), textcoords='offset points', color = cl_legend,
+            fontsize=fs_legend, rotation='vertical', va='top', ha=ha)
+
+        # plot the flap groups between flap separation lines.
+        # the number of flap groups is always one smaller than the number of
+        # flap separation lines
+        for idx in range (numLines-1):
+            # determine x position for the text, shall be centered
+            (x2, dummy) = flapPositions_x[idx+1]
+            (x1, dummy) = flapPositions_x[idx]
+            x = x1 + ((x2-x1)/2)
+
+            text = ("Flap %d" % flap_groups[idx])
+            ax.annotate(text,xy=(x, 0), xycoords='data',
+              xytext=(0, -0.2*fs_flapGroup), textcoords='offset points',
+              ha='center', va='top', color = cl_flapGroup, fontsize=fs_flapGroup)
 
         # create empty lists
         xValues = []
@@ -1741,7 +1802,7 @@ class wing:
         # build up list of x- and y-values
         grid = self.planform.grid
         for idx in range(len(grid)-1):
-            x = grid[idx].y / grid[-1].y
+            x = grid[idx].y *1000.0 # m --> mm
             xValues.append(x)
             flapDepth.append((grid[idx].flapDepth / grid[idx].chord) * 100)
 
@@ -1764,8 +1825,9 @@ class wing:
         ax.plot(0.0, 1.8*y)
 
         (dummy, y) = flapPositions_y[-1]
+        (dummy, x) = flapPositions_x[-1]
         ax.annotate('Tip',
-            xy=(1.0, y), xycoords='data',
+            xy=(x, y), xycoords='data',
             xytext=(10, 5), textcoords='offset points', color = cl_legend,
             fontsize=fs_legend, rotation='vertical')
 
@@ -2666,6 +2728,7 @@ class planform_creator:
         global fs_legend
         global fs_axes
         global fs_ticks
+        global fs_flapGroup
 
         if (scaled == False):
             # scale font sizes (1920 being default screen width)
@@ -2686,11 +2749,7 @@ class planform_creator:
             fs_legend *= scaleFactor
             fs_axes *= scaleFactor
             fs_ticks *= scaleFactor
-
-            fs_infotext *= scaleFactor
-            fs_legend *= scaleFactor
-            fs_axes *= scaleFactor
-            fs_ticks *= scaleFactor
+            fs_flapGroup *= scaleFactor
 
             scaled = True
 
@@ -2736,6 +2795,10 @@ class planform_creator:
     def get_airfoilPositions(self):
         '''gets list of airfoilpositions in mm'''
         return self.newWing.get_airfoilPositions()
+
+    def get_flapPositions(self):
+        '''gets list of flap positions along the halfwing and flapDepth in percent'''
+        return self.newWing.get_flapPositions()
 
     def update_planform(self, paramDict):
         '''applies parameters coming with paramDict'''
