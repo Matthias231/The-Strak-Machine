@@ -310,18 +310,18 @@ class control_frame():
     def __get_basicParamsTable(self):
         table = [#{"txt": "Planform name",                "variable" : params.planformName,     "unit" : None, "scaleFactor" : None},
                  #{"txt": "Planform shape",               "variable" : params.planformShape,    "unit" : None, "scaleFactor" : None },
-                  {"txt": "Airfoils basic name",          "variable" : 'airfoilBasicName',      "idx": None, "unit" : None, "scaleFactor" : None,   "decimals": None},
-                  {"txt": "wingspan",                     "variable" : 'wingspan',              "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0},
-                  {"txt": "Width of fuselage",            "variable" : 'fuselageWidth',         "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0},
-                  {"txt": "Root chord",                   "variable" : 'rootchord',             "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0},
-                  {"txt": "Tip chord",                    "variable" : 'tipchord',              "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0},
-                  {"txt": "Tip sharpness",                "variable" : 'tipSharpness',          "idx": None, "unit" : None, "scaleFactor" : None,   "decimals": 1},
-                  {"txt": "Ellipse correction",           "variable" : 'ellipseCorrection',     "idx": None, "unit" : None, "scaleFactor" : 100.0,  "decimals": 1},
-                  {"txt": "Leading edge correction",      "variable" : 'leadingEdgeCorrection', "idx": None, "unit" : None, "scaleFactor" : 100.0,  "decimals": 1},
-                  {"txt": "Dihedral",                     "variable" : 'dihedral',              "idx": None, "unit" : "°",  "scaleFactor" : None,   "decimals": 1},
-                  {"txt": "Hingeline angle @root",        "variable" : 'hingeLineAngle',        "idx": None, "unit" : "°",  "scaleFactor" : None,   "decimals": 1},
-                  {"txt": "Flap depth @root",             "variable" : 'flapDepthRoot',         "idx": None, "unit" : "%",  "scaleFactor" : None,   "decimals": 1},
-                  {"txt": "Flap depth @tip",              "variable" : 'flapDepthTip',          "idx": None, "unit" : "%",  "scaleFactor" : None,   "decimals": 1},
+                  {"txt": "Airfoils basic name",          "variable" : 'airfoilBasicName',      "idx": None, "unit" : None, "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
+                  {"txt": "wingspan",                     "variable" : 'wingspan',              "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0, "f_read" : None,   "f_write" :None},
+                  {"txt": "Width of fuselage",            "variable" : 'fuselageWidth',         "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0, "f_read" : None,   "f_write" :None},
+                  {"txt": "Root chord",                   "variable" : 'rootchord',             "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0, "f_read" : None,   "f_write" :None},
+                  {"txt": "Tip chord",                    "variable" : 'tipchord',              "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0, "f_read" : None,   "f_write" :None},
+                  {"txt": "Tip sharpness",                "variable" : 'tipSharpness',          "idx": None, "unit" : None, "scaleFactor" : None,   "decimals": 1, "f_read" : None,   "f_write" :None},
+                  {"txt": "Ellipse correction",           "variable" : 'ellipseCorrection',     "idx": None, "unit" : None, "scaleFactor" : 100.0,  "decimals": 1, "f_read" : None,   "f_write" :None},
+                  {"txt": "Leading edge correction",      "variable" : 'leadingEdgeCorrection', "idx": None, "unit" : None, "scaleFactor" : 100.0,  "decimals": 1, "f_read" : None,   "f_write" :None},
+                  {"txt": "Dihedral",                     "variable" : 'dihedral',              "idx": None, "unit" : "°",  "scaleFactor" : None,   "decimals": 1, "f_read" : None,   "f_write" :None},
+                  {"txt": "Hingeline angle @root",        "variable" : 'hingeLineAngle',        "idx": None, "unit" : "°",  "scaleFactor" : None,   "decimals": 1, "f_read" : None,   "f_write" :None},
+                  {"txt": "Flap depth @root",             "variable" : 'flapDepthRoot',         "idx": None, "unit" : "%",  "scaleFactor" : None,   "decimals": 1, "f_read" : None,   "f_write" :None},
+                  {"txt": "Flap depth @tip",              "variable" : 'flapDepthTip',          "idx": None, "unit" : "%",  "scaleFactor" : None,   "decimals": 1, "f_read" : None,   "f_write" :None},
                   #{"txt": "NCrit",                        "variable" : 'polar_Ncrit',           "idx": None, "unit" : None, "scaleFactor" : None},
                   #{"txt": "Interpolation Segments",       "variable" : 'interpolationSegments', "idx": None, "unit" : None,  "scaleFactor" : None},
                 ]
@@ -330,15 +330,18 @@ class control_frame():
     def __get_airfoilParamsTable(self):
         planformIdx = self.master.planformIdx
         params = self.params[planformIdx]
+
+        # idx of selected airfoil
         idx = self.airfoilIdx[planformIdx]
-        sf_position = params['wingspan']/2*1000.0
+
+        # scale functions for position values
+        f_read = self.creatorInstances[planformIdx].denormalize_position
+        f_write = self.creatorInstances[planformIdx].normalize_position
 
         table = [
-                 #{"txt": "selected (user) Airfoil: .dat file",    "variable" : 'datFiles',         "idx": idx, "unit" : None, "scaleFactor" : None,        "decimals": None},
-                 {"txt": "selected Airfoil: Position",            "variable" : 'airfoilPositions', "idx": idx, "unit" : 'mm', "scaleFactor" : sf_position, "decimals": 0},
-                 {"txt": "selected Airfoil: Re*Sqrt(Cl)",         "variable" : 'airfoilReynolds',  "idx": idx, "unit" : 'K', "scaleFactor" : 0.001,        "decimals": 0},
-                 {"txt": "selected Airfoil: flap group",          "variable" : 'flapGroup',        "idx": idx, "unit" : None, "scaleFactor" : None,        "decimals": 0},
-                # {"txt": "selected Airfoil: user defined name",   "variable" : 'airfoilNames',     "idx": idx, "unit" : None, "scaleFactor" : None},
+                 {"txt": "selected Airfoil: Position",            "variable" : 'airfoilPositions', "idx": idx, "unit" : 'mm', "scaleFactor" : 1000.0, "decimals": 0, "f_read" : f_read, "f_write" :f_write},
+                 {"txt": "selected Airfoil: Re*Sqrt(Cl)",         "variable" : 'airfoilReynolds',  "idx": idx, "unit" : 'K',  "scaleFactor" : 0.001,  "decimals": 0, "f_read" : None,   "f_write" :None},
+                 {"txt": "selected Airfoil: flap group",          "variable" : 'flapGroup',        "idx": idx, "unit" : None, "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
                 ]
         return table
 
@@ -463,7 +466,9 @@ class control_frame():
         variableName = tableEntry["variable"]
         idx = tableEntry["idx"]
         scaleFactor = tableEntry["scaleFactor"]
+        scaleFunction = tableEntry["f_read"]
         decimals = tableEntry["decimals"]
+
 
         # get actual parameter value and -type
         value, dataType = self.__getDictValueAndDataType(params,
@@ -472,6 +477,11 @@ class control_frame():
         if value == None:
             # nothing more to do
             return value
+
+        # is there a scale function?
+        if scaleFunction != None:
+            # carry out the scale function
+            value = scaleFunction(value)
 
         # convert and optionally scale value
         if dataType == 'str':
@@ -519,6 +529,7 @@ class control_frame():
         variableName = tableEntry["variable"]
         idx = tableEntry["idx"]
         scaleFactor = tableEntry["scaleFactor"]
+        scaleFunction = tableEntry["f_write"]
 
         # check value
         if (value == 'None') or (value == ''):
@@ -532,15 +543,25 @@ class control_frame():
                                         variableName, idx)
         if dataType == 'str':
             self.__setDictValue(params, variableName, idx, value)
+
         elif dataType == 'float':
             float_value = float(value)
             if (scaleFactor != None):
                 float_value = float_value / scaleFactor
+                # is there a scale function?
+                if scaleFunction != None:
+                    # carry out the scale function
+                    float_value = scaleFunction(float_value)
             self.__setDictValue(params, variableName, idx, float_value)
+
         elif dataType == 'int':
             int_value = int(value)
             if (scaleFactor != None):
-                int_value = int(int_value * scaleFactor)
+                int_value = int(int_value / scaleFactor)
+                # is there a scale function?
+                if scaleFunction != None:
+                    # carry out the scale function
+                    int_value = scaleFunction(int_value)
             self.__setDictValue(params, variableName, idx, int_value)
         else:
             ErrorMsg("__set_paramValue(): unimplemented handling of parameter %s" % variableName)

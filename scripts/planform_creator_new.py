@@ -254,6 +254,7 @@ class params:
 
         # lists, double / float
         self.polarReynolds = []
+        self.airfoilPositions_normalized = []
         self.airfoilPositions = []
         self.airfoilReynolds = []
         self.flapGroups = []
@@ -337,7 +338,7 @@ class params:
 
         # get airfoil- / section data
         self.airfoilTypes = self.__get_MandatoryParameterFromDict(dictData, 'airfoilTypes')
-        self.airfoilPositions = self.__get_MandatoryParameterFromDict(dictData, 'airfoilPositions')
+        self.airfoilPositions_normalized = self.__get_MandatoryParameterFromDict(dictData, 'airfoilPositions')
         self.airfoilReynolds = self.__get_MandatoryParameterFromDict(dictData, 'airfoilReynolds')
         self.flapGroups = self.__get_MandatoryParameterFromDict(dictData, 'flapGroup')
 
@@ -350,7 +351,7 @@ class params:
             exit(-1)
 
         # check if the above parameters have the same number of elements
-        if ((self.numAirfoils != len(self.airfoilPositions)) or
+        if ((self.numAirfoils != len(self.airfoilPositions_normalized)) or
             (self.numAirfoils != len(self.airfoilReynolds))):
             ErrorMsg("airfoilTypes, airfoilPositions and airfoilReynolds must have the same number of elements")
             exit(-1)
@@ -483,7 +484,7 @@ class params:
         dictData["flapDepthTip"] = self.flapDepthTip
         dictData["dihedral"] = self.dihedral
         dictData['airfoilTypes'] = self.airfoilTypes[:]
-        dictData['airfoilPositions'] = self.airfoilPositions[:]
+        dictData['airfoilPositions'] = self.airfoilPositions_normalized[:]
         dictData['airfoilReynolds'] = self.airfoilReynolds[:]
         dictData['flapGroup'] = self.flapGroups[:]
         dictData["userAirfoils"] = self.userAirfoils[:]
@@ -509,15 +510,40 @@ class params:
         # determine reynolds-number for root-airfoil
         self.rootReynolds = self.airfoilReynolds[0]
 
-    def normalize_positions(self):
-        for idx in range(len(self.airfoilPositions)):
-            if self.airfoilPositions[idx] != None:
-                self.airfoilPositions[idx] = self.airfoilPositions[idx] / self.halfwingspan
+    def normalize_positionValue(self, position):
+        # correct position offset, if fuselage is present
+        position -= (self.fuselageWidth/2)
+
+        # normalize to halfwingspan
+        position /= self.halfwingspan
+        return position
+
+    def denormalize_positionValue(self, position):
+        # denormalize
+        position *= self.halfwingspan
+
+        # correct position offset, if fuselage is present
+        position += (self.fuselageWidth/2)
+        return position
+
+##    def normalize_positions(self):
+##        for idx in range(len(self.airfoilPositions)):
+##            if self.airfoilPositions[idx] != None:
+##                self.airfoilPositions_normalized[idx] = self.airfoilPositions[idx] / self.halfwingspan
+##            else:
+##                self.airfoilPositions_normalized[idx] = None
 
     def denormalize_positions(self):
-        for idx in range(len(self.airfoilPositions)):
-            if self.airfoilPositions[idx] != None:
-                self.airfoilPositions[idx] = self.airfoilPositions[idx] * self.halfwingspan
+        self.airfoilPositions.clear()
+        num = len(self.airfoilPositions_normalized)
+
+        for idx in range(num):
+            normalized_position = self.airfoilPositions_normalized[idx]
+            if normalized_position != None:
+                position = self.denormalize_positionValue(normalized_position)
+                self.airfoilPositions.append(normalized_position)
+            else:
+                self.airfoilPositions.append(None)
 
 
     # calculate missing Re-numbers from positions
@@ -529,7 +555,7 @@ class params:
             if self.airfoilReynolds[idx] == None:
                 # for this position no reynolds-number has been specified.
                 # calculate the number from postition now
-                Re = self.get_ReFromPosition(self.airfoilPositions[idx])
+                Re = self.get_ReFromPosition(self.airfoilPositions_normalized[idx])
                 self.airfoilReynolds[idx] = int(round(Re ,0))
 
 
@@ -559,7 +585,10 @@ class chordDistribution:
     # class init
     def __init__(self):
         self.num_gridPoints = 16384
-        self.normalizedGridPoints = []
+        self.normalizedGrid = []
+
+        # calculate interval for setting up the grid
+        self.grid_delta = 1 / (self.num_gridPoints-1)
 
     def __elliptical_shape(self, x, shapeParams):
         (normalizedTipChord, tipSharpness, ellipseCorrection) = shapeParams
@@ -616,11 +645,8 @@ class chordDistribution:
     # calculate a chord-distribution, which is normalized to root_chord = 1.0
     # half wingspan = 1
     def calculate_grid(self, shape, shapeParams):
-        self.normalizedGridPoints.clear()
-
-        # calculate interval for setting up the grid
-        grid_delta = 1 / (self.num_gridPoints-1)
-        self.normalizedGrid = []
+        self.normalizedGrid.clear()
+        grid_delta = self.grid_delta
 
         # calculate all Grid-chords
         for i in range(1, (self.num_gridPoints + 1)):
@@ -645,19 +671,66 @@ class chordDistribution:
     def get_numGridPoints(self):
         return self.num_gridPoints
 
-    # get chordlength from position, according to the chord distribution
     def get_chordFromPosition(self, position):
+        '''get normalized chordlength from normalized position, using the chord distribution '''
         # valid position specified ?
         if (position == None):
             ErrorMsg("invalid position")
             return None
 
-        # get chord from planform
-        for gridData in self.normalizedGrid:
-            if (gridData.y >= position):
-                return gridData.chord
+        # calculate index at which the position will be found in the
+        # chord distribution
+        idx = int(position/self.grid_delta)
+        gridData = self.normalizedGrid
+        maxIdx = len(gridData)
+
+        if idx > maxIdx:
+            # outside specified range
+            ErrorMsg("position %f outside normalized chord distribution" % position)
+            return 0.0
+        elif idx == maxIdx:
+            # last value
+            return gridData[idx].chord
+        else:
+            # interpolate for better precision
+            pos_left = gridData[idx].y
+            chord_left = gridData[idx].chord
+            pos_right = gridData[idx+1].y
+            chord_right = gridData[idx+1].chord
+            chord = interpolate(pos_left, pos_right,chord_left, chord_right, position)
+            return chord
+
+    def get_positionFromChord(self, chord):
+        '''get normalized position from normalized chordlength, using the chord distribution '''
+        # valid chord specified ?
+        if (chord == None):
+            ErrorMsg("invalid chord")
+            return None
+
+        # search in chord distribution for the desired chord.
+        # CAUTION: we assume that chordlength is constantly decreasing !!
+        gridData = self.normalizedGrid
+        maxIdx = len(gridData)
+
+        # search in the chord distribution
+        for idx in range(maxIdx):
+            if (gridData[idx].chord < chord):
+                # found chordlength smaller than the given chord
+                # first value?
+                if idx==0:
+                    return gridData[idx].y
+                else:
+                    # interpolate for better precision
+                    pos_left = gridData[idx-1].y
+                    chord_left = gridData[idx-1].chord
+                    pos_right = gridData[idx].y
+                    chord_right = gridData[idx].chord
+                    position = interpolate(chord_left, chord_right, pos_left, pos_right, chord)
+                    return position
+
         ErrorMsg("no chordlength was found for position %f" % position)
-        return None
+        return (0.0)
+
 
     def plot(self, ax):
         global cl_referenceChord
@@ -851,6 +924,7 @@ class wing:
         self.planform = planform()
 
         # empty list of chords and sections
+        self.normalized_chords = []
         self.chords = []
         self.sections = []
 
@@ -956,6 +1030,7 @@ class wing:
 
         # section has same chord, same reynolds
         self.chords.insert(0, self.chords[0])
+        params.airfoilPositions_normalized.insert(0, 0.0)
         params.airfoilPositions.insert(0, 0.0)
         params.airfoilReynolds.insert(0, params.airfoilReynolds[0])
 
@@ -964,6 +1039,7 @@ class wing:
         params = self.params
         params.airfoilNames.append(params.airfoilNames[-1])
         params.airfoilTypes.append(params.airfoilTypes[-1])
+        params.airfoilPositions_normalized.append(0.0)
         params.airfoilPositions.append(params.wingspan/2)
 
         # is last airfoil of type "user" ?
@@ -996,7 +1072,6 @@ class wing:
 
         # start modifying and applying params now
         params.calculate_dependendValues()
-        params.denormalize_positions()
 
         # get basic shape parameters
         (shape, shapeParams) = params.get_shapeParams()
@@ -1007,10 +1082,21 @@ class wing:
         # calculate planform
         self.planform.calculate(self.params, self.chordDistribution)
 
-        # calculate Re-numbers, the chordlengths of the airfoils and the sections
-        self.calculate_ReNumbers()
+        # calculate chordlengths, either by position or reynolds of the airfoil
         self.calculate_chordlengths()
-        self.calculate_positions() # must be done after chordlenghts ar known
+
+        # normalized positions: 0.0...1.0 --> positions 0.0..halfwingspan
+        params.denormalize_positions()
+
+        # calculate missing Re-numbers (if only airfoil position had been specified)
+        # CAUTION: Re-numbers will be rounded to int (loss of precision)
+        self.calculate_ReNumbers()
+
+        # calculate missing positions (if only airfoil Re-number had been specified),
+        # therefore use chordlengths (more accurate than reynolds)
+        self.calculate_Positions()
+
+        # airfoil names can be set after all re numbers are known
         self.set_AirfoilNames()
 
         # if there is a fuselage, insert data for the fuselage section
@@ -1125,55 +1211,63 @@ class wing:
 
 
     # get Re from position, according to the planform-data
-    def get_ReFromPosition(self, position):
-        chordRatio = self.chordDistribution.get_chordFromPosition(position)
-        if (chordRatio != None):
-            Re = self.params.airfoilReynolds[0] * chordRatio
+    def get_ReFromPosition(self, normalized_position):
+        normalized_chord = self.chordDistribution.get_chordFromPosition(normalized_position)
+        if (normalized_chord != None):
+            Re = self.params.airfoilReynolds[0] * normalized_chord
             return Re
         else:
-            ErrorMsg("no Re could not be caclulated for position %f" % position)
+            ErrorMsg("no Re could not be caclulated for position %f" % normalized_position)
             return None
 
 
     # get chordlength from position, according to the planform-data
-    def get_chordFromPositionOrReynolds(self, position, reynolds):
+    def get_chordFromPositionOrReynolds(self, normalized_position, reynolds):
         params = self.params
-        # valid reynolds number specified ?
+        # valid reynolds number specified ? Will be preferred before position
         if (reynolds != None):
-            # calculate chord from ratio reynolds to rootReynolds
-            return (reynolds / params.rootReynolds) * params.rootchord
+            # calculate chord from reynolds to rootReynolds ratio
+            normalizedChord = (reynolds/params.rootReynolds)
+            chord = normalizedChord * params.rootchord
+            return (normalizedChord, chord)
 
         # valid position specified ?
-        elif (position != None):
-            # get chord from chord distribution
-            chordRatio = self.chordDistribution.get_chordFromPosition(position)
-            chord = chordRation * params.rootchord
+        elif (normalized_position != None):
+            # get normalized chord from chord distribution
+            normalizedChord = self.chordDistribution.get_chordFromPosition(normalized_position)
+            chord = normalizedChord * params.rootchord
+            return (normalizedChord, chord)
 
         # nothing was found
         ErrorMsg("position or reynolds not found inside planform")
-        NoteMsg("position was: %f, reynolds was %d" % (position, reynolds))
-        return None
+        NoteMsg("position was: %f, reynolds was %d" % (normalized_position, reynolds))
+        return (None, None)
 
 
     # calculate all chordlenghts from the list of airfoil positions
     # and the given planform-data
     def calculate_chordlengths(self):
+        self.normalized_chords.clear()
         self.chords.clear()
         params = self.params
-        for idx in range(len(params.airfoilPositions)):
-            position = params.airfoilPositions[idx]
+        for idx in range(len(params.airfoilPositions_normalized)):
+            normalized_position = params.airfoilPositions_normalized[idx]
             reynolds = params.airfoilReynolds[idx]
-            chord = self.get_chordFromPositionOrReynolds(position, reynolds)
+            (normalized_chord, chord) = self.get_chordFromPositionOrReynolds(normalized_position, reynolds)
+            self.normalized_chords.append(normalized_chord)
             self.chords.append(chord)
 
-    def calculate_positions(self):
+    def calculate_Positions(self):
+        '''calculates missing positions'''
         params = self.params
-        for idx in range(len(params.airfoilPositions)):
-            if params.airfoilPositions[idx] == None:
+        num = len(params.airfoilPositions_normalized)
+        for idx in range(num):
+            if params.airfoilPositions_normalized[idx] == None:
                 # no position defined yet, calculate now
                 chord = self.chords[idx]
-                grid = self.planform.find_grid(chord)
-                params.airfoilPositions[idx] = grid.y
+                normalized_position = self.chordDistribution.get_positionFromChord(chord)
+                params.airfoilPositions_normalized[idx] = normalized_position
+                params.airfoilPositions[idx] = self.params.denormalize_positionValue(normalized_position)
 
 
     # calculate missing Re-numbers from positions
@@ -1655,6 +1749,9 @@ class wing:
     def plot_AirfoilDistribution(self, ax):
         params = self.params
 
+        # scale all values from m to mm
+        scaleFactor = 1000.0
+
         # create empty lists
         xValues = []
         leadingEdge = []
@@ -1711,20 +1808,22 @@ class wing:
                 else:
                     labelText = None
 
-            ax.plot([element.y, element.y] ,[element.leadingEdge, element.trailingEdge],
+            # scale all values from m to mm
+            x = element.y * scaleFactor
+            LE = element.leadingEdge * scaleFactor
+            TE = element.trailingEdge * scaleFactor
+
+            ax.plot([x, x] ,[LE, TE],
             color=labelColor, linestyle = ls_sections, linewidth = lw_sections,
             solid_capstyle="round", label = labelText)
 
             # determine x and y Positions of the labels
-            xPos = element.y
             if (params.leadingEdgeOrientation == 'up'):
-                yPosChordLabel = element.trailingEdge
+                yPosChordLabel = TE
                 yPosOffsetSectionLabel = 32
             else:
-                yPosChordLabel = element.leadingEdge
+                yPosChordLabel = LE
                 yPosOffsetSectionLabel = -32
-
-            yPosSectionLabel = element.leadingEdge
 
             # plot label for chordlength of section
             try:
@@ -1734,7 +1833,7 @@ class wing:
                 ErrorMsg("label for chordlength of section could not be plotted")
 
             ax.annotate(text,
-            xy=(xPos, yPosChordLabel), xycoords='data',
+            xy=(x, yPosChordLabel), xycoords='data',
             xytext=(2, 5), textcoords='offset points', color = cl_chordlengths,
             fontsize=fs_infotext, rotation='vertical')
 
@@ -1744,12 +1843,12 @@ class wing:
              color=labelColor)
 
             ax.annotate(text,
-            xy=(xPos, yPosSectionLabel), xycoords='data',
+            xy=(x, LE), xycoords='data',
             xytext=(8, yPosOffsetSectionLabel), textcoords='offset points',
             color = labelColor,fontsize=fs_infotext, rotation='vertical', arrowprops=props)
 
             # append position of section to x-axis ticks
-            x_tick_locations.append(xPos)
+            x_tick_locations.append(x)
             idx = idx - 1
 
         # set new ticks for the x-axis according to the positions of the sections
@@ -1768,13 +1867,14 @@ class wing:
             tick.label.set_fontsize(fs_ticks)
 
         grid = self.planform.grid
+
         for element in grid:
             # build up list of x-values
-            xValues.append(element.y)
+            xValues.append(element.y * scaleFactor)
 
             # build up lists of y-values
-            leadingEdge.append(element.leadingEdge)
-            trailingeEge.append(element.trailingEdge)
+            leadingEdge.append(element.leadingEdge * scaleFactor)
+            trailingeEge.append(element.trailingEdge * scaleFactor)
 
         # setup root- and tip-joint
         trailingeEge[0] = leadingEdge[0]
@@ -2588,6 +2688,12 @@ class planform_creator:
     def get_params(self):
         '''gets parameters as a dictionary'''
         return self.newWing.get_params()
+
+    def normalize_position(self, position):
+        return self.newWing.params.normalize_positionValue(position)
+
+    def denormalize_position(self, position):
+        return self.newWing.params.denormalize_positionValue(position)
 
     def get_airfoilNames(self):
         '''gets airfoilnames as a list of strings'''
