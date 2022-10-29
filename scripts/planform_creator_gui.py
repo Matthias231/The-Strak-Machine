@@ -710,7 +710,7 @@ class control_frame():
         self.OM_airfoilChoice.configure(values = airfoilNames)
         self.OM_airfoilChoice.set(airfoilNames[airfoilIdx])
 
-    def __changeFlap(self, x, y, idx):
+    def changeFlap(self, x, y, idx):
         if idx == None:
             return
 
@@ -729,17 +729,20 @@ class control_frame():
         # carry out functions needed for update
         self.__perform_update()
 
-    def __change_airfoilPosition(self, x, y, idx):
+    def change_airfoilPosition(self, x, y, idx):
         if idx == None:
             return
 
         # get instance of planform-creator
         creatorInst:planform_creator = self.creatorInstances[self.master.planformIdx]
         params = self.params[self.master.planformIdx]
-        position = round(x,3)
 
-        # set new position (use only x-value)
-        params["airfoilPositions"] = position
+        # calculate position from x value (normalize)
+        position = float(x/1000.0) # mm -> m
+        position = creatorInst.normalize_position(position)
+
+        # set new position in dictionary
+        params["airfoilPositions"][idx] = position
 
         # carry out functions needed for update
         self.__perform_update()
@@ -975,41 +978,47 @@ class diagram(customtkinter.CTkFrame):
         if no point is within catching range to the event position.
         """
         global ctrlFrame
-        params = ctrlFrame.params[self.controller.master.planformIdx]
+        planformIdx = self.controller.master.planformIdx
+        params = ctrlFrame.params[planformIdx]
+        creatorInst = ctrlFrame.creatorInstances[planformIdx]
 
-        # set ranges to catch points, consider zoomfactor
+        # get current zoom factor
         zoom_factor = self.controller.get_zoom_factor()
-        catching_range_x = 0.01 * zoom_factor
-        catching_range_y = 0.01 * zoom_factor
-
-        mouse_target = event.xdata
-        mouse_oppoint = event.ydata
 
         # check type of active diagram
         if ((self.controller.activeDiagram == diagTypes[2]) or
             (self.controller.activeDiagram == diagTypes[3])):
             mouse_x = event.xdata
             mouse_y = event.ydata
+
+            # set ranges to catch points, consider zoomfactor
+            # wingspan (m -->  mm) / 50 --> * 20.0
+            catching_range = params["wingspan"] * 20.0 * zoom_factor
         else:
             #print("not implemented yet") #FIXME
             return None
 
         # search entry with closest coordinates
-        idx = 0
+        # change of FlapDepth requested ?
         if (self.controller.activeDiagram == diagTypes[2]):
-            # change of FlapDepth requested
             flapPositions = [0.0, 1.0] #FIXME use __get_flapPositions()
             for idx in range(len(flapPositions)):
                 x = flapPositions[idx]
-                if ((abs(mouse_x - x) < catching_range_x)):
+                if ((abs(mouse_x - x) < catching_range)):
                     return idx
+
+        # change of airfoil-position requested ?
         elif (self.controller.activeDiagram == diagTypes[3]):
-            # change of airfoil-position requested
-            airfoilPositions = params["airfoilPositions"] #FIXME use __get_airfoilPositions()
+            airfoilPositions = creatorInst.get_airfoilPositions()
+            airfoilReynolds = params["airfoilReynolds"]
+
             for idx in range(len(airfoilPositions)):
                 x = airfoilPositions[idx]
-                if x != None:
-                    if ((abs(mouse_x - x) < catching_range_x)):
+                Re = airfoilReynolds[idx]
+
+                # only airfoils with a specified position and without Re are movable
+                if (x != None) and (Re == None):
+                    if ((abs(mouse_x - x) < catching_range)):
                         return idx
 
         # nothing was found
@@ -1053,6 +1062,7 @@ class diagram(customtkinter.CTkFrame):
     def on_mouse_move(self, event):
         """Callback for mouse movements."""
         global ctrlFrame
+
         if event.inaxes is None:
             return
         if event.button == 1:
@@ -1063,12 +1073,12 @@ class diagram(customtkinter.CTkFrame):
                 # Flap distribution
                 x, y = event.xdata, event.ydata
                 # set new flap depth
-                ctrlFrame.__changeFlap(x,y,self._ind)
+                ctrlFrame.changeFlap(x,y,self._ind)
             elif (self.controller.activeDiagram == diagTypes[3]):
                 # airfoil distribution
                 x, y = event.xdata, event.ydata
                 # set new airfoil position
-                ctrlFrame.__change_airfoilPosition(x,y,self._ind)
+                ctrlFrame.change_airfoilPosition(x,y,self._ind)
         elif event.button == 3: # right mouse button
             # move visible area of the window
             self.controller.move_visibleArea(event)

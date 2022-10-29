@@ -515,7 +515,10 @@ class params:
         position -= (self.fuselageWidth/2)
 
         # normalize to halfwingspan
-        position /= self.halfwingspan
+        if self.halfwingspan > 0:
+            position /= self.halfwingspan
+        else:
+            ErrorMsg("normalize_positionValue, halfwingspan is 0")
         return position
 
     def denormalize_positionValue(self, position):
@@ -584,11 +587,9 @@ class params:
 class chordDistribution:
     # class init
     def __init__(self):
-        self.num_gridPoints = 16384
+        self.num_gridPoints = 0
+        self.grid_delta = 0
         self.normalizedGrid = []
-
-        # calculate interval for setting up the grid
-        self.grid_delta = 1 / (self.num_gridPoints-1)
 
     def __elliptical_shape(self, x, shapeParams):
         (normalizedTipChord, tipSharpness, ellipseCorrection) = shapeParams
@@ -644,8 +645,13 @@ class chordDistribution:
 
     # calculate a chord-distribution, which is normalized to root_chord = 1.0
     # half wingspan = 1
-    def calculate_grid(self, shape, shapeParams):
+    def calculate_grid(self, shape, shapeParams, num_gridPoints):
+        self.num_gridPoints = num_gridPoints
         self.normalizedGrid.clear()
+
+        # calculate interval for setting up the grid
+        self.grid_delta = 1 / (self.num_gridPoints-1)
+
         grid_delta = self.grid_delta
 
         # calculate all Grid-chords
@@ -1076,8 +1082,14 @@ class wing:
         # get basic shape parameters
         (shape, shapeParams) = params.get_shapeParams()
 
+        # number of grid points equals 2*halfwingspan (which is half of wingspan
+        # without fuselage) in mm. If fuselage width is e.g. 35 mm, the offset
+        # will be 17.5 mm, so we must have a resolution of 0.5 mm and a maximum
+        # value of halfwingspan
+        num_gridPoints = int(params.halfwingspan * 2000)
+
         # setup chordDistribution
-        self.chordDistribution.calculate_grid(shape, shapeParams)
+        self.chordDistribution.calculate_grid(shape, shapeParams, num_gridPoints)
 
         # calculate planform
         self.planform.calculate(self.params, self.chordDistribution)
@@ -1202,6 +1214,28 @@ class wing:
             airfoilNames.append(re.sub('.dat', '', element))
 
         return airfoilNames
+
+
+    def get_airfoilPositions(self):
+        airfoilPositions = []
+
+        # determine number of airfoil positions from sections, without tip
+        # airfoil
+        num = len(self.sections) - 1
+
+        if self.fuselageIsPresent():
+             # remove root airfoil
+            startIdx = 1
+            num -= 1
+        else:
+            startIdx = 0
+
+        for idx in range(startIdx, num):
+            # get position, scale from m to mm
+            position = self.sections[idx].y * 1000.0
+            airfoilPositions.append(position)
+
+        return airfoilPositions
 
     def get_distributionParams(self):
         distributionParams = (self.params.planformShape,
@@ -2698,6 +2732,10 @@ class planform_creator:
     def get_airfoilNames(self):
         '''gets airfoilnames as a list of strings'''
         return self.newWing.get_airfoilNames()
+
+    def get_airfoilPositions(self):
+        '''gets list of airfoilpositions in mm'''
+        return self.newWing.get_airfoilPositions()
 
     def update_planform(self, paramDict):
         '''applies parameters coming with paramDict'''
