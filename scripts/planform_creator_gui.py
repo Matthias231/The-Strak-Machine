@@ -1686,22 +1686,22 @@ class App(customtkinter.CTk):
             self.updateNeeded = True
 
     def add_planform(self, dummy):
-        return #FIXME implement
+        self.notImplemented_Dialog() #FIXME implement
 
     def remove_planform(self, dummy):
-        return #FIXME implement
+        self.notImplemented_Dialog() #FIXME implement
 
     def export_planforms(self, dummy):
-        return #FIXME implement
+        self.notImplemented_Dialog() #FIXME implement
 
     def add_airfoil(self, dummy):
-        return #FIXME implement
+        self.notImplemented_Dialog() #FIXME implement
 
     def remove_airfoil(self, dummy):
-        return #FIXME implement
+        self.notImplemented_Dialog() #FIXME implement
 
     def export_airfoils(self, dummy):
-        return #FIXME implement
+        self.notImplemented_Dialog() #FIXME implement
 
     def save(self, dummy):
         creatorInst = creatorInstances[self.planformIdx]
@@ -1725,12 +1725,22 @@ class App(customtkinter.CTk):
 
         self.destroy()
 
+    def notImplemented_Dialog(self):
+        # create complete dialog text
+        dialogText =  "   Sorry...\n"
+        dialogText += "   Function has not been not implemented yet   \n"
+        dialogText += "   Press \'Enter\' to close this dialog\n"
+
+        # create dialog
+        dialog = customtkinter.CTkInputDialog(master=None, text=dialogText,
+                        title = 'Not implemented :-(')
+        dialog.get_input()
 
     def unsaved_changesDialog(self, flags):
         # create complete dialog text
-        dialogText ="There are unsaved changes...FIXME\n"
-        dialogText = dialogText + "To quit without saving type \'quit'\n"
-        dialogText = dialogText + "To quit and save the changes type \'save'"
+        dialogText =  "There are unsaved changes...\n"
+        dialogText += "To quit without saving type \'quit'\n"
+        dialogText += "To quit and save the changes type \'save'"
 
         # create dialog
         dialog = customtkinter.CTkInputDialog(master=None, text=dialogText,
