@@ -1769,21 +1769,32 @@ class App(ctk.CTk):
         title = 'Export airfoils'
 
         # call function of planform creator
-        (result, airfoils) = creatorInst.export_airfoils()
+        (result, userAirfoils, blendedAirfoils) = creatorInst.export_airfoils()
+
+        msgExported =  "The following airfoils of planform \'%s\'\n" % planformName
+        msgExported += "have been successfully exported to path \'%s\':\n\n" % filePath
+        msgExported += "\'user\' airfoils:\n"
+        for airfoil in userAirfoils:
+            msgExported += "%s\n" % airfoil
+
+        msgExported += "\n\'blend\' airfoils:\n"
+        for airfoil in blendedAirfoils:
+            msgExported += "%s\n" % airfoil
 
         # check if everything was o.k.
         if result == 0:
             # create message text
-            msgText =  "The following airfoils of planform \'%s\'\n" % planformName
-            msgText += "have been successfully exported to path \'%s\':\n\n" % filePath
-
-            for airfoil in airfoils:
-                msgText += "%s\n" % airfoil
-            messagebox.showinfo(title=title, message=msgText )
+            msgText =  msgExported
+            msgText += "\nPlease use \'The Strak Machine\' to create \'opt\' airfoils (if any):"
+            messagebox.showinfo(title=title, message=msgText)
         else:
             # create message text
             msgText =  "Error, exporting airfoils of planform \'%s\'\n" % planformName
-            msgText += "to path \'%s\'\nfailed, errorcode: %d" % (filePath, result)
+            msgText += "to path \'%s\'\nfailed, errorcode: %d\n\n" % (filePath, result)
+            msgText += "There might be some \'user\', \'opt\' or \'blend\' airfoils missing.\n"
+            msgText += "Please make sure, that all \'user\' airfoils have been assigned correctly "
+            msgText += "and use \'The Strak Machine\' to create missing \'opt\' airfoils (if any):\n\n"
+            msgText += msgExported
             messagebox.showerror(title=title, message=msgText )
 
     def save(self, dummy):

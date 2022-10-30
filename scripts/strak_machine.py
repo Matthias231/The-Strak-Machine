@@ -3506,7 +3506,7 @@ def copyAndSmooth_Airfoil(xfoilWorkerCall, inputFilename, srcName, srcPath, dest
                        (inputFilename, destName +'.dat', destName)
 
         # execute xfoil-worker / create the smoothed root-airfoil
-        system(systemString)
+        result = system(systemString)
 
     DoneMsg()
     return result

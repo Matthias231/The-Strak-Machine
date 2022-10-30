@@ -2194,7 +2194,7 @@ class wing:
         num = len(userAirfoils)
         if num != len(dest_airfoilNames):
             ErrorMsg("userAirfoils and dest_airfoilNames must contain same number of elements")
-            return (-99, None)
+            return (-99, airfoilNames)
 
         for idx in range(num):
             airfoil = userAirfoils[idx]
@@ -2219,6 +2219,92 @@ class wing:
                 break
 
         return (result, airfoilNames)
+
+    def __get_rightFoilData(self, start, airfoilTypes, airfoilNames, chords):
+        end = len(airfoilTypes)
+
+        # loop over all airfoil-Types
+        for idx in range(start, end):
+            # Get the first "non-blend" airfoil beginning from "start"
+            if (airfoilTypes[idx] != "blend"):
+                return (airfoilNames[idx], chords[idx])
+
+        # Nothing was found
+        return (None, None)
+
+    def create_blendedAirfoils(self):
+        params = self.params
+        my_airfoilTypes = params.airfoilTypes[:]
+        my_airfoilNames = params.airfoilNames[:]
+        my_chords = self.normalized_chords[:]
+        blendfoilNames = []
+        result = 0
+
+        if self.fuselageIsPresent():
+            # remove duplicate root airfoil
+            my_airfoilTypes.pop(0)
+            my_airfoilNames.pop(0)
+
+        # remove duplicate tip airfoil
+        my_airfoilTypes.pop()
+        my_airfoilNames.pop()
+
+        num = len(my_airfoilTypes)
+
+        if ((num != len(my_airfoilNames)) or
+            (num != len(my_chords))):
+            ErrorMsg("my_airfoilTypes, my_airfoilNames and my_chords must contain same number of elements")
+            return(-99, blendfoilNames)
+
+        # loop over all airfoil-Types
+        for idx in range(num):
+            # not a "blend" airfoil ?
+            if (my_airfoilTypes[idx] != "blend"):
+                # yes, take this airfoil as the "left-side" airfoil for blending
+                leftFoilName = my_airfoilNames[idx]
+                leftFoilChord = my_chords[idx]
+            else:
+                # no, this is a "blend" airfoil that must be created
+                blendFoilName = my_airfoilNames[idx]
+                blendFoilName = remove_suffix(blendFoilName , ".dat")
+                blendFoilChord = my_chords[idx]
+
+                # get data of the "right-side" airfoil for blending
+                (rightFoilName, rightFoilChord) =\
+                  self.__get_rightFoilData((idx+1), my_airfoilTypes, my_airfoilNames, my_chords)
+
+                # check if left- and right-side airfoils exist
+                if (check_airfFoilsExist(leftFoilName, rightFoilName) == True):#FIXME refactoring, own class function
+                    NoteMsg("creating blended airfoil %s" % blendFoilName)
+
+                    # calculate the blend-factor
+                    blend = calculate_Blend(leftFoilChord, blendFoilChord, rightFoilChord)#FIXME refactoring, own class function
+
+                    # compose XFOIL-worker-call
+                    worker_call = xfoilWorkerCall + " -w blend %d -a %s -a2 %s -o %s"\
+                            % (blend, leftFoilName, rightFoilName, blendFoilName)
+                    print(worker_call) #Debug
+
+                    # call worker now by system call
+                    workerResult = os.system(worker_call)
+
+                    # Evaluate result
+                    if workerResult == 0:
+                        blendfoilNames.append(blendFoilName)
+                    else:
+                        # store errorcode
+                        if result == 0:
+                            result = workerResult
+                else:
+                    NoteMsg("at least one airfoil for blending does not exist,"\
+                          "skipping blending for airfoil %s" % blendFoilName)
+                      # store errorcode
+                    if result == 0:
+                        result = -1
+
+        return (result, blendfoilNames)
+
+
 
 
 ################################################################################
@@ -2374,46 +2460,6 @@ def check_airfFoilsExist(name_1, name_2):
         return False
 
     return True
-
-
-
-def create_blendedArifoils(wingData):
-    num = len(wingData.airfoilTypes)
-
-    # loop over all airfoil-Types
-    for idx in range(num):
-        # not a "blend" airfoil ?
-        if (wingData.airfoilTypes[idx] != "blend"):
-            # yes, take this airfoil as the "left-side" airfoil for blending
-            leftFoilName = wingData.airfoilNames[idx]
-            leftFoilChord = wingData.chords[idx]
-        else:
-            # no, this is a "blend" airfoil that must be created
-            blendFoilName = wingData.airfoilNames[idx]
-            blendFoilName = remove_suffix(blendFoilName , ".dat")
-            blendFoilChord = wingData.chords[idx]
-
-            # get data of the "right-side" airfoil for blending
-            (rightFoilName, rightFoilChord) = get_rightFoilData(wingData, idx+1)
-            # check if left- and right-side airfoils exist
-
-            if (check_airfFoilsExist(leftFoilName, rightFoilName) == True):
-                NoteMsg("creating blended airfoil %s" % blendFoilName)
-
-                # calculate the blend-factor
-                blend = calculate_Blend(leftFoilChord, blendFoilChord, rightFoilChord)
-
-                # compose XFOIL-worker-call
-                worker_call = xfoilWorkerCall + " -w blend %d -a %s -a2 %s -o %s"\
-                        % (blend, leftFoilName, rightFoilName, blendFoilName)
-                print(worker_call) #Debug
-
-                # call worker now by system call
-                os.system(worker_call)
-            else:
-                NoteMsg("at least one airfoil for blending does not exist,"\
-                 "skipping blending for airfoil %s" % blendFoilName)
-
 
 def update_seedfoilName(wingData, strakdata):
     seedfoilIdx = 0
@@ -2717,9 +2763,6 @@ class planform_creator:
         return 0
 
     def __export_airfoils(self):
-        result = 0
-        airfoilNames = []
-
         # get current working dir
         workingDir = os.getcwd()
 
@@ -2731,34 +2774,30 @@ class planform_creator:
         if not os.path.exists(buildPath + bs + airfoilPath):
             os.makedirs(buildPath + bs + airfoilPath)
 
-        # change working-directory to output-directory
-        #os.chdir(workingDir + bs + buildPath + bs + airfoilPath)
-
         # copy and rename user-airfoils, the results will be copied to the
         # airfoil-folder specified in the strak-machine
-        (result, airfoils) = self.newWing.copy_userAirfoils()
-        if airfoils != None:
-            airfoilNames.extend(airfoils)
+        (result, userAirfoils) = self.newWing.copy_userAirfoils()
 
         if (result != 0):
             # error
             ErrorMsg("copy_userAirfoils() failed")
             # change working-directory back
             os.chdir(workingDir)
-            return (result, airfoilNames)
+            return (result, userAirfoils, [])
 
-##        # create blended airfoils using XFOIL_worker
-##        (result, airfoils) = self.newWing.create_blendedAirfoils(self.newWing)
-##        if airfoils != None:
-##            airfoilNames.extend(airfoils)
-##
-##        if (result != 0):
-##            # error
-##            ErrorMsg("create_blendedAirfoils() failed")
+        # change working-directory to output-directory
+        os.chdir(workingDir + bs + buildPath + bs + airfoilPath)
+
+        # create blended airfoils using XFOIL_worker
+        (result, blendedAirfoils) = self.newWing.create_blendedAirfoils()
+
+        if (result != 0):
+            # error
+            ErrorMsg("create_blendedAirfoils() failed")
 
         # change working-directory back
         os.chdir(workingDir)
-        return (result, airfoilNames)
+        return (result, userAirfoils, blendedAirfoils)
 
     def __set_AxesAndLabels(self, ax, title):
         global cl_grid
