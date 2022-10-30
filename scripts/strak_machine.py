@@ -3491,7 +3491,12 @@ def copyAndSmooth_Airfoil(xfoilWorkerCall, inputFilename, srcName, srcPath, dest
 
     # first always rename and copy the airfoil
     NoteMsg("Renaming airfoil \'%s\' to \'%s\'" % (srcName, destName))
-    change_airfoilname.change_airfoilName(srcfoilNameAndPath, destName + '.dat')
+    result = change_airfoilname.change_airfoilName(srcfoilNameAndPath, destName + '.dat')
+
+    if result != 0:
+        ErrorMsg("change_airfoilName failed, errorcode %d" % result)
+        NoteMsg("working dir is %s" % getcwd())
+        return result
 
     if (smooth):
         NoteMsg("Smoothing airfoil \'%s\'" % destName)
@@ -3504,6 +3509,7 @@ def copyAndSmooth_Airfoil(xfoilWorkerCall, inputFilename, srcName, srcPath, dest
         system(systemString)
 
     DoneMsg()
+    return result
 
 
 

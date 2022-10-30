@@ -35,7 +35,7 @@ import numpy as np
 
 # imports from strak machine
 from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg,
-                           bs, ressourcesPath)
+                           bs, airfoilPath, buildPath, ressourcesPath)
 
 # imports from planform creator
 from planform_creator_new import (planform_creator, diagTypes, airfoilTypes,
@@ -1763,7 +1763,28 @@ class App(ctk.CTk):
         self.notImplemented_Dialog() #FIXME implement
 
     def export_airfoils(self, dummy):
-        self.notImplemented_Dialog() #FIXME implement
+        creatorInst = creatorInstances[self.planformIdx]
+        planformName = self.frame_bottom.planformNames[self.planformIdx]
+        filePath = bs + buildPath + bs + airfoilPath
+        title = 'Export airfoils'
+
+        # call function of planform creator
+        (result, airfoils) = creatorInst.export_airfoils()
+
+        # check if everything was o.k.
+        if result == 0:
+            # create message text
+            msgText =  "The following airfoils of planform \'%s\'\n" % planformName
+            msgText += "have been successfully exported to path \'%s\':\n\n" % filePath
+
+            for airfoil in airfoils:
+                msgText += "%s\n" % airfoil
+            messagebox.showinfo(title=title, message=msgText )
+        else:
+            # create message text
+            msgText =  "Error, exporting airfoils of planform \'%s\'\n" % planformName
+            msgText += "to path \'%s\'\nfailed, errorcode: %d" % (filePath, result)
+            messagebox.showerror(title=title, message=msgText )
 
     def save(self, dummy):
         creatorInst = creatorInstances[self.planformIdx]
@@ -1776,23 +1797,24 @@ class App(ctk.CTk):
         # check if everything was o.k.
         if result == 0:
             # create message text
-            msgText =  "Parameters of planform '%s\'\n" % planformName
+            msgText =  "Parameters of planform \'%s\'\n" % planformName
             msgText += "have been successfully saved to file \'%s\'" % filePath
             messagebox.showinfo(title='Save', message=msgText )
             self.frame_bottom.clear_unsavedChangesFlag(self.planformIdx)
         else:
             # create message text
             msgText =  "Error, saving parameters of planform \'%s\'\n" % planformName
-            msgText += "to file file \'%s\'\nfailed, errorcode: %d" % (filePath, result)
+            msgText += "to file \'%s\'\nfailed, errorcode: %d" % (filePath, result)
             messagebox.showerror(title='Save', message=msgText )
 
 
     def reset(self, dummy):
-        creatorInst = creatorInstances[self.planformIdx]
-        result = creatorInst.reset()
-        if (result == 0):
-           self.frame_bottom.set_unsavedChangesFlag(self.planformIdx)
-           self.updateNeeded = True
+        self.notImplemented_Dialog() #FIXME implement
+##        creatorInst = creatorInstances[self.planformIdx]
+##        result = creatorInst.reset()
+##        if (result == 0):
+##           self.frame_bottom.set_unsavedChangesFlag(self.planformIdx)
+##           self.updateNeeded = True
 
     def start(self):
         self.app_running = True

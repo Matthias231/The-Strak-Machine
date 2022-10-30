@@ -41,7 +41,7 @@ def change_airfoilName(old, new):
         oldfile.close()
     except:
         print("Error, failed to open file %s" % old)
-        return
+        return -1
 
     if (new.find("\\") >= 0):
         splitlines = new.split("\\")
@@ -60,7 +60,7 @@ def change_airfoilName(old, new):
         newfile = open(new, 'w+')
     except:
         print("Error, failed to open file %s" % new)
-        return
+        return -2
 
     i = 0
     for line in oldfile_content:
@@ -71,6 +71,7 @@ def change_airfoilName(old, new):
             i = i+1
 
     newfile.close()
+    return 0
 
 
 def main():

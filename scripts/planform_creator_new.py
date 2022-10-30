@@ -2171,6 +2171,56 @@ class wing:
         else:
             ErrorMsg("undefined diagramtype")
 
+    def copy_userAirfoils(self):
+        airfoilNames = []
+        userAirfoils = []
+        dest_airfoilNames = []
+        result = 0
+        params = self.params
+        smooth = params.smoothUserAirfoils
+
+        # create a list of user airfoils and destination airfoil names
+        num = len(params.airfoilTypes)
+        for idx in range(num):
+            if params.airfoilTypes[idx] == 'user':
+                userAirfoils.append(params.userAirfoils[idx])
+                dest_airfoilNames.append(params.airfoilNames[idx])
+
+        # remove all duplicates
+        userAirfoils = list(dict.fromkeys(userAirfoils))
+        dest_airfoilNames = list(dict.fromkeys(dest_airfoilNames))
+
+        # check number of list elements
+        num = len(userAirfoils)
+        if num != len(dest_airfoilNames):
+            ErrorMsg("userAirfoils and dest_airfoilNames must contain same number of elements")
+            return (-99, None)
+
+        for idx in range(num):
+            airfoil = userAirfoils[idx]
+
+            if airfoil == None:
+                # no valid user airfoil
+                continue
+
+            src_Path = os.path.dirname(airfoil)
+            src_airfoilName = remove_suffix(os.path.basename(airfoil), ".dat")
+            dest_airfoilName = remove_suffix(dest_airfoilNames[idx], ".dat")
+
+            result = copyAndSmooth_Airfoil(xfoilWorkerCall, inputFilename,
+                   src_airfoilName, src_Path, dest_airfoilName, smooth)
+
+            if result == 0:
+                airfoilNames.append(dest_airfoilName)
+            else:
+                # error
+                ErrorMsg("copyAndSmooth_Airfoil() failed, airfoil: %s, errorcode %d" %\
+                  (airfoil, result))
+                break
+
+        return (result, airfoilNames)
+
+
 ################################################################################
 # find the wing in the XML-tree
 def get_wing(root, wingFinSwitch):
@@ -2279,33 +2329,6 @@ def get_strakDataFileName(args):
     return inFileName
 
 
-def copy_userAirfoils(wingData):
-    userAirfoil_idx = 0
-
-    if wingData.fuselageIsPresent():
-        userAirfoils = wingData.userAirfoils[1:]
-        userAirfoil_idx = 1
-    else:
-        userAirfoils = wingData.userAirfoils
-        userAirfoil_idx = 0
-
-
-    for airfoil in userAirfoils:
-        splitnames = airfoil.split("\\")
-        airfoilName = splitnames[-1]
-        airfoilName = remove_suffix(airfoilName, ".dat")
-
-        if (splitnames[0]=='.'):
-            srcPath = "..\\..\\" + '\\'.join(splitnames[1:-1])
-        else:
-            srcPath = '\\'.join(splitnames[0:-1])
-
-        destName = wingData.get_UserAirfoilName(userAirfoil_idx)
-        destName = remove_suffix(destName, ".dat")
-
-        copyAndSmooth_Airfoil(xfoilWorkerCall, inputFilename, airfoilName,
-                              srcPath, destName, wingData.smoothUserAirfoils)
-        userAirfoil_idx = userAirfoil_idx + 1
 
 
 def get_rightFoilData(wingData, start):
@@ -2693,6 +2716,49 @@ class planform_creator:
 
         return 0
 
+    def __export_airfoils(self):
+        result = 0
+        airfoilNames = []
+
+        # get current working dir
+        workingDir = os.getcwd()
+
+        # check if output-folder exists. If not, create folder.
+        if not os.path.exists(buildPath):
+            os.makedirs(buildPath)
+
+        # check if airfoil-folder exists. If not, create folder.
+        if not os.path.exists(buildPath + bs + airfoilPath):
+            os.makedirs(buildPath + bs + airfoilPath)
+
+        # change working-directory to output-directory
+        #os.chdir(workingDir + bs + buildPath + bs + airfoilPath)
+
+        # copy and rename user-airfoils, the results will be copied to the
+        # airfoil-folder specified in the strak-machine
+        (result, airfoils) = self.newWing.copy_userAirfoils()
+        if airfoils != None:
+            airfoilNames.extend(airfoils)
+
+        if (result != 0):
+            # error
+            ErrorMsg("copy_userAirfoils() failed")
+            # change working-directory back
+            os.chdir(workingDir)
+            return (result, airfoilNames)
+
+##        # create blended airfoils using XFOIL_worker
+##        (result, airfoils) = self.newWing.create_blendedAirfoils(self.newWing)
+##        if airfoils != None:
+##            airfoilNames.extend(airfoils)
+##
+##        if (result != 0):
+##            # error
+##            ErrorMsg("create_blendedAirfoils() failed")
+
+        # change working-directory back
+        os.chdir(workingDir)
+        return (result, airfoilNames)
 
     def __set_AxesAndLabels(self, ax, title):
         global cl_grid
@@ -2777,6 +2843,10 @@ class planform_creator:
     def reset(self):
         '''sets all parameters to default'''
         print("reset")
+
+    def export_airfoils(self):
+        '''exports all 'user' and 'blend' airfoils'''
+        return self.__export_airfoils()
 
     def get_params(self):
         '''gets parameters as a dictionary'''
