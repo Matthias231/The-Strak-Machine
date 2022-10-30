@@ -1772,7 +1772,6 @@ class App(ctk.CTk):
 
         # FIXME use filePath, file selector dialog?
         result = creatorInst.save()
-        result = 99
 
         # check if everything was o.k.
         if result == 0:
