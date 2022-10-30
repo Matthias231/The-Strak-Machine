@@ -19,8 +19,9 @@
 
 import ctypes
 import tkinter as tk
+from tkinter import messagebox
 from tkinter import ttk
-import customtkinter
+import customtkinter as ctk
 import os
 from PIL import ImageTk, Image
 from colorama import init
@@ -128,16 +129,16 @@ class control_frame():
         self.heigth = self.master.winfo_screenheight()
 
         # create left frame
-        self.frame_left = customtkinter.CTkFrame(master=master, width=180,
+        self.frame_left = ctk.CTkFrame(master=master, width=180,
                                             corner_radius=0)
 
         # create scrollable Frame
-        self.container = customtkinter.CTkFrame(master=master, width=180,
+        self.container = ctk.CTkFrame(master=master, width=180,
                                             corner_radius=0)
 
         self.canvas = tk.Canvas(self.container, bg=bg_color_dark,
                                  highlightthickness=0)
-        self.scrollbar_v = customtkinter.CTkScrollbar(self.container,
+        self.scrollbar_v = ctk.CTkScrollbar(self.container,
                                                 command=self.canvas.yview)
 
         self.frame_right  = tk.Frame(self.canvas, width=180,
@@ -153,7 +154,7 @@ class control_frame():
         for i in range(self.numPlanforms):
             # new unsaved changes flag and label
             self.unsavedChangesFlags.append(False)
-            widget_1 = customtkinter.CTkLabel(master=self.frame_left, text='',
+            widget_1 = ctk.CTkLabel(master=self.frame_left, text='',
              text_color = 'red' )
             self.label_unsavedChanges.append(widget_1)
 
@@ -304,7 +305,7 @@ class control_frame():
         return row
 
     def __create_label(self, frame, text, size):
-        label = customtkinter.CTkLabel(master=frame,
+        label = ctk.CTkLabel(master=frame,
                 text=text, text_font=(main_font, size), anchor="e")
         return label
 
@@ -358,7 +359,7 @@ class control_frame():
         # create entries and assign values
         for paramTableEntry in paramTable:
             # Add Label (display name of the parameter)
-            param_label = customtkinter.CTkLabel(master=frame,
+            param_label = ctk.CTkLabel(master=frame,
                   text=paramTableEntry["txt"], text_font=(main_font, 13),
                    anchor="e")
             param_labels.append(param_label)
@@ -369,7 +370,7 @@ class control_frame():
             textVars.append(value_txt)
 
             # create entry for param value
-            value_entry = customtkinter.CTkEntry(frame, show=None,
+            value_entry = ctk.CTkEntry(frame, show=None,
                 textvariable = value_txt, text_font=(main_font, fs_entry),
                 width=140, height=16, justify='right')
 
@@ -381,7 +382,7 @@ class control_frame():
 
             unit = paramTableEntry["unit"]
             if unit != None:
-                unit_label = customtkinter.CTkLabel(master=frame,
+                unit_label = ctk.CTkLabel(master=frame,
                   text=unit, text_font=(main_font, fs_unit), anchor="w")
             else:
                 unit_label = None
@@ -762,14 +763,14 @@ class control_frame():
         param = button["param"]
 
         # create new button
-        button = customtkinter.CTkButton(master=frame, text=text,
+        button = ctk.CTkButton(master=frame, text=text,
                                             fg_color=("gray75", "gray30"),
                                             command= lambda ztemp=param : callback(ztemp))
         return button
 
     def __add_appearanceModeMenu(self, frame, column, row):
-        self.label_mode = customtkinter.CTkLabel(master=frame, text="Appearance Mode:")
-        self.OM_apperanceMode = customtkinter.CTkOptionMenu(master=frame,
+        self.label_mode = ctk.CTkLabel(master=frame, text="Appearance Mode:")
+        self.OM_apperanceMode = ctk.CTkOptionMenu(master=frame,
                                                         values=["Dark", "Light"],
                                                         command=self.__change_appearance_mode)
         self.__place_widgetsInRow([self.label_mode, self.OM_apperanceMode], column, row)
@@ -777,7 +778,7 @@ class control_frame():
 
     def __add_planformChoiceMenu(self, frame, column, row):
         self.label_planformChoice = self.__create_label(frame, "Choose planform:", fs_label)
-        self.OM_planformChoice = customtkinter.CTkOptionMenu(master=frame,
+        self.OM_planformChoice = ctk.CTkOptionMenu(master=frame,
                                                         values=self.planformNames,
                                                         command=self.__change_planform)
         self.__place_widgetsInRow([self.label_planformChoice, self.OM_planformChoice], column, row)
@@ -785,7 +786,7 @@ class control_frame():
 
     def __add_airfoilChoiceMenu(self, frame, column, row):
         self.label_airfoilChoice = self.__create_label(frame, "Choose airfoil:", fs_label)
-        self.OM_airfoilChoice = customtkinter.CTkOptionMenu(master=frame,
+        self.OM_airfoilChoice = ctk.CTkOptionMenu(master=frame,
                                                         values=self.airfoilNames[self.master.planformIdx],
                                                         command=self.__change_airfoil)
         self.__place_widgetsInRow([self.label_airfoilChoice, self.OM_airfoilChoice] ,column, row)
@@ -793,7 +794,7 @@ class control_frame():
 
     def __add_airfoilTypeMenu(self, frame, column, row):
         self.label_airfoilType = self.__create_label(frame, "Selected airfoil: type", fs_label)
-        self.OM_airfoilType = customtkinter.CTkOptionMenu(master=frame,
+        self.OM_airfoilType = ctk.CTkOptionMenu(master=frame,
                                                         values=airfoilTypes,
                                                         command=self.__change_airfoilType)
         self.__place_widgetsInRow([self.label_airfoilType, self.OM_airfoilType] ,column, row)
@@ -812,11 +813,11 @@ class control_frame():
         return (row + 1)
 
     def __change_appearance_mode(self, new_appearanceMode):
-        customtkinter.set_appearance_mode(new_appearanceMode)
+        ctk.set_appearance_mode(new_appearanceMode)
         self.master.appearance_mode = new_appearanceMode
 
         # change the color of the scrollable frame manually,as this is not a
-        # customtkinter frame
+        # ctk frame
         bg_color = self.__get_bg_color(new_appearanceMode)
         self.frame_right.configure(bg = bg_color)
         self.canvas.configure(bg = bg_color)
@@ -962,10 +963,10 @@ class control_frame():
     def on_closing(self, event=0):
         self.destroy()
 
-class diagram(customtkinter.CTkFrame):
+class diagram(ctk.CTkFrame):
 
     def __init__(self, parent, controller, bufferIdx, fig):
-        customtkinter.CTkFrame.__init__(self, parent)
+        ctk.CTkFrame.__init__(self, parent)
 
         # canvas
         canvas = FigureCanvasTkAgg(fig, self)
@@ -1361,7 +1362,7 @@ class diagram_frame():
             self.offsets[diagType] = (0.0, 0.0)
 
         # create new frame (container)
-        self.container = customtkinter.CTkFrame(master=master, width=180,
+        self.container = ctk.CTkFrame(master=master, width=180,
                                             corner_radius=0)
         self.container.pack(side = side, fill=tk.BOTH, expand=1)
         self.container.grid_rowconfigure(0, weight=1)
@@ -1623,7 +1624,7 @@ class diagram_frame():
 
 
 # main application
-class App(customtkinter.CTk):
+class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         global ctrlFrame
@@ -1636,8 +1637,8 @@ class App(customtkinter.CTk):
         self.appearance_mode = "Dark" # Modes: "System" (standard), "Dark", "Light"
 
         # configure customtkinter
-        customtkinter.set_appearance_mode(self.appearance_mode)    # Modes: "System" (standard), "Dark", "Light"
-        customtkinter.set_default_color_theme("blue") # Themes: "blue" (standard), "green", "dark-blue"
+        ctk.set_appearance_mode(self.appearance_mode)    # Modes: "System" (standard), "Dark", "Light"
+        ctk.set_default_color_theme("blue") # Themes: "blue" (standard), "green", "dark-blue"
 
         # set window title
         self.title("Planform Creator")
@@ -1723,13 +1724,28 @@ class App(customtkinter.CTk):
 
     def load(self, dummy):
         creatorInst = creatorInstances[self.planformIdx]
+        planformName = self.frame_bottom.planformNames[self.planformIdx]
+        filePath = bs + ressourcesPath + bs + planformFiles[self.planformIdx]
+
+        # FIXME use filePath, file selector dialog?
         result = creatorInst.load()
 
-        if (result == 0):
+        # check if everything was o.k.
+        if result == 0:
             creatorInst.update_planform(creatorInst.get_params())
             self.frame_bottom.update_Entries(self.planformIdx)
             self.frame_bottom.clear_unsavedChangesFlag(self.planformIdx)
             self.updateNeeded = True
+
+            # create message text
+            msgText =  "Parameters of planform \'%s\'\n" % planformName
+            msgText += " have been successfully loaded from file\n\'%s\'\n" % filePath
+            messagebox.showinfo(title='Load', message=msgText)
+        else:
+            # create message text
+            msgText =  "Error, loading parameters of planform \'%s\'\n" % planformName
+            msgText += "from file \'%s\'\nfailed, errorcode %d\n" % (filePath, result)
+            messagebox.showerror(title='Load', message=msgText )
 
     def add_planform(self, dummy):
         self.notImplemented_Dialog() #FIXME implement
@@ -1751,8 +1767,25 @@ class App(customtkinter.CTk):
 
     def save(self, dummy):
         creatorInst = creatorInstances[self.planformIdx]
-        creatorInst.save()
-        self.frame_bottom.clear_unsavedChangesFlag(self.planformIdx)
+        planformName = self.frame_bottom.planformNames[self.planformIdx]
+        filePath = bs + ressourcesPath + bs + planformFiles[self.planformIdx]
+
+        # FIXME use filePath, file selector dialog?
+        result = creatorInst.save()
+        result = 99
+
+        # check if everything was o.k.
+        if result == 0:
+            # create message text
+            msgText =  "Parameters of planform '%s\'\n" % planformName
+            msgText += "have been successfully saved to file \'%s\'" % filePath
+            messagebox.showinfo(title='Save', message=msgText )
+            self.frame_bottom.clear_unsavedChangesFlag(self.planformIdx)
+        else:
+            # create message text
+            msgText =  "Error, saving parameters of planform \'%s\'\n" % planformName
+            msgText += "to file file \'%s\'\nfailed, errorcode: %d" % (filePath, result)
+            messagebox.showerror(title='Save', message=msgText )
 
 
     def reset(self, dummy):
@@ -1772,15 +1805,12 @@ class App(customtkinter.CTk):
         self.destroy()
 
     def notImplemented_Dialog(self):
-        # create complete dialog text
-        dialogText =  "   Sorry...\n"
-        dialogText += "   Function has not been not implemented yet   \n"
-        dialogText += "   Press \'Enter\' to close this dialog\n"
+        # create mesage text
+        msgText =  "   Sorry...\n"
+        msgText += "   Function has not been not implemented yet   \n"
 
-        # create dialog
-        dialog = customtkinter.CTkInputDialog(master=None, text=dialogText,
-                        title = 'Not implemented :-(')
-        dialog.get_input()
+        messagebox.showwarning(title='Not implemented :-(', message=msgText )
+
 
     def unsaved_changesDialog(self, flags):
         # create complete dialog text
@@ -1789,7 +1819,7 @@ class App(customtkinter.CTk):
         dialogText += "To quit and save the changes type \'save'"
 
         # create dialog
-        dialog = customtkinter.CTkInputDialog(master=None, text=dialogText,
+        dialog = ctk.CTkInputDialog(master=None, text=dialogText,
                         title = 'Unsaved Changes detected')
 
         # get user input, what to do
