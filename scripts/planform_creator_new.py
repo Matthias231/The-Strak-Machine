@@ -18,6 +18,7 @@
 #  Copyright (C) 2020-2022 Matthias Boese
 
 import ctypes
+import shutil
 import customtkinter
 import re
 import xml.etree.ElementTree as ET
@@ -45,14 +46,14 @@ from matplotlib.backends.backend_tkagg import (
 # Implement the default Matplotlib key bindings.
 from matplotlib.backend_bases import key_press_handler
 import tkinter.font as font
-from strak_machine import (copyAndSmooth_Airfoil, get_ReString,
+from strak_machine import ( get_ReString,
                              ErrorMsg, WarningMsg, NoteMsg, DoneMsg,
                              remove_suffix, interpolate, round_Re,
                              bs, buildPath, ressourcesPath, airfoilPath,
                              scriptPath, exePath, smoothInputFile,
                              strakMachineInputFileName, xfoilWorkerName,
                              T1_polarInputFile)
-
+from change_airfoilname import change_airfoilName
 from colorama import init
 from termcolor import colored
 from FLZ_Vortex_export import export_toFLZ
@@ -2171,7 +2172,55 @@ class wing:
         else:
             ErrorMsg("undefined diagramtype")
 
-    def copy_userAirfoils(self):
+
+    def __copyAndSmooth_Airfoil(self, srcNameAndPath, destName, destPath, smooth):
+        global xfoilWorkerCall
+        global inputFilename
+
+        # copy airfoil from src path to destination path
+        NoteMsg("Copying airfoil \'%s\' to \'%s\'" % (srcNameAndPath, destPath))
+        shutil.copy2(srcNameAndPath, destPath)
+
+        # store current working directory and change working directory to
+        # destPath
+        workingDir = os.getcwd()
+        os.chdir(destPath)
+
+        srcName = os.path.basename(srcNameAndPath)
+
+        # check if the airfoil shall get a new name
+        if (srcName != destName):
+            # rename the airfoil
+            NoteMsg("Renaming airfoil \'%s\' to \'%s\'" % (srcName, destName))
+            result = change_airfoilName(srcName, destName + '.dat')
+
+            if result != 0:
+                ErrorMsg("change_airfoilName failed, errorcode %d" % result)
+                NoteMsg("working dir was %s" % getcwd())
+
+                # change back working directory
+                os.chdir(workingDir)
+                return result
+            else:
+                # delete the airfoil file with original name
+                os.remove(srcName)
+
+        if (smooth):
+            NoteMsg("Smoothing airfoil \'%s\'" % destName)
+
+            # compose system-string for smoothing the airfoil
+            systemString = xfoilWorkerCall + " -w smooth -i %s -a %s -o %s" % \
+                           (inputFilename, destName +'.dat', destName)
+
+            # execute xfoil-worker / create the smoothed root-airfoil
+            result = system(systemString)
+
+        # change back working directory
+        os.chdir(workingDir)
+        return result
+
+
+    def copy_userAirfoils(self, dest_Path):
         airfoilNames = []
         userAirfoils = []
         dest_airfoilNames = []
@@ -2203,12 +2252,9 @@ class wing:
                 # no valid user airfoil
                 continue
 
-            src_Path = os.path.dirname(airfoil)
-            src_airfoilName = remove_suffix(os.path.basename(airfoil), ".dat")
             dest_airfoilName = remove_suffix(dest_airfoilNames[idx], ".dat")
-
-            result = copyAndSmooth_Airfoil(xfoilWorkerCall, inputFilename,
-                   src_airfoilName, src_Path, dest_airfoilName, smooth)
+            result = self.__copyAndSmooth_Airfoil(airfoil, dest_airfoilName,
+                                                  dest_Path, smooth)
 
             if result == 0:
                 airfoilNames.append(dest_airfoilName)
@@ -2232,7 +2278,7 @@ class wing:
         # Nothing was found
         return (None, None)
 
-    def create_blendedAirfoils(self):
+    def create_blendedAirfoils(self, dest_path):
         params = self.params
         my_airfoilTypes = params.airfoilTypes[:]
         my_airfoilNames = params.airfoilNames[:]
@@ -2251,10 +2297,16 @@ class wing:
 
         num = len(my_airfoilTypes)
 
+        # check if lists contain same number of elements
         if ((num != len(my_airfoilNames)) or
             (num != len(my_chords))):
             ErrorMsg("my_airfoilTypes, my_airfoilNames and my_chords must contain same number of elements")
             return(-99, blendfoilNames)
+
+        # store current working directory and change working directory to
+        # destPath
+        workingDir = os.getcwd()
+        os.chdir(dest_path)
 
         # loop over all airfoil-Types
         for idx in range(num):
@@ -2298,10 +2350,12 @@ class wing:
                 else:
                     NoteMsg("at least one airfoil for blending does not exist,"\
                           "skipping blending for airfoil %s" % blendFoilName)
-                      # store errorcode
+                    # store errorcode
                     if result == 0:
                         result = -1
 
+        # change back working directory
+        os.chdir(workingDir)
         return (result, blendfoilNames)
 
 
@@ -2763,40 +2817,32 @@ class planform_creator:
         return 0
 
     def __export_airfoils(self):
-        # get current working dir
-        workingDir = os.getcwd()
-
-        # check if output-folder exists. If not, create folder.
+        # check if output (build) folder exists. If not, create folder.
         if not os.path.exists(buildPath):
             os.makedirs(buildPath)
 
-        # check if airfoil-folder exists. If not, create folder.
-        if not os.path.exists(buildPath + bs + airfoilPath):
-            os.makedirs(buildPath + bs + airfoilPath)
+        # compose destination path (airfoil folder)
+        dest_path = buildPath + bs + airfoilPath
 
-        # copy and rename user-airfoils, the results will be copied to the
-        # airfoil-folder specified in the strak-machine
-        (result, userAirfoils) = self.newWing.copy_userAirfoils()
+        # check if airfoil folder exists. If not, create folder.
+        if not os.path.exists(dest_path):
+            os.makedirs(dest_path)
+
+        # copy and rename user-airfoils
+        (result, userAirfoils) = self.newWing.copy_userAirfoils(dest_path)
 
         if (result != 0):
             # error
             ErrorMsg("copy_userAirfoils() failed")
-            # change working-directory back
-            os.chdir(workingDir)
             return (result, userAirfoils, [])
 
-        # change working-directory to output-directory
-        os.chdir(workingDir + bs + buildPath + bs + airfoilPath)
-
         # create blended airfoils using XFOIL_worker
-        (result, blendedAirfoils) = self.newWing.create_blendedAirfoils()
+        (result, blendedAirfoils) = self.newWing.create_blendedAirfoils(dest_path)
 
         if (result != 0):
             # error
             ErrorMsg("create_blendedAirfoils() failed")
 
-        # change working-directory back
-        os.chdir(workingDir)
         return (result, userAirfoils, blendedAirfoils)
 
     def __set_AxesAndLabels(self, ax, title):

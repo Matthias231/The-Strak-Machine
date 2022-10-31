@@ -909,13 +909,16 @@ class control_frame():
         filetypes = (('.dat files', '*.dat'),
                      ('All files', '*.*'))
 
-        filename = tk.filedialog.askopenfilename(
+        absFilename = tk.filedialog.askopenfilename(
                     title='Open a file',
                     initialdir=self.latestPath[planformIdx],
                     filetypes=filetypes)
 
+        # Compute the relative file path
+        relFilename = os.path.relpath(absFilename)
+
         # update name of .dat file in params (None is allowed value)
-        params["userAirfoils"][airfoilIdx] = filename
+        params["userAirfoils"][airfoilIdx] = relFilename
         self.__update_datFileName(params, planformIdx)
 
         # store latest path
