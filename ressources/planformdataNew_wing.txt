@@ -54,13 +54,13 @@
     3
   ],
   "userAirfoils":[
-    ".\\airfoil_library\\F3B_F3F\\JX\\JX-GT\\JX-GT-15.dat",
+    "C:/GitHub/The-Strak-Machine/airfoil_library/F3B_F3F/JX/JX-GT/JX-GT-15.dat",
     null,
     null,
     null,
-    ".\\airfoil_library\\F3B_F3F\\JX\\JX-GT\\JX-GT-10.dat",
+    "C:/GitHub/The-Strak-Machine/airfoil_library/F3B_F3F/JX/JX-GT/JX-GT-10.dat",
     null,
-    ".\\airfoil_library\\F3B_F3F\\JX\\JX-GT\\JX-GT-05.dat",
+    "C:/GitHub/The-Strak-Machine/airfoil_library/F3B_F3F/JX/JX-GT/JX-GT-05.dat",
     null
   ],
   "leadingEdgeOrientation":"up",

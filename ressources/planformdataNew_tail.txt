@@ -46,12 +46,12 @@
     1
   ],
   "userAirfoils":[
-    ".\\airfoil_library\\Tail\\JX\\\\JX-Fe\\JX-Fe-250.dat",
+    "C:/GitHub/The-Strak-Machine/airfoil_library/Tail/JX/JX-Fe/JX-Fe-250.dat",
     null,
     null,
     null,
     null,
-    ".\\airfoil_library\\Tail\\JX\\\\JX-Fe\\JX-Fe-150.dat"
+    "C:/GitHub/The-Strak-Machine/airfoil_library/Tail/JX/JX-Fe/JX-Fe-150.dat"
   ],
   "leadingEdgeOrientation":"up",
   "interpolationSegments":4,
