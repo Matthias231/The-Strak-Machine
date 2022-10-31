@@ -153,3 +153,8 @@ Strakmachine/airfoil_library/Tail/JX/JX-Fe/JX-Fe-150.dat
 Strakmachine/airfoil_library/Tail/JX/JX-Fe/JX-Fe-250.dat
 Strakmachine/airfoil_library/Tail/JX/JX-Fe/readme.md
 *.pyc
+Strakmachine/ressources/planformdataNew_tail.txt
+Strakmachine/ressources/planformdataNew_wing.txt
+Strakmachine_R3.zip
+Strakmachine_R4.zip
+ressources/planformdataNew_wingTest.txt
