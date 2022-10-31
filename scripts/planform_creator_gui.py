@@ -34,12 +34,12 @@ from matplotlib.figure import Figure
 import numpy as np
 
 # imports from strak machine
-from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg,
-                           bs, airfoilPath, buildPath, ressourcesPath)
+from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg, bs,
+          airfoilPath, buildPath, ressourcesPath)
 
 # imports from planform creator
 from planform_creator_new import (planform_creator, diagTypes, airfoilTypes,
-                                  planformShapes, main_font)
+                                  planformShapes, planformsPath, main_font)
 
 # some global variables
 num_diagrams = len(diagTypes)
@@ -1638,6 +1638,7 @@ class App(ctk.CTk):
         # index of active planform
         self.planformIdx = 0
         self.appearance_mode = "Dark" # Modes: "System" (standard), "Dark", "Light"
+        self.exportFlags = []
 
         # configure customtkinter
         ctk.set_appearance_mode(self.appearance_mode)    # Modes: "System" (standard), "Dark", "Light"
@@ -1658,7 +1659,10 @@ class App(ctk.CTk):
         scaleFactor = width/1980
 
         for creatorInst in creatorInstances:
+            # set screen parameters
             creatorInst.set_screenParams(width, heigth)
+            # append export flag for planform export dialog
+            self.exportFlags.append((tk.BooleanVar(value=True)))
 
         # notification variable for updating the diagrams
         self.updateNeeded = 0
@@ -1674,6 +1678,22 @@ class App(ctk.CTk):
 
         # set global variable
         ctrlFrame = self.frame_bottom
+    def __center(self, win):
+        """
+        centers a tkinter window
+        :param win: the main window or Toplevel window to center
+        """
+        win.update_idletasks()
+        width = win.winfo_width()
+        frm_width = win.winfo_rootx() - win.winfo_x()
+        win_width = width + 2 * frm_width
+        height = win.winfo_height()
+        titlebar_height = win.winfo_rooty() - win.winfo_y()
+        win_height = height + titlebar_height + frm_width
+        x = win.winfo_screenwidth() // 2 - win_width // 2
+        y = win.winfo_screenheight() // 2 - win_height // 2
+        win.geometry('{}x{}+{}+{}'.format(width, height, x, y))
+        win.deiconify()
 
     def get_Buttons(self):
         headlines = []
@@ -1690,7 +1710,7 @@ class App(ctk.CTk):
         headlines.append("Planform actions")
         buttonsColumn = [{"txt": "Add planform",     "cmd" : self.add_planform,     "param" : None},
                          {"txt": "Remove planform",  "cmd" : self.remove_planform,  "param" : None},
-                         {"txt": "Export planforms", "cmd" : self.export_planforms, "param" : None}
+                         {"txt": "Export planforms", "cmd" : self.export_planformsDialog, "param" : None}
                         ]
         buttons.append(buttonsColumn)
 
@@ -1756,8 +1776,63 @@ class App(ctk.CTk):
     def remove_planform(self, dummy):
         self.notImplemented_Dialog() #FIXME implement
 
-    def export_planforms(self, dummy):
-        self.notImplemented_Dialog() #FIXME implement
+    def export_planformsDialog(self, dummy):
+        exportWindow = ctk.CTkToplevel()
+        self.exportWindow = exportWindow
+        exportWindow.wm_title("Export planforms")
+
+        planformnames = self.frame_bottom.planformNames
+        num = len(planformnames)
+        row = 1
+
+        label = ctk.CTkLabel(master=exportWindow, text="Select planforms to be exported:",
+        text_font=(main_font, fs_label), pady=10, padx=20, anchor="e")
+        label.grid(row=row, column=0)
+
+        for idx in range(num):
+            checkbox = ctk.CTkCheckBox(master=exportWindow, text=planformnames[idx],
+                       variable=self.exportFlags[idx], text_font=(main_font, fs_label))
+            checkbox.grid(row=row, column=1, pady=10, padx=20, sticky="w")
+            row += 1
+
+        button = ctk.CTkButton(exportWindow, text="OK", command=self.export_planforms)
+        button.grid(row=row+1, column=0, pady=10, padx=20, sticky="e")
+        button = ctk.CTkButton(exportWindow, text="Cancel", command=self.cancel_export_planforms)
+        button.grid(row=row+1, column=1, pady=10, padx=20, sticky="w")
+        self.__center(exportWindow)
+
+    def cancel_export_planforms(self):
+        self.exportWindow.destroy()
+
+    def export_planforms(self):
+        self.exportWindow.destroy()
+        num = len(creatorInstances)
+        exportNames = []
+        title='Export planforms'
+        filePath = buildPath + bs + planformsPath
+
+        for idx in range(num):
+            # check if planform shall be exported
+            if (self.exportFlags[idx].get() == True):
+                result = creatorInstances[idx].export_planform(filePath)
+                exportNames.append(ctrlFrame.planformNames[idx])
+                # check result
+                if result != 0:
+                    break
+
+        if result == 0:
+            # create message text
+            msgText =  "The selected planforms:\n\n"
+            for name in exportNames:
+                msgText += "%s\n" % name
+
+            msgText += "\nhave been successfully exported to file\n\'%s\'\n" % filePath
+            messagebox.showinfo(title=title, message=msgText)
+        else:
+            # create message text
+            msgText =  "Error, export of selected planforms to file\n"
+            msgText += " \'%s\'\nfailed, errorcode %d\n" % (filePath, result)
+            messagebox.showerror(title=title, message=msgText )
 
     def add_airfoil(self, dummy):
         self.notImplemented_Dialog() #FIXME implement

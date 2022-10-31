@@ -2845,6 +2845,10 @@ class planform_creator:
 
         return (result, userAirfoils, blendedAirfoils)
 
+    def __export_planform(self, filePath):
+        print("not implemented")# FIXME implement
+        return 0
+
     def __set_AxesAndLabels(self, ax, title):
         global cl_grid
         global cl_diagramTitle
@@ -2932,6 +2936,10 @@ class planform_creator:
     def export_airfoils(self):
         '''exports all 'user' and 'blend' airfoils'''
         return self.__export_airfoils()
+
+    def export_planform(self, filePath):
+        '''exports planform to given filepath'''
+        return self.__export_planform(filePath)
 
     def get_params(self):
         '''gets parameters as a dictionary'''
