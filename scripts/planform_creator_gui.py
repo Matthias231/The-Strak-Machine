@@ -47,6 +47,8 @@ diagram_width = 10
 diagram_height = 7
 ctrlFrame = None
 creatorInstances:planform_creator = []
+interpolationSteps_default = 4 # default steps for interpolation/planform export
+yPanels_default = 1 # default number of y panels for planform export
 
 # path to airfoils library
 airfoilLibrary_path = 'airfoil_library'
@@ -1632,13 +1634,19 @@ class App(ctk.CTk):
         super().__init__()
         global ctrlFrame
         global creatorInstances
+        global interpolationSteps_default
+        global yPanels_default
 
         self.app_running = False
 
         # index of active planform
         self.planformIdx = 0
         self.appearance_mode = "Dark" # Modes: "System" (standard), "Dark", "Light"
+
+        # variables for planform export
         self.exportFlags = []
+        self.interpolationSteps = interpolationSteps_default
+        self.yPanels = yPanels_default
 
         # configure customtkinter
         ctk.set_appearance_mode(self.appearance_mode)    # Modes: "System" (standard), "Dark", "Light"
@@ -1694,6 +1702,18 @@ class App(ctk.CTk):
         y = win.winfo_screenheight() // 2 - win_height // 2
         win.geometry('{}x{}+{}+{}'.format(width, height, x, y))
         win.deiconify()
+
+    def __update_interpolationSteps(self):
+        try:
+            self.interpolationSteps = int(self.steps_entry.get())
+        except:
+            ErrorMsg("__update_interpolationSteps, invalid steps")
+
+    def __update_yPanels(self):
+        try:
+            self.yPanels = int(self.yPanels_entry.get())
+        except:
+            ErrorMsg("__update_yPanels, invalid number of yPanels")
 
     def get_Buttons(self):
         headlines = []
@@ -1776,6 +1796,8 @@ class App(ctk.CTk):
     def remove_planform(self, dummy):
         self.notImplemented_Dialog() #FIXME implement
 
+
+
     def export_planformsDialog(self, dummy):
         exportWindow = ctk.CTkToplevel()
         self.exportWindow = exportWindow
@@ -1793,8 +1815,35 @@ class App(ctk.CTk):
             checkbox = ctk.CTkCheckBox(master=exportWindow, text=planformnames[idx],
                        variable=self.exportFlags[idx], text_font=(main_font, fs_label))
             checkbox.grid(row=row, column=1, pady=10, padx=20, sticky="w")
-            row += 1
+            row += 2
 
+        # Add Label and entry to configure interpolation steps
+        interpolation_label = ctk.CTkLabel(master=exportWindow,
+              text="Interpolation steps:", text_font=(main_font, 13))
+        interpolation_label.grid(row=row, column=0, pady=10, padx=20, sticky="e")
+
+        steps_txt = tk.StringVar(master=exportWindow, value=self.interpolationSteps)
+        self.steps_entry = ctk.CTkEntry(master=exportWindow, show=None,
+            textvariable = steps_txt, text_font=(main_font, fs_entry),
+            width=30, height=16, justify='right')
+        self.steps_entry.bind('<Return>', self.__update_interpolationSteps)
+        self.steps_entry.grid(row=row, column=1, pady=10, padx=20, sticky="w")
+        row += 1
+
+        # Add Label and entry to configure y panels
+        yPanels_label = ctk.CTkLabel(master=exportWindow,
+              text="Y-panels:", text_font=(main_font, 13))
+        yPanels_label.grid(row=row, column=0, pady=10, padx=20, sticky="e")
+
+        yPanels_txt = tk.StringVar(master=exportWindow, value=self.yPanels)
+        self.yPanels_entry = ctk.CTkEntry(master=exportWindow, show=None,
+            textvariable = yPanels_txt, text_font=(main_font, fs_entry),
+            width=30, height=16, justify='right')
+        self.yPanels_entry.bind('<Return>', self.__update_yPanels)
+        self.yPanels_entry.grid(row=row, column=1, pady=10, padx=20, sticky="w")
+        row += 2
+
+        # add OK / Cancel buttons
         button = ctk.CTkButton(exportWindow, text="OK", command=self.export_planforms)
         button.grid(row=row+1, column=0, pady=10, padx=20, sticky="e")
         button = ctk.CTkButton(exportWindow, text="Cancel", command=self.cancel_export_planforms)
@@ -1802,36 +1851,38 @@ class App(ctk.CTk):
         self.__center(exportWindow)
 
     def cancel_export_planforms(self):
+        # cleaning up
+        self.steps_entry.destroy()
         self.exportWindow.destroy()
 
     def export_planforms(self):
+        # cleaning up
         self.exportWindow.destroy()
-        num = len(creatorInstances)
-        exportNames = []
-        title='Export planforms'
-        filePath = buildPath + bs + planformsPath
+        self.steps_entry.destroy()
 
+        num = len(creatorInstances)
+        title='Export planforms'
+
+        append = False
         for idx in range(num):
             # check if planform shall be exported
             if (self.exportFlags[idx].get() == True):
-                result = creatorInstances[idx].export_planform(filePath)
-                exportNames.append(ctrlFrame.planformNames[idx])
+                result, filenames = creatorInstances[idx].export_planform(planformsPath,
+                                                self.interpolationSteps, self.yPanels, append)
+                append = True
                 # check result
                 if result != 0:
                     break
 
         if result == 0:
             # create message text
-            msgText =  "The selected planforms:\n\n"
-            for name in exportNames:
+            msgText =  "The selected planforms have been successfully exported to\n\n"
+            for name in filenames:
                 msgText += "%s\n" % name
-
-            msgText += "\nhave been successfully exported to file\n\'%s\'\n" % filePath
             messagebox.showinfo(title=title, message=msgText)
         else:
             # create message text
-            msgText =  "Error, export of selected planforms to file\n"
-            msgText += " \'%s\'\nfailed, errorcode %d\n" % (filePath, result)
+            msgText =  "Error, export of selected planforms failed, errorcode %d\n" % result
             messagebox.showerror(title=title, message=msgText )
 
     def add_airfoil(self, dummy):

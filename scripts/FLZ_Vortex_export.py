@@ -19,6 +19,7 @@
 
 from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg, bs,
                              buildPath, ressourcesPath, airfoilPath)
+
 from math import atan, pi
 from copy import deepcopy
 import numpy as np
@@ -62,7 +63,7 @@ class segmentData:
         # geometrical data of the wing planform
         self.widths = self.calculate_widths(wingData)
         self.chords = self.get_chords(wingData)
-        self.hingeDepths = self.calculateHingeDepths(wingData)
+        self.flapDepths = self.calculateHingeDepths(wingData)
         self.airfoilNames = self.get_airfoilNames(wingData)
         self.angles = self.calculate_angles(wingData)
         self.dihedrals = self.get_dihedrals(wingData)
@@ -92,11 +93,12 @@ class segmentData:
     def getFlapGroups(self, wingData):
         flapGroupsLeftHalfWing = []
         flapGroupsRightHalfWing = []
+        params = wingData.params
         numSections = len(wingData.sections)
 
         # determine number of different flap groups. Fuselage is not counted
-        numDifferentGroups = len(np.unique(wingData.flapGroups))
-        if (0 in wingData.flapGroups):
+        numDifferentGroups = len(np.unique(params.flapGroups))
+        if (0 in params.flapGroups):
             numDifferentGroups = numDifferentGroups - 1
 
         for idx in range(1, numSections):
@@ -112,23 +114,24 @@ class segmentData:
         return (flapGroupList)
 
     def calculateHingeDepths(self, wingData):
-        hingeDepthsLeftHalfWing = []
-        hingeDepthsRightHalfWing = []
+        flapDepthsLeftHalfWing = []
+        flapDepthsRightHalfWing = []
+        params = wingData.params
         numSections = len(wingData.sections)
 
         for idx in range(1, numSections):
-            # calculate hingeDepth
-            hingeDepth = (wingData.sections[idx].hingeDepth / wingData.sections[idx].chord)*100.0
-            hingeDepthsLeftHalfWing.append(hingeDepth)
-            hingeDepthsRightHalfWing.append(hingeDepth)
+            # calculate flapDepth
+            flapDepth = (wingData.sections[idx].flapDepth / wingData.sections[idx].chord)*100.0
+            flapDepthsLeftHalfWing.append(flapDepth)
+            flapDepthsRightHalfWing.append(flapDepth)
 
         # reverse list of left half wing
-        hingeDepthsLeftHalfWing.reverse()
-        hingeDepthsLeftHalfWing.append(wingData.hingeDepthRoot)
-        hingeDepthList = hingeDepthsLeftHalfWing + hingeDepthsRightHalfWing
-        #print("hingeDepth:")
-        #print(hingeDepthList)# Debug
-        return (hingeDepthList)
+        flapDepthsLeftHalfWing.reverse()
+        flapDepthsLeftHalfWing.append(params.flapDepthRoot)
+        flapDepthList = flapDepthsLeftHalfWing + flapDepthsRightHalfWing
+        #print("flapDepth:")
+        #print(flapDepthList)# Debug
+        return (flapDepthList)
 
 
     def get_chords(self, wingData):
@@ -232,8 +235,9 @@ def write_airfoilData(airfoilName, file):
 
 
 def write_segmentData(wingData, segments, idx, file):
-    klappentiefeLinks = segments.hingeDepths[idx]
-    klappentiefeRechts = segments.hingeDepths[idx+1]
+    params = wingData.params
+    klappentiefeLinks = segments.flapDepths[idx]
+    klappentiefeRechts = segments.flapDepths[idx+1]
     Bezugspunkt = 100.0 - klappentiefeLinks
 
     # insert start of segment
@@ -261,8 +265,8 @@ def write_segmentData(wingData, segments, idx, file):
         write_airfoilData(segments.airfoilNames[idx], file)
     except:
         print("airfoil %s not found, writing airfoil data of %s (root airfoil) instead" %\
-        (segments.airfoilNames[idx], wingData.airfoilNames[0]))
-        write_airfoilData(wingData.airfoilNames[0], file)
+        (segments.airfoilNames[idx], params.airfoilNames[0]))
+        write_airfoilData(params.airfoilNames[0], file)
 
     # insert end of segment
     file.write("[SEGMENT ENDE]\n")
@@ -278,15 +282,15 @@ def write_header(FLZ_fileContent, file):
             return
 
 
-def write_wingHeader(wingData, file):
+def write_wingHeader(params, file):
     file.write("[FLAECHE0]\n")
     file.write("ART=FLUEGEL\n")
-    file.write("BEZEICHNUNG=%s\n" % wingData.planformName)
+    file.write("BEZEICHNUNG=%s\n" % params.planformName)
     file.write("POSITION X,Y,Z=0.00000 0.00000 0.00000\n") #FIXME position
     file.write("ALFA0_CM0_OPTIMIERUNG=TRUE\n")
     file.write("EINSTELLWINKEL=0.00000\n")
-    file.write("PROFILTIEFE=%.5f\n" % wingData.rootchord)
-    file.write("BEZUGSPUNKT_PROFILTIEFE=%.5f\n" % (100.0 - wingData.hingeDepthRoot))
+    file.write("PROFILTIEFE=%.5f\n" % params.rootchord)
+    file.write("BEZUGSPUNKT_PROFILTIEFE=%.5f\n" % (100.0 - params.flapDepthRoot))
     file.write("VERWINDUNGSWINKEL=0.00000\n")
     file.write("ANZAHL PANELS X=7\n")
     file.write("VERTEILUNG=SIN_L\n")
@@ -297,20 +301,20 @@ def write_wingHeader(wingData, file):
     file.write("CM0_MAN=0.00000\n")
     file.write("ZIRKULATIONSVORGABE=1.00000\n")
     # insert data of the root-airfoil now
-    write_airfoilData(wingData.airfoilNames[0], file)
+    write_airfoilData(params.airfoilNames[0], file)
     # job is done
 
 
-def write_finHeader(wingData, file):
+def write_finHeader(params, file):
     file.write("[FLAECHE1]\n")
     file.write("ART=FLUEGEL\n")
     #file.write("ART=LEITWERK\n")
-    file.write("BEZEICHNUNG=%s\n" % wingData.planformName)
+    file.write("BEZEICHNUNG=%s\n" % params.planformName)
     file.write("POSITION X,Y,Z=0.88500 0.00000 0.00000\n") #FIXME position
     file.write("ALFA0_CM0_OPTIMIERUNG=TRUE\n")
     file.write("EINSTELLWINKEL=0.00000\n")
-    file.write("PROFILTIEFE=%.5f\n" % wingData.rootchord)
-    file.write("BEZUGSPUNKT_PROFILTIEFE=%.5f\n" % (100.0 - wingData.hingeDepthRoot))
+    file.write("PROFILTIEFE=%.5f\n" % params.rootchord)
+    file.write("BEZUGSPUNKT_PROFILTIEFE=%.5f\n" % (100.0 - params.flapDepthRoot))
     file.write("VERWINDUNGSWINKEL=0.00000\n")
     file.write("ANZAHL PANELS X=7\n")
     file.write("VERTEILUNG=SIN_L\n")
@@ -321,7 +325,7 @@ def write_finHeader(wingData, file):
     file.write("CM0_MAN=0.00000\n")
     file.write("ZIRKULATIONSVORGABE=1.00000\n")
     # insert data of the root-airfoil now
-    write_airfoilData(wingData.airfoilNames[0], file)
+    write_airfoilData(params.airfoilNames[0], file)
     # job is done
 
 
@@ -364,39 +368,40 @@ def write_footer(FLZ_fileContent, file):
             file.write(line)
 
 
-def export_toFLZ(wingData, inFileName, outFileName):
+def export_toFLZ(wingData, FileName):
     # calculate segment values from wingdata
     segments = segmentData(wingData)
+    params = wingData.params
 
     # read in all the data
-    NoteMsg("Reading data from FLZ file %s" % inFileName)
+    NoteMsg("Reading data from FLZ file %s" % FileName)
     try:
         # open file for reading
-        FLZ_inFile = open(inFileName)
+        FLZ_inFile = open(FileName, encoding = 'cp1252') # There are ANSI-characters inside the file !!
         FLZ_fileContent = FLZ_inFile.readlines()
         FLZ_inFile.close()
     except:
-        ErrorMsg("failed to open file %s" % inFileName)
-        return
+        ErrorMsg("failed to open file %s for reading" % FileName)
+        return -1
 
     # open file for writing
-    NoteMsg("Writing wing data to FLZ file %s" % outFileName)
+    NoteMsg("Writing wing data to FLZ file %s" % FileName)
     try:
-        FLZ_outfile = open(outFileName, "w+")
+        FLZ_outfile = open(FileName, 'w+')
     except:
-        ErrorMsg("failed to open file %s" % outFileName)
-        return
+        ErrorMsg("failed to open file %s  for writing" % FileName)
+        return -2
 
     # transfer the header from the in file to the out file
     write_header(FLZ_fileContent, FLZ_outfile)
 
     # if the new data to be written is the fin, the data of the wing must be
     # kept -->copy from FLZ_fileContent
-    if wingData.isFin:
+    if params.isFin:
         copy_wingData(FLZ_fileContent, FLZ_outfile)
-        write_finHeader(wingData, FLZ_outfile)
+        write_finHeader(params, FLZ_outfile)
     else:
-        write_wingHeader(wingData, FLZ_outfile)
+        write_wingHeader(params, FLZ_outfile)
 
 
     # loop over all sections of the wing
@@ -412,4 +417,5 @@ def export_toFLZ(wingData, inFileName, outFileName):
 
     # Everything is done
     FLZ_outfile.close()
-    NoteMsg("wing data was successfully written.")
+    NoteMsg("FLZ data was successfully written.")
+    return 0

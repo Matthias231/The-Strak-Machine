@@ -21,7 +21,6 @@ import ctypes
 import shutil
 import customtkinter
 import re
-import xml.etree.ElementTree as ET
 from copy import deepcopy
 import argparse
 from sys import version_info
@@ -57,6 +56,7 @@ from change_airfoilname import change_airfoilName
 from colorama import init
 from termcolor import colored
 from FLZ_Vortex_export import export_toFLZ
+from XFLR5_export import export_toXFLR5
 
 ################################################################################
 # some global variables
@@ -65,10 +65,17 @@ from FLZ_Vortex_export import export_toFLZ
 print_disabled = False
 
 # folder where the generated planforms can be found
-planformsPath = '02_planforms'
+planformsFolder = '02_planforms'
 
-# folder containing the output / result-files
-outputFolder = buildPath + bs + planformsPath
+# folders containing the output / result-files
+planformsPath = buildPath + bs + planformsFolder
+airfoilsPath = buildPath + bs + airfoilPath
+
+# name of template files for planform export
+XFLR5_template = 'plane_template.xml'
+FLZ_template = 'plane_template.flz'
+XFLR5_output = 'XFLR5_plane.xml'
+FLZ_output = 'FLZ_plane.flz'
 
 # colours, lineStyles
 cl_background = None
@@ -1489,19 +1496,19 @@ class wing:
     # e.g in FLZ-Vortex or XFLR5.
     # Also other calculations, like wing area, aspect ratio etc. get
     # more accurate
-    def interpolate_sections(self):
+    def interpolate_sections(self, steps):
         params = self.params
-        if params.interpolationSegments < 1:
-            self.interpolated_params = None
+        if steps < 1:
             # nothing to do
             return
 
-        self.interpolated_params = interpolated_params(params)
         NoteMsg("Interpolation of sections was requested, interpolating each section with"\
-                " additional %d steps" % params.interpolationSegments)
+                " additional %d steps" % steps)
 
         new_positions = []
         new_chords = []
+        new_positions_normalized = []
+        #new_normalized_chords = []
         new_airfoilNames = []
         new_airfoilTypes = []
         new_flapGroups = []
@@ -1512,10 +1519,12 @@ class wing:
             # do not interpolate fuselage section
             startIdx = 1
             new_positions.append(params.airfoilPositions[0])
-            new_chords.append(params.chords[0])
+            new_chords.append(self.chords[0])
+            new_positions_normalized.append(params.airfoilPositions_normalized[0])
+            #new_normalized_chords.append(self.normalized_chords[0])
             new_airfoilNames.append(params.airfoilNames[0])
             new_airfoilTypes.append(params.airfoilTypes[0])
-            # assinging flapGroup of fuselage not necessary, will be done
+            # assigning flapGroup of fuselage not necessary, will be done
             # in assignFlapGroups!
         else:
             startIdx = 0
@@ -1523,40 +1532,55 @@ class wing:
         for idx in range(startIdx, num-1):
             # determine interpolation-distance
             posDelta = params.airfoilPositions[idx+1]-params.airfoilPositions[idx]
-            posDelta = posDelta / float(params.interpolationSegments+1)
+            posDelta /= (steps+1)
+
+            posDelta_normalized  = params.airfoilPositions_normalized[idx+1]\
+                     - params.airfoilPositions_normalized[idx]
+            posDelta_normalized /= (steps+1)
+            print("PosDelta: %f, PosDelta_norm: %f, ratio: %f \n"  % (posDelta, posDelta_normalized, (posDelta/posDelta_normalized)))
 
             # add existiong position and name
             new_positions.append(params.airfoilPositions[idx])
-            new_chords.append(params.chords[idx])
+            new_chords.append(self.chords[idx])
+            new_positions_normalized.append(params.airfoilPositions_normalized[idx])
+            #new_normalized_chords.append(self.normalized_chords[idx])
             new_airfoilNames.append(params.airfoilNames[idx])
             new_airfoilTypes.append(params.airfoilTypes[idx])
             new_flapGroups.append(params.flapGroups[idx])
 
             # add interpolated position and name
-            for n in range(params.interpolationSegments):
+            for n in range(steps):
                 position = params.airfoilPositions[idx] + (float(n+1)*posDelta)
+                position_normalized = params.airfoilPositions_normalized[idx] + (float(n+1)*posDelta_normalized)
                 new_positions.append(position)
-                chordRatio = self.chordDistribution.get_chordFromPosition(position)
-                chord = chordRatio * params.rootchord
+                new_positions_normalized.append(position_normalized)
+                normalized_chord = float(self.chordDistribution.get_chordFromPosition(position_normalized))
+                chord = float(normalized_chord * params.rootchord)
                 new_chords.append(chord)
+                #new_normalized_chords.append(normalized_chord)
                 new_airfoilNames.append(params.airfoilNames[idx])
                 new_flapGroups.append(params.flapGroups[idx])
                 new_airfoilTypes.append("blend")
 
         # set Tip values
         new_positions.append(params.airfoilPositions[-1])
-        new_chords.append(params.chords[-1])
+        new_chords.append(self.chords[-1])
+        new_positions_normalized.append(params.airfoilPositions_normalized[-1])
+        #new_normalized_chord.append(self.normalized_chords[-1])
         new_airfoilNames.append(params.airfoilNames[-1])
         new_airfoilTypes.append(params.airfoilTypes[-1])
         # assigning of flapGroup for tip not  not necessary, will be done in
         # assignFlapGroups!
 
         # assign interpolated lists
-        params.interpolated_airfoilPositions = new_positions
-        params.interpolated_airfoilTypes = new_airfoilTypes
-        params.interpolated_airfoilNames = new_airfoilNames
-        params.interpolated_chords = new_chords
-        params.interpolated_flapGroups = new_flapGroups
+        params.airfoilPositions = new_positions
+        params.airfoilPositions_normalized = new_positions_normalized
+        params.airfoilTypes = new_airfoilTypes
+        params.airfoilNames = new_airfoilNames
+        self.chords = new_chords
+        #self.normalized_chords = new_normalized_chords
+        self.normalized_chords.clear()
+        params.flapGroups = new_flapGroups
 
         # calculate the interpolated sections
         self.calculate_sections()
@@ -2363,82 +2387,82 @@ class wing:
 
 ################################################################################
 # find the wing in the XML-tree
-def get_wing(root, wingFinSwitch):
-    for wing in root.iter('wing'):
-        for XMLwingFinSwitch in wing.iter('isFin'):
-            # convert string to boolean value
-            if (XMLwingFinSwitch.text == 'true') or (XMLwingFinSwitch.text == 'True'):
-                value = True
-            else:
-                value = False
-
-            # check against value of wingFinswitch
-            if (value == wingFinSwitch):
-                return wing
-
-
-# insert the planform-data into XFLR5-xml-file
-def insert_PlanformDataIntoXFLR5_File(data, inFileName, outFileName):
-
-    # basically parse the XML-file
-    tree = ET.parse(inFileName)
-
-    # get root of XML-tree
-    root = tree.getroot()
-
-    # find wing-data
-    wing = get_wing(root, data.isFin)
-
-    if (wing == None):
-        ErrorMsg("wing not found\n")
-        return
-
-    # find sections-data-template
-    for sectionTemplate in wing.iter('Sections'):
-        # copy the template
-        newSection = deepcopy(sectionTemplate)
-
-        # remove the template
-        wing.remove(sectionTemplate)
-
-    # write the new section-data to the wing
-    for section in data.sections:
-        # copy the template
-        newSection = deepcopy(sectionTemplate)
-
-        # enter the new data
-        for yPosition in newSection.iter('y_position'):
-            # convert float to text
-            yPosition.text = str(section.y)
-
-        for chord in newSection.iter('Chord'):
-            # convert float to text
-            chord.text = str(section.chord)
-
-        for xOffset in newSection.iter('xOffset'):
-            # convert float to text
-            xOffset.text = str(section.leadingEdge)
-
-        for dihedral in newSection.iter('Dihedral'):
-            # convert float to text
-            dihedral.text = str(section.dihedral)
-
-        for foilName in newSection.iter('Left_Side_FoilName'):
-            # convert float to text
-            foilName.text = remove_suffix(str(section.airfoilName), '.dat')
-
-        for foilName in newSection.iter('Right_Side_FoilName'):
-            # convert float to text
-            foilName.text = remove_suffix(str(section.airfoilName), '.dat')
-
-        # add the new section to the tree
-        wing.append(newSection)
-        hingeDepthPercent = (section.flapDepth /section.chord )*100
-        NoteMsg("Section %d: position: %.0f mm, chordlength %.0f mm, hingeDepth %.1f  %%, airfoilName %s was inserted" %
-          (section.number, section.y*1000, section.chord*1000, hingeDepthPercent, section.airfoilName))
-
-    # write all data to the new file file
-    tree.write(outFileName)
+##def get_wing(root, wingFinSwitch):
+##    for wing in root.iter('wing'):
+##        for XMLwingFinSwitch in wing.iter('isFin'):
+##            # convert string to boolean value
+##            if (XMLwingFinSwitch.text == 'true') or (XMLwingFinSwitch.text == 'True'):
+##                value = True
+##            else:
+##                value = False
+##
+##            # check against value of wingFinswitch
+##            if (value == wingFinSwitch):
+##                return wing
+##
+##
+### insert the planform-data into XFLR5-xml-file
+##def insert_PlanformDataIntoXFLR5_File(data, FileName):
+##
+##    # basically parse the XML-file
+##    tree = ET.parse(inFileName)
+##
+##    # get root of XML-tree
+##    root = tree.getroot()
+##
+##    # find wing-data
+##    wing = get_wing(root, data.isFin)
+##
+##    if (wing == None):
+##        ErrorMsg("wing not found\n")
+##        return
+##
+##    # find sections-data-template
+##    for sectionTemplate in wing.iter('Sections'):
+##        # copy the template
+##        newSection = deepcopy(sectionTemplate)
+##
+##        # remove the template
+##        wing.remove(sectionTemplate)
+##
+##    # write the new section-data to the wing
+##    for section in data.sections:
+##        # copy the template
+##        newSection = deepcopy(sectionTemplate)
+##
+##        # enter the new data
+##        for yPosition in newSection.iter('y_position'):
+##            # convert float to text
+##            yPosition.text = str(section.y)
+##
+##        for chord in newSection.iter('Chord'):
+##            # convert float to text
+##            chord.text = str(section.chord)
+##
+##        for xOffset in newSection.iter('xOffset'):
+##            # convert float to text
+##            xOffset.text = str(section.leadingEdge)
+##
+##        for dihedral in newSection.iter('Dihedral'):
+##            # convert float to text
+##            dihedral.text = str(section.dihedral)
+##
+##        for foilName in newSection.iter('Left_Side_FoilName'):
+##            # convert float to text
+##            foilName.text = remove_suffix(str(section.airfoilName), '.dat')
+##
+##        for foilName in newSection.iter('Right_Side_FoilName'):
+##            # convert float to text
+##            foilName.text = remove_suffix(str(section.airfoilName), '.dat')
+##
+##        # add the new section to the tree
+##        wing.append(newSection)
+##        hingeDepthPercent = (section.flapDepth /section.chord )*100
+##        NoteMsg("Section %d: position: %.0f mm, chordlength %.0f mm, hingeDepth %.1f  %%, airfoilName %s was inserted" %
+##          (section.number, section.y*1000, section.chord*1000, hingeDepthPercent, section.airfoilName))
+##
+##    # write all data to the new file file
+##    tree.write(outFileName)
 
 ################################################################################
 # function that gets the name of the planform-data-file
@@ -2845,9 +2869,71 @@ class planform_creator:
 
         return (result, userAirfoils, blendedAirfoils)
 
-    def __export_planform(self, filePath):
-        print("not implemented")# FIXME implement
-        return 0
+    def __export_planform(self, outputPath, interpolationSteps, yPanels, append):
+        global XFLR5_template
+        global FLZ_template
+        exportedFiles = []
+
+        # interpolation of sections, make copy first
+        interpolatedWing = self.newWing # FIXME repair interpolationalgorithm
+##        interpolatedWing = wing()
+##        interpolatedWing.chords = self.newWing.chords[:]
+##        interpolatedWing.params.airfoilPositions = self.newWing.params.airfoilPositions[:]
+##        interpolatedWing.params.airfoilPositions_normalized =  self.newWing.params.airfoilPositions_normalized[:]
+##        interpolatedWing.params.airfoilNames = self.newWing.params.airfoilNames[:]
+##        interpolatedWing.params.airfoilTypes = self.newWing.params.airfoilTypes[:]
+##        interpolatedWing.params.flapGroups = self.newWing.params.flapGroups[:]
+##        interpolatedWing.chordDistribution = self.newWing.chordDistribution
+##        interpolatedWing.interpolate_sections(interpolationSteps)
+
+        # copy template files to output folder and rename
+        XFLR5_FileName = outputPath + bs + XFLR5_output
+        FLZ_FileName = outputPath + bs + FLZ_output
+
+        # check if output folder exists
+        if (os.path.exists(outputPath) == False):
+            try:
+                os.makedirs(outputPath)
+            except:
+                ErrorMsg("creating ouputPath failed")
+                return (-1, exportedFiles)
+
+        if append == False:
+            try:
+                # remove existing files
+                if os.path.exists(XFLR5_FileName):
+                    os.remove(XFLR5_FileName)
+
+                if os.path.exists(FLZ_FileName):
+                    os.remove(FLZ_FileName)
+
+                # copy template files
+                shutil.copy2((ressourcesPath + bs + XFLR5_template), XFLR5_FileName)
+                shutil.copy2((ressourcesPath + bs + FLZ_template), FLZ_FileName)
+            except:
+                ErrorMsg("__export_planform: delete or copy template files failed")
+                return (-1, exportedFiles)
+        try:
+            result = export_toXFLR5(interpolatedWing, XFLR5_FileName)
+        except:
+            ErrorMsg("export_toXFLR5 failed")
+            return (-2, exportedFiles)
+
+        if result == 0:
+            exportedFiles.append(XFLR5_FileName)
+        else:
+            return (result, exportedFiles)
+
+        try:
+            result = export_toFLZ(interpolatedWing, FLZ_FileName)
+        except:
+            ErrorMsg("export_toFLZ failed")
+            return (-3, exportedFiles)
+
+        if result == 0:
+            exportedFiles.append(FLZ_FileName)
+
+        return (result, exportedFiles)
 
     def __set_AxesAndLabels(self, ax, title):
         global cl_grid
@@ -2937,9 +3023,9 @@ class planform_creator:
         '''exports all 'user' and 'blend' airfoils'''
         return self.__export_airfoils()
 
-    def export_planform(self, filePath):
+    def export_planform(self, filePath, steps, panels, append):
         '''exports planform to given filepath'''
-        return self.__export_planform(filePath)
+        return self.__export_planform(filePath, steps, panels, append)
 
     def get_params(self):
         '''gets parameters as a dictionary'''
