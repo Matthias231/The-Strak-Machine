@@ -1058,7 +1058,7 @@ class wing:
         params = self.params
         params.airfoilNames.append(params.airfoilNames[-1])
         params.airfoilTypes.append(params.airfoilTypes[-1])
-        params.airfoilPositions_normalized.append(0.0)
+        params.airfoilPositions_normalized.append(1.0)
         params.airfoilPositions.append(params.wingspan/2)
 
         # is last airfoil of type "user" ?
@@ -1072,6 +1072,7 @@ class wing:
         reynolds = (params.tipchord / self.chords[-1]) * params.airfoilReynolds[-1]
         params.airfoilReynolds.append(int(round(reynolds,0)))
         self.chords.append(params.tipchord)
+        self.normalized_chords.append(params.tipchord/params.rootchord)
 
     # get the number of user defined airfoils
     def get_numUserAirfoils(self):
@@ -1326,8 +1327,8 @@ class wing:
         for idx in range(num):
             if params.airfoilPositions_normalized[idx] == None:
                 # no position defined yet, calculate now
-                chord = self.chords[idx]
-                normalized_position = self.chordDistribution.get_positionFromChord(chord)
+                normalized_chord = self.normalized_chords[idx]
+                normalized_position = self.chordDistribution.get_positionFromChord(normalized_chord)
                 params.airfoilPositions_normalized[idx] = normalized_position
                 params.airfoilPositions[idx] = self.params.denormalize_positionValue(normalized_position)
 
@@ -1506,9 +1507,8 @@ class wing:
                 " additional %d steps" % steps)
 
         new_positions = []
-        new_chords = []
         new_positions_normalized = []
-        #new_normalized_chords = []
+        new_chords = []
         new_airfoilNames = []
         new_airfoilTypes = []
         new_flapGroups = []
@@ -1519,9 +1519,8 @@ class wing:
             # do not interpolate fuselage section
             startIdx = 1
             new_positions.append(params.airfoilPositions[0])
-            new_chords.append(self.chords[0])
             new_positions_normalized.append(params.airfoilPositions_normalized[0])
-            #new_normalized_chords.append(self.normalized_chords[0])
+            new_chords.append(self.chords[0])
             new_airfoilNames.append(params.airfoilNames[0])
             new_airfoilTypes.append(params.airfoilTypes[0])
             # assigning flapGroup of fuselage not necessary, will be done
@@ -1531,42 +1530,37 @@ class wing:
 
         for idx in range(startIdx, num-1):
             # determine interpolation-distance
-            posDelta = params.airfoilPositions[idx+1]-params.airfoilPositions[idx]
+            posDelta = float(params.airfoilPositions[idx+1]-params.airfoilPositions[idx])
             posDelta /= (steps+1)
 
-            posDelta_normalized  = params.airfoilPositions_normalized[idx+1]\
-                     - params.airfoilPositions_normalized[idx]
+            posDelta_normalized  = float(params.airfoilPositions_normalized[idx+1] - params.airfoilPositions_normalized[idx])
             posDelta_normalized /= (steps+1)
-            print("PosDelta: %f, PosDelta_norm: %f, ratio: %f \n"  % (posDelta, posDelta_normalized, (posDelta/posDelta_normalized)))
 
-            # add existiong position and name
+            # add existiog position and name
             new_positions.append(params.airfoilPositions[idx])
-            new_chords.append(self.chords[idx])
             new_positions_normalized.append(params.airfoilPositions_normalized[idx])
-            #new_normalized_chords.append(self.normalized_chords[idx])
+            new_chords.append(self.chords[idx])
             new_airfoilNames.append(params.airfoilNames[idx])
             new_airfoilTypes.append(params.airfoilTypes[idx])
             new_flapGroups.append(params.flapGroups[idx])
 
             # add interpolated position and name
             for n in range(steps):
-                position = params.airfoilPositions[idx] + (float(n+1)*posDelta)
-                position_normalized = params.airfoilPositions_normalized[idx] + (float(n+1)*posDelta_normalized)
+                position = params.airfoilPositions[idx] + float((n+1)*posDelta)
+                position_normalized = params.airfoilPositions_normalized[idx] + float((n+1)*posDelta_normalized)
                 new_positions.append(position)
                 new_positions_normalized.append(position_normalized)
                 normalized_chord = float(self.chordDistribution.get_chordFromPosition(position_normalized))
                 chord = float(normalized_chord * params.rootchord)
                 new_chords.append(chord)
-                #new_normalized_chords.append(normalized_chord)
                 new_airfoilNames.append(params.airfoilNames[idx])
                 new_flapGroups.append(params.flapGroups[idx])
                 new_airfoilTypes.append("blend")
 
         # set Tip values
         new_positions.append(params.airfoilPositions[-1])
-        new_chords.append(self.chords[-1])
         new_positions_normalized.append(params.airfoilPositions_normalized[-1])
-        #new_normalized_chord.append(self.normalized_chords[-1])
+        new_chords.append(self.chords[-1])
         new_airfoilNames.append(params.airfoilNames[-1])
         new_airfoilTypes.append(params.airfoilTypes[-1])
         # assigning of flapGroup for tip not  not necessary, will be done in
@@ -1578,8 +1572,6 @@ class wing:
         params.airfoilTypes = new_airfoilTypes
         params.airfoilNames = new_airfoilNames
         self.chords = new_chords
-        #self.normalized_chords = new_normalized_chords
-        self.normalized_chords.clear()
         params.flapGroups = new_flapGroups
 
         # calculate the interpolated sections
@@ -2875,16 +2867,8 @@ class planform_creator:
         exportedFiles = []
 
         # interpolation of sections, make copy first
-        interpolatedWing = self.newWing # FIXME repair interpolationalgorithm
-##        interpolatedWing = wing()
-##        interpolatedWing.chords = self.newWing.chords[:]
-##        interpolatedWing.params.airfoilPositions = self.newWing.params.airfoilPositions[:]
-##        interpolatedWing.params.airfoilPositions_normalized =  self.newWing.params.airfoilPositions_normalized[:]
-##        interpolatedWing.params.airfoilNames = self.newWing.params.airfoilNames[:]
-##        interpolatedWing.params.airfoilTypes = self.newWing.params.airfoilTypes[:]
-##        interpolatedWing.params.flapGroups = self.newWing.params.flapGroups[:]
-##        interpolatedWing.chordDistribution = self.newWing.chordDistribution
-##        interpolatedWing.interpolate_sections(interpolationSteps)
+        interpolatedWing = deepcopy(self.newWing)
+        interpolatedWing.interpolate_sections(interpolationSteps)
 
         # copy template files to output folder and rename
         XFLR5_FileName = outputPath + bs + XFLR5_output
