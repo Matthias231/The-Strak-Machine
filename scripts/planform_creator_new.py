@@ -57,6 +57,7 @@ from colorama import init
 from termcolor import colored
 from FLZ_Vortex_export import export_toFLZ
 from XFLR5_export import export_toXFLR5
+from DXF_export import export_toDXF
 
 ################################################################################
 # some global variables
@@ -1212,6 +1213,9 @@ class wing:
 
     def get_params(self):
         return self.paramsDict
+
+    def get_planformName(self):
+        return self.paramsDict["planformName"]
 
     def get_airfoilNames(self):
         newList = self.params.airfoilNames[:]
@@ -2874,6 +2878,11 @@ class planform_creator:
         XFLR5_FileName = outputPath + bs + XFLR5_output
         FLZ_FileName = outputPath + bs + FLZ_output
 
+        # DXF does not need template at the moment
+        DXF_output = self.newWing.get_planformName()
+        DXF_output = DXF_output.replace(' ', '_') + '.dxf'
+        DXF_FileName = outputPath + bs + DXF_output
+
         # check if output folder exists
         if (os.path.exists(outputPath) == False):
             try:
@@ -2916,6 +2925,15 @@ class planform_creator:
 
         if result == 0:
             exportedFiles.append(FLZ_FileName)
+
+        try:
+            result = export_toDXF(interpolatedWing, DXF_FileName)
+        except:
+            ErrorMsg("export_toDXF failed")
+            return (-4, exportedFiles)
+
+        if result == 0:
+            exportedFiles.append(DXF_FileName)
 
         return (result, exportedFiles)
 
