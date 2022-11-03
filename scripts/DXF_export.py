@@ -26,37 +26,33 @@ from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg, bs)
 def export_toDXF(wingData, FileName):
     params = wingData.params
 
-    # create empty lists
-    xValues = []
-    leadingEdge = []
-    trailingeEge = []
-    #hingeLine = []
-    #quarterChordLine = []
+    # create empty list (outline of planform)
+    outline = []
 
+    # create new dxf
     doc = ezdxf.new('R2010')
     msp = doc.modelspace()
 
     grid = wingData.planform.grid
-    for element in grid:
-        # build up list of x-values
-        xValues.append(element.y)
 
-        # build up lists of y-values
-        leadingEdge.append(element.leadingEdge)
-        #quarterChordLine.append(element.quarterChordLine)
-        #hingeLine.append(element.hingeLine)
-        trailingeEge.append(element.trailingEdge)
+    # setup root joint (trailing edge --> leading edge)
+    outline.append((grid[0].y, grid[0].trailingEdge))
 
-    # setup root- and tip-joint
-    trailingeEge[0] = leadingEdge[0]
-    trailingeEge[-1] = leadingEdge[-1]
+    num = len(grid)
 
-    num = len(xValues) -1
+    # add points of leading edge to outline from root --> tip
     for idx in range(num):
-        # add leading edge
-        msp.add_line((xValues[idx], leadingEdge[idx]), ((xValues[idx+1], leadingEdge[idx+1])))
-        # add trailing edge
-        msp.add_line((xValues[idx], trailingeEge[idx]), ((xValues[idx+1], trailingeEge[idx+1])))
+        outline.append((grid[idx].y, grid[idx].leadingEdge))
+
+    # setup tip joint (leading edge --> trailing edge)
+    outline.append((grid[-1].y, grid[-1].trailingEdge))
+
+    # add points of trailing edge to outline from tip --> root
+    for idx in reversed(range(num)):
+        outline.append((grid[idx].y, grid[idx].trailingEdge))
+
+    # add leightweight polyline
+    msp.add_lwpolyline(outline)
 
     # save to file
     doc.saveas(FileName)
