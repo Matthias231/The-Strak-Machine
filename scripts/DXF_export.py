@@ -23,6 +23,8 @@ import numpy as np
 from copy import deepcopy
 from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg, bs)
 
+# scale from m --> mm
+scaleFactor = 1000.0
 ################################################################################
 #
 # helper functions
@@ -41,8 +43,8 @@ def norm_xy(xy, wingData):
 
 def denorm_xy(xy_norm, wingData):
     (x_norm, y_norm) = xy_norm
-    x = x_norm * wingData.params.halfwingspan
-    y = y_norm * wingData.params.rootchord
+    x = x_norm * wingData.params.halfwingspan * scaleFactor
+    y = y_norm * wingData.params.rootchord * scaleFactor
     return (x, y)
 
 ################################################################################
@@ -130,8 +132,9 @@ def export_toDXF(wingData, FileName, num_points):
 
     # add hingeline #FIXME if we have more points than just start and end we must change algorithm here
     hingeline = []
-    hingeline.append((grid[0].y, grid[0].hingeLine))
-    hingeline.append((grid[-1].y, grid[-1].hingeLine))
+    hingeline.append((grid[0].y * scaleFactor, grid[0].hingeLine * scaleFactor))
+    hingeline.append((grid[-1].y * scaleFactor, grid[-1].hingeLine * scaleFactor))
+
     msp.add_lwpolyline(hingeline)
 
     # save to file
