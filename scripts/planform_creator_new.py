@@ -2865,7 +2865,8 @@ class planform_creator:
 
         return (result, userAirfoils, blendedAirfoils)
 
-    def __export_planform(self, outputPath, interpolationSteps, yPanels, append):
+    def __export_planform(self, outputPath, interpolationSteps, xPanels, yPanels,
+                        num_points, append):
         global XFLR5_template
         global FLZ_template
         exportedFiles = []
@@ -2917,6 +2918,7 @@ class planform_creator:
         else:
             return (result, exportedFiles)
 
+        result = export_toFLZ(interpolatedWing, FLZ_FileName)
         try:
             result = export_toFLZ(interpolatedWing, FLZ_FileName)
         except:
@@ -2927,7 +2929,7 @@ class planform_creator:
             exportedFiles.append(FLZ_FileName)
 
         try:
-            result = export_toDXF(interpolatedWing, DXF_FileName)
+            result = export_toDXF(interpolatedWing, DXF_FileName, num_points)
         except:
             ErrorMsg("export_toDXF failed")
             return (-4, exportedFiles)
@@ -3025,9 +3027,10 @@ class planform_creator:
         '''exports all 'user' and 'blend' airfoils'''
         return self.__export_airfoils()
 
-    def export_planform(self, filePath, steps, panels, append):
+    def export_planform(self, filePath, steps,  xPanels, yPanels, num_points, append):
         '''exports planform to given filepath'''
-        return self.__export_planform(filePath, steps, panels, append)
+        return self.__export_planform(filePath, steps, xPanels, yPanels,
+                      num_points, append)
 
     def get_params(self):
         '''gets parameters as a dictionary'''

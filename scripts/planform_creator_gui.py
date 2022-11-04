@@ -47,8 +47,10 @@ diagram_width = 10
 diagram_height = 7
 ctrlFrame = None
 creatorInstances:planform_creator = []
-interpolationSteps_default = 4 # default steps for interpolation/planform export
-yPanels_default = 1 # default number of y panels for planform export
+interpolationSteps_default = 4  # default steps for interpolation/planform export
+xPanels_default = 15            # default number of x panels for planform export (XFRL5, FLZ)
+yPanels_default = 1             # default number of y panels for planform export (XFRL5, FLZ)
+dxf_num_points_default = 100    # default number of points for dxf planform export
 
 # path to airfoils library
 airfoilLibrary_path = 'airfoil_library'
@@ -924,7 +926,7 @@ class control_frame():
         self.__update_datFileName(params, planformIdx)
 
         # store latest path
-        self.latestPath[planformIdx] = os.path.dirname(filename)
+        self.latestPath[planformIdx] = os.path.dirname(absFilename)
 
         # carry out functions needed for update
         self.__perform_update()
@@ -1635,7 +1637,9 @@ class App(ctk.CTk):
         global ctrlFrame
         global creatorInstances
         global interpolationSteps_default
+        global xPanels_default
         global yPanels_default
+        global dxf_num_points_default
 
         self.app_running = False
 
@@ -1646,7 +1650,9 @@ class App(ctk.CTk):
         # variables for planform export
         self.exportFlags = []
         self.interpolationSteps = interpolationSteps_default
+        self.xPanels = xPanels_default
         self.yPanels = yPanels_default
+        self.num_points = dxf_num_points_default
 
         # configure customtkinter
         ctk.set_appearance_mode(self.appearance_mode)    # Modes: "System" (standard), "Dark", "Light"
@@ -1709,11 +1715,23 @@ class App(ctk.CTk):
         except:
             ErrorMsg("__update_interpolationSteps, invalid steps")
 
+    def __update_xPanels(self):
+        try:
+            self.xPanels = int(self.xPanels_entry.get())
+        except:
+            ErrorMsg("__update_xPanels, invalid number of xPanels")
+
     def __update_yPanels(self):
         try:
             self.yPanels = int(self.yPanels_entry.get())
         except:
             ErrorMsg("__update_yPanels, invalid number of yPanels")
+
+    def __update_num_points(self):
+        try:
+            self.num_points = int(self.num_points_entry.get())
+        except:
+            ErrorMsg("__update_num_points, invalid number of num_points")
 
     def get_Buttons(self):
         headlines = []
@@ -1799,9 +1817,18 @@ class App(ctk.CTk):
 
 
     def export_planformsDialog(self, dummy):
-        exportWindow = ctk.CTkToplevel()
+        #exportWindow = ctk.CTkToplevel() #FIXME problems with windowsize
+        exportWindow = tk.Toplevel() # FIXMe workaround window sizing problem
+        if ((self.appearance_mode == 1) or (self.appearance_mode == 'Dark')):
+            exportWindow.configure(bg=bg_color_dark)
+        else:
+            exportWindow.configure(bg=bg_color_light)
+
         self.exportWindow = exportWindow
         exportWindow.wm_title("Export planforms")
+
+        # define width for all entries
+        entry_width = 60
 
         planformnames = self.frame_bottom.planformNames
         num = len(planformnames)
@@ -1825,9 +1852,22 @@ class App(ctk.CTk):
         steps_txt = tk.StringVar(master=exportWindow, value=self.interpolationSteps)
         self.steps_entry = ctk.CTkEntry(master=exportWindow, show=None,
             textvariable = steps_txt, text_font=(main_font, fs_entry),
-            width=30, height=16, justify='right')
+            width=entry_width, height=16, justify='right')
         self.steps_entry.bind('<Return>', self.__update_interpolationSteps)
         self.steps_entry.grid(row=row, column=1, pady=10, padx=20, sticky="w")
+        row += 1
+
+        # Add Label and entry to configure x panels
+        xPanels_label = ctk.CTkLabel(master=exportWindow,
+              text="X-panels:", text_font=(main_font, 13))
+        xPanels_label.grid(row=row, column=0, pady=10, padx=20, sticky="e")
+
+        xPanels_txt = tk.StringVar(master=exportWindow, value=self.xPanels)
+        self.xPanels_entry = ctk.CTkEntry(master=exportWindow, show=None,
+            textvariable = xPanels_txt, text_font=(main_font, fs_entry),
+            width=entry_width, height=16, justify='right')
+        self.xPanels_entry.bind('<Return>', self.__update_xPanels)
+        self.xPanels_entry.grid(row=row, column=1, pady=10, padx=20, sticky="w")
         row += 1
 
         # Add Label and entry to configure y panels
@@ -1838,9 +1878,22 @@ class App(ctk.CTk):
         yPanels_txt = tk.StringVar(master=exportWindow, value=self.yPanels)
         self.yPanels_entry = ctk.CTkEntry(master=exportWindow, show=None,
             textvariable = yPanels_txt, text_font=(main_font, fs_entry),
-            width=30, height=16, justify='right')
+            width=entry_width, height=16, justify='right')
         self.yPanels_entry.bind('<Return>', self.__update_yPanels)
         self.yPanels_entry.grid(row=row, column=1, pady=10, padx=20, sticky="w")
+        row += 1
+
+        # Add Label and entry to configure number of points (dxf)
+        num_points_label = ctk.CTkLabel(master=exportWindow,
+              text="number of points (.dxf):", text_font=(main_font, 13))
+        num_points_label.grid(row=row, column=0, pady=10, padx=20, sticky="e")
+
+        num_points_txt = tk.StringVar(master=exportWindow, value=self.num_points)
+        self.num_points_entry = ctk.CTkEntry(master=exportWindow, show=None,
+            textvariable = num_points_txt, text_font=(main_font, fs_entry),
+            width=entry_width, height=16, justify='right')
+        self.num_points_entry.bind('<Return>', self.__update_num_points)
+        self.num_points_entry.grid(row=row, column=1, pady=10, padx=20, sticky="w")
         row += 2
 
         # add OK / Cancel buttons
@@ -1868,7 +1921,7 @@ class App(ctk.CTk):
             # check if planform shall be exported
             if (self.exportFlags[idx].get() == True):
                 result, filenames = creatorInstances[idx].export_planform(planformsPath,
-                                                self.interpolationSteps, self.yPanels, append)
+                  self.interpolationSteps, self.xPanels, self.yPanels, self.num_points, append)
                 append = True
                 # check result
                 if result != 0:

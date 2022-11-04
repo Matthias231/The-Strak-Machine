@@ -19,11 +19,38 @@
 
 import os, re
 import ezdxf
+import numpy as np
 from copy import deepcopy
 from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg, bs)
 
+################################################################################
+#
+# helper functions
+#
+################################################################################
+def calculate_distance(x1, x2, y1, y2):
+    '''calculates the distance between two given points'''
+    dist = np.sqrt(np.square(x2-x1) + np.square(y2-y1))
+    return dist
 
-def export_toDXF(wingData, FileName):
+def norm_xy(xy, wingData):
+    (x, y) = xy
+    x_norm = x / wingData.params.halfwingspan
+    y_norm = y / wingData.params.rootchord
+    return (x_norm, y_norm)
+
+def denorm_xy(xy_norm, wingData):
+    (x_norm, y_norm) = xy_norm
+    x = x_norm * wingData.params.halfwingspan
+    y = y_norm * wingData.params.rootchord
+    return (x, y)
+
+################################################################################
+#
+# main function
+#
+################################################################################
+def export_toDXF(wingData, FileName, num_points):
     params = wingData.params
 
     # create empty list (outline of planform)
@@ -36,23 +63,76 @@ def export_toDXF(wingData, FileName):
     grid = wingData.planform.grid
 
     # setup root joint (trailing edge --> leading edge)
-    outline.append((grid[0].y, grid[0].trailingEdge))
+    x, y = norm_xy((grid[0].y, grid[0].trailingEdge), wingData)
+    outline.append((x, y))
 
     num = len(grid)
 
     # add points of leading edge to outline from root --> tip
     for idx in range(num):
-        outline.append((grid[idx].y, grid[idx].leadingEdge))
+        x, y = norm_xy((grid[idx].y, grid[idx].leadingEdge), wingData)
+        outline.append((x, y))
 
     # setup tip joint (leading edge --> trailing edge)
-    outline.append((grid[-1].y, grid[-1].trailingEdge))
+    x, y = norm_xy((grid[-1].y, grid[-1].trailingEdge), wingData)
+    outline.append((x, y))
 
     # add points of trailing edge to outline from tip --> root
     for idx in reversed(range(num)):
-        outline.append((grid[idx].y, grid[idx].trailingEdge))
+        x, y = norm_xy((grid[idx].y, grid[idx].trailingEdge), wingData)
+        outline.append((x, y))
+
+    # calculate length of outline (normalized)
+    length = 0
+    maxIdx = len(outline)-1
+    # start with idx 2 (after root joint)
+    for idx in range(2, maxIdx):
+        x1, y1 = outline[idx]
+        x2, y2 =  outline[idx+1]
+        length += calculate_distance(x1, x2, y1, y2)
+
+    # calculate distance between points
+    distDelta = length / num_points
+
+    dist = 0
+    new_outline = []
+
+    # always append first two points of outline to new outline
+    new_outline.append(outline[0])
+    new_outline.append(outline[1])
+
+    # start with idx 1, as idx 0 --> idx 1 is the root joint
+    x1, y1 = outline[1]
+    for idx in range(1, maxIdx):
+        x2, y2 = outline[idx]
+        dist = calculate_distance(x1, x2, y1, y2)
+
+        # check distance to last point that has been copied to new outline
+        # and actual point
+        if dist >= distDelta:
+            # copy this point to new outline
+            new_outline.append(outline[idx])
+            x1, y1 = outline[idx]
+
+    # check last point of outline and new_outline
+    if outline[-1] != new_outline[-1]:
+        new_outline.append(outline[-1])
+
+    # now we have a normalzed outline with reduced number of points
+    # --> denormalize
+    num = len(new_outline)
+    for idx in range(num):
+        xy = denorm_xy(new_outline[idx], wingData)
+        new_outline[idx] = xy
 
     # add leightweight polyline
-    msp.add_lwpolyline(outline)
+    msp.add_lwpolyline(new_outline)
+
+    # add hingeline #FIXME if we have more points than just start and end we must change algorithm here
+    hingeline = []
+    hingeline.append((grid[0].y, grid[0].hingeLine))
+    hingeline.append((grid[-1].y, grid[-1].hingeLine))
+    msp.add_lwpolyline(hingeline)
 
     # save to file
     doc.saveas(FileName)
