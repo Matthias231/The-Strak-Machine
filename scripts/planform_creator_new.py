@@ -2314,6 +2314,7 @@ class wing:
         # remove duplicate tip airfoil
         my_airfoilTypes.pop()
         my_airfoilNames.pop()
+        my_chords.pop()
 
         num = len(my_airfoilTypes)
 
