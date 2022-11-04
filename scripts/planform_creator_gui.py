@@ -1916,21 +1916,27 @@ class App(ctk.CTk):
         num = len(creatorInstances)
         title='Export planforms'
 
+        all_filenames= []
         append = False
         for idx in range(num):
             # check if planform shall be exported
             if (self.exportFlags[idx].get() == True):
                 result, filenames = creatorInstances[idx].export_planform(planformsPath,
                   self.interpolationSteps, self.xPanels, self.yPanels, self.num_points, append)
+
+                all_filenames.extend(filenames)
                 append = True
                 # check result
                 if result != 0:
                     break
 
+        # remove duplicate filenames
+        all_filenames = list(dict.fromkeys(all_filenames))
+
         if result == 0:
             # create message text
             msgText =  "The selected planforms have been successfully exported to\n\n"
-            for name in filenames:
+            for name in all_filenames:
                 msgText += "%s\n" % name
             messagebox.showinfo(title=title, message=msgText)
         else:
