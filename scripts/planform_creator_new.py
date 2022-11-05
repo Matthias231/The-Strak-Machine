@@ -129,6 +129,9 @@ main_font = "Roboto Medium"
 scaled = False
 scaleFactor = 1.0
 
+# number of points for setting up the grid (planform shape, chord distribution)
+num_gridpoints_default = 1000
+
 # types of diagrams
 diagTypes = ["Chord distribution", "Planform shape", "Flap distribution",
              "Airfoil distribution", "Projected wingplan"]
@@ -834,6 +837,65 @@ class planform:
         self.wingArea *= 2.0
         self.flapArea *= 2.0
 
+    def __interpolate_grid(self, grid_left, grid_right, chord):
+        # create new instance of wing grid
+        newGrid = wingGrid()
+
+        # interpolate for better precision
+        chord_left = grid_left.chord
+        y_left = grid_left.y
+        leadingEdge_left = grid_left.leadingEdge
+        quarterChordLine_left = grid_left.quarterChordLine
+        hingeLine_left = grid_left.hingeLine
+        flapDepth_left = grid_left.flapDepth
+        trailingEdge_left = grid_left.trailingEdge
+
+        chord_right = grid_right.chord
+        y_right = grid_right.y
+        leadingEdge_right = grid_right.leadingEdge
+        quarterChordLine_right = grid_right.quarterChordLine
+        hingeLine_right = grid_right.hingeLine
+        flapDepth_right = grid_right.flapDepth
+        trailingEdge_right = grid_right.trailingEdge
+
+        # perform interpolation
+        newGrid.chord = chord
+        newGrid.y = interpolate(chord_left, chord_right, y_left, y_right, chord)
+        newGrid.leadingEdge = interpolate(chord_left, chord_right, leadingEdge_left, leadingEdge_right, chord)
+        newGrid.trailingEdge = interpolate(chord_left, chord_right, trailingEdge_left, trailingEdge_right, chord)
+        newGrid.quarterChordLine = interpolate(chord_left, chord_right, quarterChordLine_left, quarterChordLine_right, chord)
+        newGrid.hingeLine = interpolate(chord_left, chord_right, hingeLine_left, hingeLine_right, chord)
+        newGrid.flapDepth = interpolate(chord_left, chord_right, flapDepth_left, flapDepth_right, chord)
+
+        return newGrid
+
+
+
+    def __get_gridDataFromChord(self, chord):
+        '''get interpolated grid data from chordlength'''
+        # valid chord specified ?
+        if (chord == None):
+            ErrorMsg("invalid chord")
+            return None
+
+        # search in grid for the desired chord.
+        # CAUTION: we assume that chordlength is constantly decreasing !!
+        grid = self.grid
+        maxIdx = len(grid)
+
+        for idx in range(maxIdx):
+            if (grid[idx].chord < chord):
+                # found chordlength smaller than the given chord
+                # first value?
+                if idx==0:
+                    return grid[0]
+                else:
+                    # interpolate for better precision
+                    newGrid = self.__interpolate_grid(grid[idx-1], grid[idx], chord)
+                    return newGrid
+
+        ErrorMsg("no grid data was found for chord %f" % chord)
+        return grid[-1]
 
     # calculate planform-shape of the half-wing (high-resolution wing planform)
     def calculate(self, params:params, chordDistribution:chordDistribution):
@@ -912,13 +974,8 @@ class planform:
         for element in self.grid:
             element.y = element.y + params.fuselageWidth/2
 
-
-
     def find_grid(self, chord):
-        for element in self.grid:
-            if (element.chord <= chord):
-              return element
-
+        return self.__get_gridDataFromChord(chord)
 
 ################################################################################
 #
@@ -1085,6 +1142,8 @@ class wing:
         return num
 
     def apply_params(self):
+        global num_gridpoints_default
+
         # first clean up in case this function was repeatedly called
         self.chords.clear()
         self.sections.clear()
@@ -1097,14 +1156,8 @@ class wing:
         # get basic shape parameters
         (shape, shapeParams) = params.get_shapeParams()
 
-        # number of grid points equals 2*halfwingspan (which is half of wingspan
-        # without fuselage) in mm. If fuselage width is e.g. 35 mm, the offset
-        # will be 17.5 mm, so we must have a resolution of 0.5 mm and a maximum
-        # value of halfwingspan
-        num_gridPoints = int(params.halfwingspan * 2000)
-
         # setup chordDistribution
-        self.chordDistribution.calculate_grid(shape, shapeParams, num_gridPoints)
+        self.chordDistribution.calculate_grid(shape, shapeParams, num_gridpoints_default)
 
         # calculate planform
         self.planform.calculate(self.params, self.chordDistribution)
@@ -1178,10 +1231,6 @@ class wing:
     # find planform-values for a given chord-length
     def find_PlanformData(self, chord):
         return self.planform.find_grid(chord)
-        for element in self.grid:
-            if (element.chord <= chord):
-              return element
-
 
     # copy planform-values to section
     def copy_PlanformDataToSection(self, grid, section):
@@ -1822,10 +1871,13 @@ class wing:
 
         # build up list of x- and y-values
         grid = self.planform.grid
-        for idx in range(len(grid)-1):
+        for idx in range(len(grid)):
             x = grid[idx].y *1000.0 # m --> mm
-            xValues.append(x)
-            flapDepth.append((grid[idx].flapDepth / grid[idx].chord) * 100)
+            depth = (grid[idx].flapDepth / grid[idx].chord) * 100
+
+            if (depth > 0.0):
+                xValues.append(x)
+                flapDepth.append(depth)
 
         # plot flap depth in percent
         ax.plot(xValues, flapDepth, color=cl_hingeLine,
