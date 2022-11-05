@@ -57,6 +57,7 @@ airfoilLibrary_path = 'airfoil_library'
 
 # names of the planformfiles
 planformFiles = ["planformdataNew_wing.txt", "planformdataNew_tail.txt"]
+#planformFiles = ["planformdataNew_tail.txt"]
 
 bg_color_light = "#DDDDDD"
 bg_color_dark =  "#222222"
@@ -463,6 +464,10 @@ class control_frame():
             # no, get value directly
             dictValue = dictionary[key]
             dataType = get_dataType(dictValue)
+
+        # if no datatype was found, default datatpy will be float
+        if dataType == None:
+            dataType = 'float'
 
         return (dictValue, dataType)
 
