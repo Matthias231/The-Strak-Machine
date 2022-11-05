@@ -133,8 +133,9 @@ scaleFactor = 1.0
 num_gridpoints_default = 1000
 
 # types of diagrams
-diagTypes = ["Chord distribution", "Planform shape", "Flap distribution",
-             "Airfoil distribution", "Projected wingplan"]
+diagTypes = ["Projected wingplan", "Chord distribution", "Planform shape",
+             "Airfoil distribution", "Flap distribution" ]
+
 airfoilTypes = ['user', 'blend', 'opt']
 planformShapes = ['elliptical', 'trapezoidal']
 
@@ -2231,19 +2232,17 @@ class wing:
 
     def draw_diagram(self, diagramType, ax, x_limits, y_limits):
         if diagramType == diagTypes[0]:
-            self.chordDistribution.plot(ax)
+            self.plot_WingPlanform(ax)
         elif diagramType == diagTypes[1]:
-            self.plot_PlanformShape(ax)
+            self.chordDistribution.plot(ax)
         elif diagramType == diagTypes[2]:
-            self.plot_FlapDistribution(ax)
+            self.plot_PlanformShape(ax)
         elif diagramType == diagTypes[3]:
             self.plot_AirfoilDistribution(ax)
         elif diagramType == diagTypes[4]:
-            self.plot_WingPlanform(ax)
-
+            self.plot_FlapDistribution(ax)
         else:
             ErrorMsg("undefined diagramtype")
-
 
     def __copyAndSmooth_Airfoil(self, srcNameAndPath, destName, destPath, smooth):
         global xfoilWorkerCall

@@ -1805,7 +1805,12 @@ class App(ctk.CTk):
 
         # check if everything was o.k.
         if result == 0:
-            creatorInst.update_planform(creatorInst.get_params())
+            # set appearance mode
+            params = creatorInst.get_params()
+            params["theme"] = self.appearance_mode
+
+            # update planform
+            creatorInst.update_planform(params)
             self.frame_bottom.update_Entries(self.planformIdx)
             self.frame_bottom.clear_unsavedChangesFlag(self.planformIdx)
             self.updateNeeded = True
