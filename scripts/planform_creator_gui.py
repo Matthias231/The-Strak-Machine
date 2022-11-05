@@ -817,19 +817,26 @@ class control_frame():
         return (row + 1)
 
     def __change_appearance_mode(self, new_appearanceMode):
-        ctk.set_appearance_mode(new_appearanceMode)
-        self.master.appearance_mode = new_appearanceMode
+        if (new_appearanceMode == 1) or (new_appearanceMode == 'Dark'):
+            new_mode = 'Dark'
+        else:
+            new_mode = 'Light'
+
+        ctk.set_appearance_mode(new_mode)
+        self.master.appearance_mode = new_mode
 
         # change the color of the scrollable frame manually,as this is not a
         # ctk frame
-        bg_color = self.__get_bg_color(new_appearanceMode)
+        bg_color = self.__get_bg_color(new_mode)
         self.frame_right.configure(bg = bg_color)
         self.canvas.configure(bg = bg_color)
 
         # change appearance mode in planform-creator
         for idx in range (len(self.creatorInstances)):
+            params = self.params[idx]
+            params["theme"] = new_mode
             creatorInst = self.creatorInstances[idx]
-            creatorInst.set_appearance_mode(new_appearanceMode)
+            creatorInst.set_appearance_mode(new_mode)
 
         # notify the diagram frame about the change
         self.master.set_updateNeeded()
@@ -1814,12 +1821,10 @@ class App(ctk.CTk):
     def remove_planform(self, dummy):
         self.notImplemented_Dialog() #FIXME implement
 
-
-
     def export_planformsDialog(self, dummy):
         #exportWindow = ctk.CTkToplevel() #FIXME problems with windowsize
         exportWindow = tk.Toplevel() # FIXMe workaround window sizing problem
-        if ((self.appearance_mode == 1) or (self.appearance_mode == 'Dark')):
+        if (self.appearance_mode == 'Dark'):
             exportWindow.configure(bg=bg_color_dark)
         else:
             exportWindow.configure(bg=bg_color_light)
