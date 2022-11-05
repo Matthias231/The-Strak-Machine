@@ -1834,7 +1834,8 @@ class App(ctk.CTk):
     def export_planformsDialog(self, dummy):
         #exportWindow = ctk.CTkToplevel() #FIXME problems with windowsize
         exportWindow = tk.Toplevel() # FIXMe workaround window sizing problem
-        if (self.appearance_mode == 'Dark'):
+        mode = ctk.get_appearance_mode()
+        if (mode == 'Dark'):
             exportWindow.configure(bg=bg_color_dark)
         else:
             exportWindow.configure(bg=bg_color_light)
