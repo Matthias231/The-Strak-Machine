@@ -19,6 +19,7 @@
 
 import os, re
 import ezdxf
+from ezdxf.addons import Importer
 import numpy as np
 from copy import deepcopy
 from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg, bs)
@@ -142,3 +143,34 @@ def export_toDXF(wingData, FileName, num_points):
     doc.saveas(FileName)
     NoteMsg("DXF data was successfully written.")
     return 0
+
+def import_fromDXF(FileName):
+    try:
+        sdoc = ezdxf.readfile(FileName)
+    except:
+        ErrorMsg("import_fromDXF: unable to read file %s" % FileName)
+
+    tdoc = ezdxf.new()
+    importer = Importer(sdoc, tdoc)
+
+    # import all entities from source modelspace into modelspace of the target drawing
+    importer.import_modelspace()
+
+    # import all paperspace layouts from source drawing
+    importer.import_paperspace_layouts()
+
+    # import all CIRCLE and LINE entities from source modelspace into an arbitrary target layout.
+    # create target layout
+    tblock = tdoc.blocks.new('SOURCE_ENTS')
+
+    # query source entities
+    ents = sdoc.modelspace().query('CIRCLE LINE')
+
+    # import source entities into target block
+    importer.import_entities(ents, tblock)
+
+    # This is ALWAYS the last & required step, without finalizing the target drawing is maybe invalid!
+    # This step imports all additional required table entries and block definitions.
+    importer.finalize()
+    NoteMsg("import_fromDXF: planform was succesfully imported from file %s" % FileName)
+    #tdoc.saveas('imported.dxf')

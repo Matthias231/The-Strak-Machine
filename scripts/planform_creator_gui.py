@@ -1665,6 +1665,9 @@ class App(ctk.CTk):
         self.yPanels = yPanels_default
         self.num_points = dxf_num_points_default
 
+        # variables for planform import
+        self.latestPath_dxf = planformsPath
+
         # configure customtkinter
         ctk.set_appearance_mode(self.appearance_mode)    # Modes: "System" (standard), "Dark", "Light"
         ctk.set_default_color_theme("blue") # Themes: "blue" (standard), "green", "dark-blue"
@@ -1759,7 +1762,8 @@ class App(ctk.CTk):
         headlines.append("Planform actions")
         buttonsColumn = [{"txt": "Add planform",     "cmd" : self.add_planform,     "param" : None},
                          {"txt": "Remove planform",  "cmd" : self.remove_planform,  "param" : None},
-                         {"txt": "Export planforms", "cmd" : self.export_planformsDialog, "param" : None}
+                         {"txt": "Export planforms", "cmd" : self.export_planformsDialog, "param" : None},
+                         {"txt": "Import planform",  "cmd" : self.import_planformDialog, "param" : None}
                         ]
         buttons.append(buttonsColumn)
 
@@ -1917,6 +1921,28 @@ class App(ctk.CTk):
         button = ctk.CTkButton(exportWindow, text="Cancel", command=self.cancel_export_planforms)
         button.grid(row=row+1, column=1, pady=10, padx=20, sticky="w")
         self.__center(exportWindow)
+
+    def import_planformDialog(self, dummy):
+        filetypes = (('.dxf files', '*.dxf'),
+                     ('All files', '*.*'))
+
+        absFilename = tk.filedialog.askopenfilename(
+                    title='Open a file',
+                    initialdir=self.latestPath_dxf,
+                    filetypes=filetypes)
+        if absFilename == '':
+            return
+
+        # Compute the relative file path
+        relFilename = os.path.relpath(absFilename)
+
+        # import planform from .dxf
+        creatorInstances[self.planformIdx].import_planform(relFilename)
+
+        # store latest path
+        self.latestPath_dxf = os.path.dirname(absFilename)
+        self.notImplemented_Dialog() #FIXME implement
+
 
     def cancel_export_planforms(self):
         # cleaning up

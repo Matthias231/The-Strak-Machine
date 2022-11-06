@@ -58,7 +58,7 @@ from colorama import init
 from termcolor import colored
 from FLZ_Vortex_export import export_toFLZ
 from XFLR5_export import export_toXFLR5
-from DXF_export import export_toDXF
+from DXF_export import (export_toDXF, import_fromDXF)
 
 ################################################################################
 # some global variables
@@ -2947,6 +2947,9 @@ class planform_creator:
 
         return (result, exportedFiles)
 
+    def __import_planform(self, filepath):
+        return import_fromDXF(filepath)
+
     def __set_AxesAndLabels(self, ax, title):
         global cl_grid
         global cl_diagramTitle
@@ -3039,6 +3042,10 @@ class planform_creator:
         '''exports planform to given filepath'''
         return self.__export_planform(filePath, steps, xPanels, yPanels,
                       num_points, append)
+
+    def import_planform(self, filePath):
+        '''imports planform from given filepath (.dxf file)'''
+        return self.__import_planform(filePath)
 
     def get_params(self):
         '''gets parameters as a dictionary'''
