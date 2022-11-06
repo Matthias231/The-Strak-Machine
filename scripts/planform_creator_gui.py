@@ -38,7 +38,7 @@ from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg, bs,
           airfoilPath, buildPath, ressourcesPath)
 
 # imports from planform creator
-from planform_creator_new import (planform_creator, diagTypes, airfoilTypes,
+from planform_creator import (planform_creator, diagTypes, airfoilTypes,
                                   planformShapes, planformsPath, main_font)
 
 # some global variables
@@ -56,7 +56,7 @@ dxf_num_points_default = 100    # default number of points for dxf planform expo
 airfoilLibrary_path = 'airfoil_library'
 
 # names of the planformfiles
-planformFiles = ["planformdataNew_wing.txt", "planformdataNew_tail.txt"]
+planformFiles = ["planformdata_wing.txt", "planformdata_tail.txt"]
 #planformFiles = ["planformdataNew_tail.txt"]
 
 bg_color_light = "#DDDDDD"

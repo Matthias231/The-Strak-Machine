@@ -18,20 +18,26 @@
 #  Copyright (C) 2020-2022 Matthias Boese
 
 import ctypes
+import shutil
+import customtkinter
 import re
-import xml.etree.ElementTree as ET
 from copy import deepcopy
 import argparse
 from sys import version_info
 import os
+from os import listdir, path, system, makedirs, chdir, getcwd, remove
 import f90nml
 from shutil import copyfile
 from matplotlib import pyplot as plt
+from matplotlib.patches import Wedge
+from matplotlib.figure import Figure
 from matplotlib import rcParams
+from matplotlib import bezier
+from matplotlib import ticker
 import numpy as np
 from scipy.interpolate import make_interp_spline
+from scipy.interpolate import UnivariateSpline
 from scipy import interpolate as scipy_interpolate
-from scipy.optimize import curve_fit
 from math import log10, floor, tan, atan, sin, cos, pi, sqrt
 import json
 import tkinter
@@ -40,267 +46,132 @@ from matplotlib.backends.backend_tkagg import (
 # Implement the default Matplotlib key bindings.
 from matplotlib.backend_bases import key_press_handler
 import tkinter.font as font
-from strak_machine import (copyAndSmooth_Airfoil, get_ReString,
+from strak_machine import ( get_ReString,
                              ErrorMsg, WarningMsg, NoteMsg, DoneMsg,
                              remove_suffix, interpolate, round_Re,
                              bs, buildPath, ressourcesPath, airfoilPath,
                              scriptPath, exePath, smoothInputFile,
                              strakMachineInputFileName, xfoilWorkerName,
                              T1_polarInputFile)
-
+from change_airfoilname import change_airfoilName
 from colorama import init
 from termcolor import colored
 from FLZ_Vortex_export import export_toFLZ
-#import bezier FIXME BEZIER
-
+from XFLR5_export import export_toXFLR5
+from DXF_export import export_toDXF
 
 ################################################################################
 # some global variables
 
+# disables all print output to console
+print_disabled = False
+
 # folder where the generated planforms can be found
-planformsPath = '02_planforms'
+planformsFolder = '02_planforms'
 
-# folder containing the output / result-files
-outputFolder = buildPath + bs + planformsPath
+# folders containing the output / result-files
+planformsPath = buildPath + bs + planformsFolder
+airfoilsPath = buildPath + bs + airfoilPath
 
-# fonts
-csfont = {'fontname':'DejaVu Sans'}
-
-# fontsizes
-fs_infotext = 7
-fs_legend = 7
+# name of template files for planform export
+XFLR5_template = 'plane_template.xml'
+FLZ_template = 'plane_template.flz'
+XFLR5_output = 'XFLR5_plane.xml'
+FLZ_output = 'FLZ_plane.flz'
 
 # colours, lineStyles
-cl_background = 'dark_background'
-cl_quarterChordLine = 'orange'
-cl_areaCenterLine = 'blue'
-cl_hingeLine = 'r'
-cl_hingeLineFill ='r'
-cl_planform = 'gray'
-cl_planformFill = 'gray'
-cl_sections = 'grey'
-cl_userAirfoil = 'DeepSkyBlue'
-cl_optAirfoil = 'yellow'
-cl_infotext = 'DeepSkyBlue'
-cl_chordlengths = 'darkgray'
-cl_referenceChord = 'gray'
-cl_normalizedChord = 'blue'
-cl_controlPoints = 'red'
+cl_background = None
+cl_grid = None
+cl_quarterChordLine = None
+cl_geoCenter = None
+cl_hingeLine = None
+cl_flapFill = None
+cl_planform = None
+cl_planformFill = None
+cl_sections = None
+cl_userAirfoil = None
+cl_userAirfoil_unassigned = None
+cl_optAirfoil = None
+cl_infotext = None
+cl_diagramTitle = None
+cl_legend = None
+cl_chordlengths = None
+cl_referenceChord = None
+cl_normalizedChord = None
+cl_controlPoints = None
+cl_flapGroup = None
 
+# linestyles
+ls_grid = 'dotted'
 ls_quarterChordLine = 'solid'
-lw_quarterChordLine  = 0.8
-ls_areaCenterLine = 'solid'
-lw_areaCenterLine = 0.8
 ls_hingeLine = 'solid'
-lw_hingeLine = 0.6
 ls_planform = 'solid'
-lw_planform = 1.0
 ls_sections = 'solid'
-lw_sections = 0.4
-fs_tick = 7
 
+# linewidths
+lw_grid = 0.3
+lw_quarterChordLine  = 0.8
+lw_hingeLine = 0.6
+lw_planform = 1.0
+lw_sections = 0.4
+
+# fontsizes
+fs_diagramTitle = 20
+fs_infotext = 9
+fs_legend = 9
+fs_axes = 20
+fs_ticks = 10
+fs_flapGroup = 20
+
+# fonts
+main_font = "Roboto Medium"
+
+# scaling information
+scaled = False
+scaleFactor = 1.0
+
+# number of points for setting up the grid (planform shape, chord distribution)
+num_gridpoints_default = 1000
+
+# types of diagrams
+diagTypes = ["Projected wingplan", "Chord distribution", "Planform shape",
+             "Airfoil distribution", "Flap distribution" ]
+
+airfoilTypes = ['user', 'blend', 'opt']
+planformShapes = ['elliptical', 'trapezoidal']
 
 xfoilWorkerCall = "..\\..\\bin\\" + xfoilWorkerName + '.exe'
 inputFilename = "..\\..\\ressources\\" + smoothInputFile
 
-# example-dictionary, containing all data of the planform
-PLanformDict =	{
-            # name of XFLR5-template-xml-file
-            "templateFileName": 'plane_template.xml',
-            # name of the generated XFLR5-xml-file
-            "outFileName": "rocketeerMainWing.xml",
-            # name of the planform
-            "planformName": 'main wing',
-            # Wing or Fin
-            "isFin": 'false',
-            # wingspan in m
-            "wingspan": 2.98,#2.54,
-            # width of fuselage in m
-            "fuselageWidth": 0.035,
-            # shape of the planform, elliptical / trapezoidal
-            "planformShape": 'elliptical',
-            # orientation of the wings leading edge
-            "leadingEdgeOrientation": 'up',
-            # length of the root-chord in m
-            "rootchord": 0.223,
-            # length of the tip-cord in m
-            "tipchord": 0.002,
-            # sweep of the tip of the wing in degrees
-            "rootTipSweep": 3.2,
-            # depth of the aileron / flap in percent of the chord-length, root
-            "hingeDepthRoot": 27.0,
-            # depth of the aileron / flap in percent of the chord-length, tip
-            "hingeDepthTip": 19.0,
-            # correction value to avoid a part of the wing being swept forward
-            "leadingEdgeCorrection": 0.0085,
-            # dihedral of the of the wing in degree
-            "dihedral": 2.5,
-            # whether to show the line at 25% of wing depth
-            "showQuarterChordLine" : 'True',
-            # whether to show line from root-chord to middle of the tip
-            "showTipLine": 'True',
-            # whether to show the hinge-line
-            "showHingeLine" : 'True',
-            # positions of the airfoils
-            "airfoilPositions": [   0.0,     0.3,     0.6,     0.9,     1.2,    1.5,     1.6,    1.8],
-            # user-defined names of the airfoils
-            "airfoilNames":     ["SD-1",  "SD-2",  "SD-3",  "SD-4",  "SD-5", "SD-6",  "SD-7", "SD-8"],
-            # types of the airfoils (user / blend / opt
-            "airfoilTypes":     ["user", "blend", "blend", "blend", "blend", "user", "blend", "user"],
-            # user-defined airfoils and where to find them
-            "userAirfoils":     [".\\airfoil_library\\Scale_Glider\\SD\\SD-220.dat",
-                                 ".\\airfoil_library\\Scale_Glider\\SD\\SD-150.dat",
-                                 ".\\airfoil_library\\Scale_Glider\\SD\\SD-80.dat"]
-            }
-
-# derivative function
-def deriv(f,x):
-     h = 0.000000001                 #step-size
-     return (f(x+h) - f(x))/h        #definition of derivative
-
-
-
-def plot_Line(x, y):
-    plt.plot(x, y, color='blue', linewidth = lw_planform, solid_capstyle="round")
-
-    # maximize window
-    figManager = plt.get_current_fig_manager()
-    try:
-        figManager.window.Maximize(True)
-    except:
-        try:
-            figManager.window.state('zoomed')
-        except:
-            pass
-
-    # show diagram
-    plt.show()
-
-
-
-def objective_elliptical_wrapper(values, normalizedTipChord, tipSharpness,
-                                 leadingEdgeCorrection):
-    result = []
-
-    for x in values:
-        y = objective_elliptical(x, normalizedTipChord, tipSharpness,
-                         leadingEdgeCorrection)
-
-        result.append(y)
-
-    return (result)
-
-
-def objective_elliptical(x, normalizedTipChord, tipSharpness,
-                         leadingEdgeCorrection):
-
-    # calculate distance to tip, where rounding starts
-    tipRoundingDistance = normalizedTipChord * tipSharpness
-
-    # calculate actual distance to tip
-    distanceToTip = 1.0 - x
-
-   # calculate delta that will be added to pure ellipse
-    if (distanceToTip > tipRoundingDistance):
-        # add constant value, as we are far away from the tip
-        delta = normalizedTipChord
-    else:
-        # add decreasing value according to quarter ellipse
-        a = tipRoundingDistance
-        x1 = tipRoundingDistance-distanceToTip
-        b = normalizedTipChord
-        radicand = (a*a)-(x1*x1)
-
-        if radicand > 0:
-            # quarter ellipse formula
-            delta = (b/a) * np.sqrt(radicand)
-        else:
-            delta = 0
-
-    # elliptical shaping of the wing plus additonal delta
-    y = (1.0-delta) * np.sqrt(1.0-(x*x)) + delta
-
-    # correct chord with leading edge correction
-    y = y - leadingEdgeCorrection * sin(interpolate(0.0, 1.0, 0.0, pi, x))
-
-    return y
-
-
-##def objective_bezier_wrapper(values, b1_x, b1_y, b2_x, b2_y, b3_x, b3_y, b4_x, b4_y, b5_x, b5_y):
-##    result = []
-##
-##    for x in values:
-##        y = objective_bezier(x, b1_x, b1_y, b2_x, b2_y, b3_x, b3_y, b4_x, b4_y, b5_x, b5_y)
-##
-##        result.append(y)
-##
-##    return (result)
-##
-##
-##def objective_bezier(x, b1_x, b1_y, b2_x, b2_y, b3_x, b3_y, b4_x, b4_y, b5_x, b5_y):
-##
-##    nodes = np.asfortranarray([
-##    [0.0, b1_x, b2_x, b3_x, b4_x, b5_x, 1.0],
-##    [1.0, b1_y, b2_y, b3_y, b4_y, b5_y, 0.0],
-##    ])
-##
-##
-##    deg = len(nodes[0])-1
-##
-##    curve = bezier.Curve(nodes, degree=deg)
-##
-##    result = curve.evaluate(b1_x)
-##    if b1_y < result[1][0] :
-##        return -1
-##
-##    result = curve.evaluate(b2_x)
-##    if b2_y < result[1][0] :
-##        return -1
-##
-##    result = curve.evaluate(b3_x)
-##    if b3_y < result[1][0] :
-##        return -1
-##
-##    result = curve.evaluate(b4_x)
-##    if b4_y < result[1][0] :
-##        return -1
-##
-##    result = curve.evaluate(b5_x)
-##    if b5_y < result[1][0] :
-##        return -1
-##
-##    result = curve.evaluate(x)
-##    y = result[1][0]
-##    return y
-
 ################################################################################
-# function that gets a single boolean parameter from dictionary and returns a
-#  default value in case of error
-def get_booleanParameterFromDict(dict, key, default):
-    value = default
-    try:
-        string = dict[key]
-        if (string == 'true') or (string == 'True'):
-            value = True
-        else:
-            value = False
-    except:
-        NoteMsg('parameter \'%s\' not specified, using' \
-        ' default-value \'%s\'' % (key, str(value)))
-    return value
-
-
+#
+# helper functions
+#
 ################################################################################
-# function that gets a single mandatory parameter from dictionary and exits, if
-# the key was not found
-def get_MandatoryParameterFromDict(dict, key):
-    try:
-        value = dict[key]
-    except:
-        ErrorMsg('parameter \'%s\' not specified, this key is mandatory!'% key)
-        sys.exit(-1)
-    return value
+def calculate_distance(x1, x2, y1, y2):
+    '''calculates the distance between two given points'''
+    dist = np.sqrt(np.square(x2-x1) + np.square(y2-y1))
+    return dist
 
+def bullseye(center, radius, color, ax, **kwargs):
+    '''function for plotting a bullseye with given radius and center'''
+    circle1 = plt.Circle(center, radius=radius, color=color, fill=False)
+    w1 = Wedge(center, radius, 90, 180, fill=True, color=color)
+    w2 = Wedge(center, radius, 270, 360, fill=True, color=color)
+    ax.add_patch(circle1)
+    ax.add_artist(w1)
+    ax.add_artist(w2)
+
+def bullseye_BW(center, radius, ax, **kwargs):
+    '''function for plotting a bullseye with given radius and center'''
+    w1 = Wedge(center, radius, 90, 180, fill=True, color='white', alpha = 1.0)
+    w2 = Wedge(center, radius, 270, 360, fill=True, color='white', alpha = 1.0)
+    w3 = Wedge(center, radius, 180, 270, fill=True, color='black', alpha = 1.0)
+    w4 = Wedge(center, radius, 0, 90, fill=True, color='black', alpha = 1.0)
+    ax.add_artist(w1)
+    ax.add_artist(w2)
+    ax.add_artist(w3)
+    ax.add_artist(w4)
 
 ################################################################################
 #
@@ -319,10 +190,9 @@ class wingSection:
         self.Re = 0.0
         self.leadingEdge = 0
         self.trailingEdge = 0
-        self.hingeDepth = 0
+        self.flapDepth = 0
         self.hingeLine = 0
         self.quarterChordLine = 0
-        self.areaCenterLine = 0
         self.dihedral= 3.00
         self.flapGroup = 0
 
@@ -355,217 +225,138 @@ class wingGrid:
         self.y = 0.0
         self.chord = 0.0
         self.leadingEdge = 0.0
-        self.trailingEdge = 0.0
-        self.hingeDepth = 0.0
-        self.hingeLine = 0.0
         self.quarterChordLine = 0.0
-        self.LE_derivative = 0.0
-        self.areaCenterLine = 0.0
-
+        self.hingeLine = 0.0
+        self.flapDepth = 0.0
+        self.trailingEdge = 0.0
 
 ################################################################################
 #
-# Wing class
+# params class
 #
 ################################################################################
-class wing:
+class params:
     # class init
     def __init__(self):
-        self.theme = 'default'
-        self.airfoilBasicName = ""
-        self.airfoilNames = []
-        self.numAirfoils= 0
-        self.planformName= "Main Wing"
-        self.rootchord = 0.223
-        self.tipchord = 0.03
-        self.leadingEdgeOrientation = 'up'
-        self.leadingEdgeCorrection = 0.0
-        self.wingspan = 2.54
-        self.fuselageWidth = 0.035
+        # single parameters, strings
+        self.planformName = 'main wing'
         self.planformShape = 'elliptical'
-        self.planform_chord = []
-        self.planform_y = []
-        self.halfwingspan = 0.0
-        self.numberOfGridChords = 16384
-        self.hingeDepthRoot = 23.0
-        self.hingeDepthTip = 23.0
-        self.tipDepthPercent = 8.0
-        self.tipDepth = 0
-        self.tipSharpness = 0.5
-        self.blendingEndPoint = 0.5
-        self.hingeInnerPoint = 0
-        self.hingeOuterPoint = 0
+        self.leadingEdgeOrientation = 'up'
+        self.airfoilBasicName = 'airfoil'
+        self.theme = 'Dark'
+
+        # single parameters,boolean
+        self.isFin = False
+        self.smoothUserAirfoils = False
+
+        # single parameters, double /float
+        self.wingspan = 0.0
+        self.rootchord = 0.0
+        self.rootReynolds = 0.0
+        self.tipchord = 0.0
+        self.tipSharpness = 0.0
+        self.fuselageWidth = 0.0
+        self.leadingEdgeCorrection = 0.0
+        self.ellipseCorrection = 0.0
         self.hingeLineAngle = 0.0
-        self.dihedral = 0.00
+        self.flapDepthRoot = 0.0
+        self.flapDepthTip = 0.0
+        self.dihedral = 0.0
+        self.NCrit = 0.0
+
+        # single parameters, int
+        self.numAirfoils = 0
+        self.interpolationSegments = 0
+
+        # lists, double / float
+        self.polarReynolds = []
+        self.airfoilPositions_normalized = []
+        self.airfoilPositions = []
+        self.airfoilReynolds = []
+        self.flapGroups = []
+
+        # lists, string
+        self.airfoilTypes = []
+        self.userAirfoils = []
+        self.airfoilNames = []
+
+        # dependend parameters double / float
+        self.tipDepthPercent = 0.0
+        self.halfwingspan = 0.0
         self.area = 0.0
         self.aspectRatio = 0.0
-        self.interpolationSegments = 5
-        self.NCrit = 9.0           # for polar creation
-        self.polarReynolds = []    # for polar creation
-        self.sections = []
-        self.grid = []
-        self.normalizedGrid = []
-        self.valueList = []
-        self.chords = []
-        self.isFin = False
-        self.showQuarterChordLine = True
-        self.showTipLine = False
-        self.showHingeLine = True
-        self.smoothUserAirfoils = True
-        self.use_bezier = False
-        self.bezier_x = []
-        self.bezier_y = []
+
+        # dependend parameters int
+        self.rootReynolds = 0
+
+    ################################################################################
+    # function that gets a single boolean parameter from dictionary and returns a
+    #  default value in case of error
+    def __get_booleanParameterFromDict(self, dict, key, default):
+        value = default
+        try:
+            string = dict[key]
+            if (string == 'true') or (string == 'True') or (string == True):
+                value = True
+            else:
+                value = False
+        except:
+            NoteMsg('parameter \'%s\' not specified, using' \
+            ' default-value \'%s\'' % (key, str(value)))
+        return value
+
+    ################################################################################
+    # function that gets a single mandatory parameter from dictionary and exits, if
+    # the key was not found
+    def __get_MandatoryParameterFromDict(self, dict, key):
+        try:
+            value = dict[key]
+        except:
+            ErrorMsg('parameter \'%s\' not specified, this key is mandatory!'% key)
+            value = None
+        return value
 
 
-    def set_colours(self):
-        global cl_background
-        global cl_quarterChordLine
-        global cl_areaCenterLine
-        global cl_hingeLine
-        global cl_planform
-        global cl_hingeLineFill
-        global cl_planformFill
-        global cl_sections
-        global cl_userAirfoil
-        global cl_optAirfoil
-        global cl_infotext
-        global cl_controlPoints
+    def read_fromDict(self, dictData):
+        '''Function that reads parameters from a given dictionary'''
+        # initialize params first
+        self.__init__()
 
-        #self.theme = ' '
-        if self.theme == 'black_white':
-            # black and white theme
-            cl_background = 'default'
-            cl_quarterChordLine = 'black'
-            cl_areaCenterLine = 'black'
-            cl_hingeLine = 'dimgray'
-            cl_planform = 'black'
-            cl_hingeLineFill = 'gray'
-            cl_planformFill = 'lightgray'
-            cl_sections = 'black'
-            cl_userAirfoil = 'black'
-            cl_optAirfoil = 'black'
-            cl_infotext = 'black'
-            cl_chordlengths = 'lightgray'
-            cl_referenceChord = 'gray'
-            cl_normalizedChord = 'black'
-            cl_controlPoints = 'red'
-        else:
-            # dark theme
-            cl_background = 'dark_background'
-            cl_quarterChordLine = 'orange'
-            cl_areaCenterLine = 'blue'
-            cl_hingeLine = 'r'
-            cl_planform = 'gray'
-            cl_hingeLineFill = 'r'
-            cl_planformFill = 'lightgray'
-            cl_sections = 'grey'
-            cl_userAirfoil = 'DeepSkyBlue'
-            cl_optAirfoil = 'yellow'
-            cl_infotext = 'DeepSkyBlue'
-            cl_chordlengths = 'darkgray'
-            cl_referenceChord = 'gray'
-            cl_normalizedChord = 'blue'
-            cl_controlPoints = 'red'
-
-
-    # compose a name from the airfoil basic name and the Re-number
-    def set_AirfoilNamesFromRe(self):
-        # loop over all airfoils (without tip and fuselage section)
-        for idx in range(self.numAirfoils):
-            Re = self.airfoilReynolds[idx]
-            airfoilName = (self.airfoilBasicName + "-%s.dat") % get_ReString(Re)
-            self.airfoilNames.append(airfoilName)
-
-
-    # set missing airfoilnames from basic name and Re-number
-    def set_AirfoilNames(self):
-        if (len(self.airfoilNames) == 0):
-            # list is empty and has to be created
-            self.set_AirfoilNamesFromRe()
-
-        # check if the .dat ending was appended to all airfoils.
-        # if not, append the ending
-        for idx in range(self.numAirfoils):
-            if (self.airfoilNames[idx].find('.dat')<0):
-                self.airfoilNames[idx] = self.airfoilNames[idx] +'.dat'
-
-
-    def insert_fuselageData(self):
-        self.airfoilNames.insert(0, self.airfoilNames[0])
-
-        # root airfoil must be of type "user", so always insert user-airfoil
-        self.userAirfoils.insert(0, self.userAirfoils[0])
-        self.airfoilTypes.insert(0, self.airfoilTypes[0])
-
-        # section has same chord, same reynolds
-        self.chords.insert(0, self.chords[0])
-        self.airfoilPositions.insert(0, 0.0)
-        self.airfoilReynolds.insert(0, self.airfoilReynolds[0])
-
-
-    def insert_tipData(self):
-        self.airfoilNames.append(self.airfoilNames[-1])
-        self.airfoilTypes.append(self.airfoilTypes[-1])
-        self.airfoilPositions.append(self.wingspan/2)
-
-        # is last airfoil of type "user" ?
-        if self.airfoilTypes[-1] == "user":
-            # yes, so append user-airfoil
-            self.userAirfoils.append(self.userAirfoils[-1])
-
-        reynolds = (self.tipchord / self.chords[-1]) * self.airfoilReynolds[-1]
-        self.airfoilReynolds.append(int(round(reynolds,0)))
-        self.chords.append(self.tipchord)
-
-
-    # get the number of user defined airfoils
-    def get_numUserAirfoils(self):
-        num = 0
-        for foilType in self.airfoilTypes:
-            if (foilType == "user"):
-                num = num + 1
-
-        return num
-
-
-    # set basic data of the wing
-    def set_Data(self, dictData):
-        # -------------- get mandatory parameters --------------------
-
-        # get basic planformdata
-        self.planformName = get_MandatoryParameterFromDict(dictData, "planformName")
-        self.rootchord =  get_MandatoryParameterFromDict(dictData, "rootchord")
-        self.wingspan =  get_MandatoryParameterFromDict(dictData, "wingspan")
-        self.fuselageWidth =  get_MandatoryParameterFromDict(dictData, "fuselageWidth")
-        self.planformShape =  get_MandatoryParameterFromDict(dictData, "planformShape")
+        # now check dictionary and read values into params
+        self.planformName = self.__get_MandatoryParameterFromDict(dictData, "planformName")
+        self.rootchord =  self.__get_MandatoryParameterFromDict(dictData, "rootchord")
+        self.wingspan =  self.__get_MandatoryParameterFromDict(dictData, "wingspan")
+        self.fuselageWidth =  self.__get_MandatoryParameterFromDict(dictData, "fuselageWidth")
+        self.planformShape =  self.__get_MandatoryParameterFromDict(dictData, "planformShape")
 
         if ((self.planformShape != 'elliptical') and\
-            (self.planformShape != 'curve_fitting') and\
             (self.planformShape != 'trapezoidal')):
-            ErrorMsg("planformshape must be elliptical or curve_fitting or trapezoidal")
-            sys.exit(-1)
+            ErrorMsg("planformshape must be elliptical or trapezoidal")
+            exit(-1)
 
         if self.planformShape == 'elliptical':
-            self.leadingEdgeCorrection = get_MandatoryParameterFromDict(dictData, "leadingEdgeCorrection")
-            self.tipSharpness =  get_MandatoryParameterFromDict(dictData, "tipSharpness")
-        elif self.planformShape == 'curve_fitting':
-            self.planform_chord = get_MandatoryParameterFromDict(dictData, "planform_chord")
-            self.planform_y = get_MandatoryParameterFromDict(dictData, "planform_y")
+            self.leadingEdgeCorrection = self.__get_MandatoryParameterFromDict(dictData, "leadingEdgeCorrection")
+            self.tipSharpness =  self.__get_MandatoryParameterFromDict(dictData, "tipSharpness")
+            self.ellipseCorrection = self.__get_MandatoryParameterFromDict(dictData, "ellipseCorrection")
+        else:
+            self.leadingEdgeCorrection = 0.0
+            self.ellipseCorrection = 0.0
+            self.tipSharpness = 0.0
 
         if (self.planformShape == 'elliptical') or\
            (self.planformShape == 'trapezoidal'):
-            self.tipchord =  get_MandatoryParameterFromDict(dictData, "tipchord")
+            self.tipchord =  self.__get_MandatoryParameterFromDict(dictData, "tipchord")
 
-        self.hingeLineAngle = get_MandatoryParameterFromDict(dictData, "hingeLineAngle")
-        self.hingeDepthRoot = get_MandatoryParameterFromDict(dictData, "hingeDepthRoot")
-        self.hingeDepthTip = get_MandatoryParameterFromDict(dictData, "hingeDepthTip")
-        self.dihedral = get_MandatoryParameterFromDict(dictData, "dihedral")
+        self.hingeLineAngle = self.__get_MandatoryParameterFromDict(dictData, "hingeLineAngle")
+        self.flapDepthRoot = self.__get_MandatoryParameterFromDict(dictData, "flapDepthRoot")
+        self.flapDepthTip = self.__get_MandatoryParameterFromDict(dictData, "flapDepthTip")
+        self.dihedral = self.__get_MandatoryParameterFromDict(dictData, "dihedral")
 
         # get airfoil- / section data
-        self.airfoilTypes = get_MandatoryParameterFromDict(dictData, 'airfoilTypes')
-        self.airfoilPositions = get_MandatoryParameterFromDict(dictData, 'airfoilPositions')
-        self.airfoilReynolds = get_MandatoryParameterFromDict(dictData, 'airfoilReynolds')
-        self.flapGroups = get_MandatoryParameterFromDict(dictData, 'flapGroup')
+        self.airfoilTypes = self.__get_MandatoryParameterFromDict(dictData, 'airfoilTypes')
+        self.airfoilPositions_normalized = self.__get_MandatoryParameterFromDict(dictData, 'airfoilPositions')
+        self.airfoilReynolds = self.__get_MandatoryParameterFromDict(dictData, 'airfoilReynolds')
+        self.flapGroups = self.__get_MandatoryParameterFromDict(dictData, 'flapGroup')
 
         # number of airfoils equals number of specified airfoil types
         self.numAirfoils = len(self.airfoilTypes)
@@ -576,7 +367,7 @@ class wing:
             exit(-1)
 
         # check if the above parameters have the same number of elements
-        if ((self.numAirfoils != len(self.airfoilPositions)) or
+        if ((self.numAirfoils != len(self.airfoilPositions_normalized)) or
             (self.numAirfoils != len(self.airfoilReynolds))):
             ErrorMsg("airfoilTypes, airfoilPositions and airfoilReynolds must have the same number of elements")
             exit(-1)
@@ -594,33 +385,38 @@ class wing:
             ErrorMsg("type of first airfoils must \"user\"")
             exit(-1)
 
-        # check if there is a valid reynolds number specified for the first airfoil
-        if (self.airfoilReynolds[0] == None):
-            ErrorMsg("reynolds of first airfoils must not be \"None\"")
-            exit(-1)
-        else:
-            # determine reynolds-number for root-airfoil
-            self.rootReynolds = self.airfoilReynolds[0]
+        # check if reynolds number of root airfoil was specified separately
+        try:
+            self.rootReynolds = dictData["rootReynolds"]
+            # overwrite reynolds number of first airfoil
+            self.airfoilReynolds[0] = self.rootReynolds
+        except:
+            # not specified.
+            # check if there is a valid reynolds number specified for the first airfoil
+            if (self.airfoilReynolds[0] == None):
+                ErrorMsg("reynolds of first airfoils must not be \"None\"")
+                exit(-1)
+            else:
+                # copy reynolds number of first airfoil to rootReynolds
+                self.rootReynolds = self.airfoilReynolds[0]
 
         # get names and paths of user-defined airfoils
         self.userAirfoils = dictData["userAirfoils"]
 
         # check userAirfoil names against number
-        numDefinedUserAirfoils = len(self.userAirfoils)
+        numDefinedUserAirfoils = 0
+        for element in self.userAirfoils:
+            if element != None:
+                numDefinedUserAirfoils += 1
+
         if (numDefinedUserAirfoils < numUserAirfoils):
-            ErrorMsg("%d airfoils have type \"user\", but only %d user-airfoils"\
+            WarningMsg("%d airfoils have type \"user\", but only %d user-airfoils"\
             " were defined in \"user-airfoils\""\
              % (numUserAirfoils, numDefinedUserAirfoils))
-            exit(-1)
         elif (numDefinedUserAirfoils > numUserAirfoils):
             WarningMsg("%d airfoils have type \"user\", but %d user-airfoils"\
             " were defined in \"user-airfoils\""\
              % (numUserAirfoils, numDefinedUserAirfoils))
-            self.userAirfoils = self.userAirfoils[0:numUserAirfoils]
-
-        # calculate dependent parameters
-        self.tipDepthPercent = (self.tipchord/self.rootchord)*100
-        self.halfwingspan = (self.wingspan/2)-(self.fuselageWidth/2)
 
         # -------------- get optional parameters --------------------
         try:
@@ -675,20 +471,745 @@ class wing:
             NoteMsg("polar_Reynolds not defined, no Information for polar creation available")
 
         # evaluate additional boolean data
-        self.isFin = get_booleanParameterFromDict(dictData, "isFin", self.isFin)
+        self.isFin = self.__get_booleanParameterFromDict(dictData, "isFin", self.isFin)
 
-        self.smoothUserAirfoils = get_booleanParameterFromDict(dictData,
+        self.smoothUserAirfoils = self.__get_booleanParameterFromDict(dictData,
                                   "smoothUserAirfoils", self.smoothUserAirfoils)
 
-        self.showQuarterChordLine = get_booleanParameterFromDict(dictData,
-                                  "showQuarterChordLine", self.showQuarterChordLine)
 
-        self.showTipLine = get_booleanParameterFromDict(dictData,
-                                  "showTipLine", self.showTipLine)
+    def write_toDict(self, dictData):
+        '''Function that writes actual parameter values to a given dictionary'''
+        # Clear Dictionary first
+        dictData.clear()
 
-        self.showHingeLine = get_booleanParameterFromDict(dictData,
-                                   "showHingeLine", self.showHingeLine)
+        # Now export all parameters to empty dictionary.
+        # Remove references / make real copy by using [:] (important!)
+        dictData["planformName"] = self.planformName[:]
+        dictData["rootchord"] = self.rootchord
+        dictData["rootReynolds"] = self.airfoilReynolds[0]
+        dictData["wingspan"] = self.wingspan
+        dictData["fuselageWidth"] = self.fuselageWidth
+        dictData["planformShape"] = self.planformShape
+        dictData["tipSharpness"] = self.leadingEdgeCorrection
+        dictData["tipSharpness"] = self.tipSharpness
+        dictData["leadingEdgeCorrection"] = self.leadingEdgeCorrection
+        dictData["ellipseCorrection"] = self.ellipseCorrection
+        dictData["tipchord"] = self.tipchord
+        dictData["hingeLineAngle"] = self.hingeLineAngle
+        dictData["flapDepthRoot"] = self.flapDepthRoot
+        dictData["flapDepthTip"] = self.flapDepthTip
+        dictData["dihedral"] = self.dihedral
+        dictData['airfoilTypes'] = self.airfoilTypes[:]
+        dictData['airfoilPositions'] = self.airfoilPositions_normalized[:]
+        dictData['airfoilReynolds'] = self.airfoilReynolds[:]
+        dictData['flapGroup'] = self.flapGroups[:]
+        dictData["userAirfoils"] = self.userAirfoils[:]
 
+        # -------------- set optional parameters --------------------
+        dictData["leadingEdgeOrientation"] = self.leadingEdgeOrientation
+        dictData["interpolationSegments"] = self.interpolationSegments
+        dictData["theme"] = self.theme
+        dictData["airfoilNames"] = self.airfoilNames[:]
+        dictData["airfoilBasicName"] = self.airfoilBasicName
+        dictData["polar_Reynolds"] = self.polarReynolds[:]
+        dictData["polar_Ncrit"] = self.NCrit
+
+        # set additional boolean data
+        dictData["smoothUserAirfoils"] = self.smoothUserAirfoils
+        dictData["isFin"] = self.isFin
+
+    def calculate_dependendValues(self):
+        # calculate dependent parameters
+        self.tipDepthPercent = (self.tipchord/self.rootchord)*100
+        self.halfwingspan = (self.wingspan/2)-(self.fuselageWidth/2)
+
+        # determine reynolds-number for root-airfoil
+        self.rootReynolds = self.airfoilReynolds[0]
+
+    def normalize_positionValue(self, position):
+        # correct position offset, if fuselage is present
+        position -= (self.fuselageWidth/2)
+
+        # normalize to halfwingspan
+        if self.halfwingspan > 0:
+            position /= self.halfwingspan
+        else:
+            ErrorMsg("normalize_positionValue, halfwingspan is 0")
+        return position
+
+    def denormalize_positionValue(self, position):
+        # denormalize
+        position *= self.halfwingspan
+
+        # correct position offset, if fuselage is present
+        position += (self.fuselageWidth/2)
+        return position
+
+##    def normalize_positions(self):
+##        for idx in range(len(self.airfoilPositions)):
+##            if self.airfoilPositions[idx] != None:
+##                self.airfoilPositions_normalized[idx] = self.airfoilPositions[idx] / self.halfwingspan
+##            else:
+##                self.airfoilPositions_normalized[idx] = None
+
+    def denormalize_positions(self):
+        self.airfoilPositions.clear()
+        num = len(self.airfoilPositions_normalized)
+
+        for idx in range(num):
+            normalized_position = self.airfoilPositions_normalized[idx]
+            if normalized_position != None:
+                position = self.denormalize_positionValue(normalized_position)
+                self.airfoilPositions.append(normalized_position)
+            else:
+                self.airfoilPositions.append(None)
+
+
+    # calculate missing Re-numbers from positions
+    def calculate_ReNumbers(self):
+        num = len(self.airfoilReynolds)
+
+        # loop over list of specified Re-numbers
+        for idx in range(num):
+            if self.airfoilReynolds[idx] == None:
+                # for this position no reynolds-number has been specified.
+                # calculate the number from postition now
+                Re = self.get_ReFromPosition(self.airfoilPositions_normalized[idx])
+                self.airfoilReynolds[idx] = int(round(Re ,0))
+
+
+    def get_shapeParams(self):
+        normalizedTipChord = self.tipDepthPercent / 100
+        shapeParams = (normalizedTipChord, self.tipSharpness,
+                       self.ellipseCorrection)
+        return (self.planformShape, shapeParams)
+
+
+    # get the number of user defined airfoils
+    def get_numUserAirfoils(self):
+        num = 0
+        for foilType in self.airfoilTypes:
+            if (foilType == "user"):
+                num = num + 1
+
+        return num
+
+
+################################################################################
+#
+# chordDistribution class
+#
+################################################################################
+class chordDistribution:
+    # class init
+    def __init__(self):
+        self.num_gridPoints = 0
+        self.grid_delta = 0
+        self.normalizedGrid = []
+
+    def __elliptical_shape(self, x, shapeParams):
+        (normalizedTipChord, tipSharpness, ellipseCorrection) = shapeParams
+
+        # calculate distance to tip, where rounding starts
+        tipRoundingDistance = normalizedTipChord * tipSharpness
+
+        # calculate actual distance to tip
+        distanceToTip = 1.0 - x
+
+       # calculate delta that will be added to pure ellipse
+        if (distanceToTip > tipRoundingDistance):
+            # add constant value, as we are far away from the tip
+            delta = normalizedTipChord
+        else:
+            # add decreasing value according to quarter ellipse
+            a = tipRoundingDistance
+            x1 = tipRoundingDistance - distanceToTip
+            b = normalizedTipChord
+            radicand = (a*a)-(x1*x1)
+
+            if radicand > 0:
+                # quarter ellipse formula
+                delta = (b/a) * np.sqrt(radicand)
+            else:
+                delta = 0
+
+        # elliptical shaping of the wing plus additonal delta
+        chord = (1.0-delta) * np.sqrt(1.0-(x*x)) + delta
+
+        # correct chord with ellipseCorrection
+        chord = chord - ellipseCorrection * sin(interpolate(0.0, 1.0, 0.0, pi, x))
+
+        return chord
+
+
+    def __trapezoidal_shape(self, x, shapeParams):
+        (normalizedTipChord, tipSharpness, ellipseCorrection) = shapeParams
+
+        chord = (1.0-x) + (normalizedTipChord * x)
+        return chord
+
+
+    def __calculate_chord(self, x, shape, shapeParams):
+        if (shape == 'elliptical'):
+                # elliptical shaping of the wing
+                chord = self.__elliptical_shape(x, shapeParams)
+        elif (shape == 'trapezoidal'):
+            # trapezoidal shaping of the wing
+            chord = self.__trapezoidal_shape(x, shapeParams)
+
+        return chord
+
+    # calculate a chord-distribution, which is normalized to root_chord = 1.0
+    # half wingspan = 1
+    def calculate_grid(self, shape, shapeParams, num_gridPoints):
+        self.num_gridPoints = num_gridPoints
+        self.normalizedGrid.clear()
+
+        # calculate interval for setting up the grid
+        self.grid_delta = 1 / (self.num_gridPoints-1)
+
+        grid_delta = self.grid_delta
+
+        # calculate all Grid-chords
+        for i in range(1, (self.num_gridPoints + 1)):
+            # create new normalized grid
+            grid = normalizedGrid()
+
+            # calculate grid coordinates
+            grid.y = grid_delta * (i-1)
+
+            # pure elliptical shaping of the wing as a reference
+            grid.referenceChord = np.sqrt(1.0-(grid.y*grid.y))
+
+            # normalized chord-length
+            grid.chord = self.__calculate_chord(grid.y, shape, shapeParams)
+
+            # append section to section-list of wing
+            self.normalizedGrid.append(grid)
+
+    def get_normalizedGrid(self, idx):
+        return self.normalizedGrid[idx]
+
+    def get_numGridPoints(self):
+        return self.num_gridPoints
+
+    def get_chordFromPosition(self, position):
+        '''get normalized chordlength from normalized position, using the chord distribution '''
+        # valid position specified ?
+        if (position == None):
+            ErrorMsg("invalid position")
+            return None
+
+        # calculate index at which the position will be found in the
+        # chord distribution
+        idx = int(position/self.grid_delta)
+        gridData = self.normalizedGrid
+        maxIdx = len(gridData)
+
+        if idx > maxIdx:
+            # outside specified range
+            ErrorMsg("position %f outside normalized chord distribution" % position)
+            return 0.0
+        elif idx == maxIdx:
+            # last value
+            return gridData[idx].chord
+        else:
+            # interpolate for better precision
+            pos_left = gridData[idx].y
+            chord_left = gridData[idx].chord
+            pos_right = gridData[idx+1].y
+            chord_right = gridData[idx+1].chord
+            chord = interpolate(pos_left, pos_right,chord_left, chord_right, position)
+            return chord
+
+    def get_positionFromChord(self, chord):
+        '''get normalized position from normalized chordlength, using the chord distribution '''
+        # valid chord specified ?
+        if (chord == None):
+            ErrorMsg("invalid chord")
+            return None
+
+        # search in chord distribution for the desired chord.
+        # CAUTION: we assume that chordlength is constantly decreasing !!
+        gridData = self.normalizedGrid
+        maxIdx = len(gridData)
+
+        # search in the chord distribution
+        for idx in range(maxIdx):
+            if (gridData[idx].chord < chord):
+                # found chordlength smaller than the given chord
+                # first value?
+                if idx==0:
+                    return gridData[idx].y
+                else:
+                    # interpolate for better precision
+                    pos_left = gridData[idx-1].y
+                    chord_left = gridData[idx-1].chord
+                    pos_right = gridData[idx].y
+                    chord_right = gridData[idx].chord
+                    position = interpolate(chord_left, chord_right, pos_left, pos_right, chord)
+                    return position
+
+        ErrorMsg("no chordlength was found for position %f" % position)
+        return (0.0)
+
+
+    def plot(self, ax):
+        global cl_referenceChord
+        global cl_normalizedChord
+
+        # generate lists of x and y-coordinates
+        normalizedHalfwingspan = []
+        normalizedChord = []
+        referenceChord = []
+
+        for element in self.normalizedGrid:
+            normalizedHalfwingspan.append(element.y)
+            normalizedChord.append(element.chord)
+            referenceChord.append(element.referenceChord)
+
+        # plot reference chord (pure ellipse)
+        ax.plot(normalizedHalfwingspan, referenceChord, color=cl_referenceChord,
+                linewidth = lw_planform, solid_capstyle="round",
+                label = "pure ellipse")
+
+        # plot normalized chord that will be taken for planform generation
+        ax.plot(normalizedHalfwingspan, normalizedChord, color=cl_normalizedChord,
+                 linewidth = lw_planform, solid_capstyle="round",
+                 label = "normalized chord")
+
+        ax.annotate('Root',
+            xy=(0.0, 0.0), xycoords='data',
+            xytext=(0, 5), textcoords='offset points', color = cl_legend,
+            fontsize=fs_legend, rotation='vertical')
+
+        ax.annotate('Tip',
+            xy=(1.0, 0.0), xycoords='data',
+            xytext=(5, 5), textcoords='offset points', color = cl_legend,
+            fontsize=fs_legend, rotation='vertical')
+
+        # place legend
+        ax.legend(loc='upper right', fontsize=fs_legend, labelcolor=cl_legend,
+         frameon=False)
+
+
+################################################################################
+#
+# planform class
+#
+################################################################################
+class planform:
+    # class init
+    def __init__(self):
+        self.num_gridPoints = 0
+        self.grid = []
+        self.hingeInnerPoint = 0
+        self.hingeOuterPoint = 0
+        self.hingeLineAngle = 0.0
+        self.dihedral = 0.00
+        self.wingArea = 0.0
+        self.geometricalCenter = (0.0, 0.0)
+        self.aspectRatio = 0.0
+
+    def __calculate_wingArea(self):
+        grid_delta_y = self.grid[1].y - self.grid[0].y
+        center_x = 0.0
+        center_y = 0.0
+        self.wingArea = 0.0
+        self.flapArea = 0.0
+
+        for element in self.grid:
+            # sum up area of the grid elements.
+            area = grid_delta_y * element.chord
+            flapArea = grid_delta_y * element.flapDepth
+            center_y = center_y + element.centerLine*area
+            center_x = center_x + element.y*area
+
+            # sum up area of the grid elements, which in the end will be half of
+            # the total wing area / flap area
+            self.wingArea += area
+            self.flapArea += flapArea
+
+        # Calculate geometrical center of the halfwing
+        center_x /= self.wingArea
+        center_y /= self.wingArea
+        self.geometricalCenter = (center_x, center_y)
+
+        # calculate area/ flap area of the whole wing
+        self.wingArea *= 2.0
+        self.flapArea *= 2.0
+
+    def __interpolate_grid(self, grid_left, grid_right, chord):
+        # create new instance of wing grid
+        newGrid = wingGrid()
+
+        # interpolate for better precision
+        chord_left = grid_left.chord
+        y_left = grid_left.y
+        leadingEdge_left = grid_left.leadingEdge
+        quarterChordLine_left = grid_left.quarterChordLine
+        hingeLine_left = grid_left.hingeLine
+        flapDepth_left = grid_left.flapDepth
+        trailingEdge_left = grid_left.trailingEdge
+
+        chord_right = grid_right.chord
+        y_right = grid_right.y
+        leadingEdge_right = grid_right.leadingEdge
+        quarterChordLine_right = grid_right.quarterChordLine
+        hingeLine_right = grid_right.hingeLine
+        flapDepth_right = grid_right.flapDepth
+        trailingEdge_right = grid_right.trailingEdge
+
+        # perform interpolation
+        newGrid.chord = chord
+        newGrid.y = interpolate(chord_left, chord_right, y_left, y_right, chord)
+        newGrid.leadingEdge = interpolate(chord_left, chord_right, leadingEdge_left, leadingEdge_right, chord)
+        newGrid.trailingEdge = interpolate(chord_left, chord_right, trailingEdge_left, trailingEdge_right, chord)
+        newGrid.quarterChordLine = interpolate(chord_left, chord_right, quarterChordLine_left, quarterChordLine_right, chord)
+        newGrid.hingeLine = interpolate(chord_left, chord_right, hingeLine_left, hingeLine_right, chord)
+        newGrid.flapDepth = interpolate(chord_left, chord_right, flapDepth_left, flapDepth_right, chord)
+
+        return newGrid
+
+
+
+    def __get_gridDataFromChord(self, chord):
+        '''get interpolated grid data from chordlength'''
+        # valid chord specified ?
+        if (chord == None):
+            ErrorMsg("invalid chord")
+            return None
+
+        # search in grid for the desired chord.
+        # CAUTION: we assume that chordlength is constantly decreasing !!
+        grid = self.grid
+        maxIdx = len(grid)
+
+        for idx in range(maxIdx):
+            if (grid[idx].chord < chord):
+                # found chordlength smaller than the given chord
+                # first value?
+                if idx==0:
+                    return grid[0]
+                else:
+                    # interpolate for better precision
+                    newGrid = self.__interpolate_grid(grid[idx-1], grid[idx], chord)
+                    return newGrid
+
+        ErrorMsg("no grid data was found for chord %f" % chord)
+        return grid[-1]
+
+    # calculate planform-shape of the half-wing (high-resolution wing planform)
+    def calculate(self, params:params, chordDistribution:chordDistribution):
+        self.grid.clear()
+        self.num_gridPoints = chordDistribution.get_numGridPoints()
+        self.hingeInnerPoint = (1-(params.flapDepthRoot/100))*params.rootchord
+
+        # calculate tip-depth
+        self.tipDepth = params.rootchord*(params.tipDepthPercent/100)
+
+        # calculate the depth of the hinge at the tip
+        tipHingeDepth = self.tipDepth *(params.flapDepthTip/100)
+
+        # calculate quarter-chord-lines
+        rootQuarterChord = params.rootchord/4
+        tipQuarterChord = self.tipDepth/4
+
+        # hinge line angle: convert radian measure --> degree
+        hingeLineAngle_radian = (params.hingeLineAngle/180) * pi
+
+        # calculate hingeOuterPoint from hinge line angle
+        AK = params.halfwingspan
+        GK = tan(hingeLineAngle_radian)*AK
+        self.hingeOuterPoint = self.hingeInnerPoint + GK
+
+        # calculate interval for setting up the grid
+        grid_delta_y = (params.halfwingspan / (self.num_gridPoints-1))
+
+        # calculate all Grid-chords
+        for i in range(1, (self.num_gridPoints + 1)):
+
+            # Get normalized grid for chordlength calculation
+            normalizedGrid = chordDistribution.get_normalizedGrid(i-1)
+            normalizedChord = normalizedGrid.chord
+
+            # create new grid
+            grid = wingGrid()
+
+            # calculate grid coordinates
+            grid.y = grid_delta_y * (i-1)
+
+            # chord-length
+            grid.chord = params.rootchord * normalizedChord
+
+            # calculate hingeDepth in percent at this particular point along the wing
+            hingeDepth_y = interpolate(0.0, params.halfwingspan,
+                                       params.flapDepthRoot, params.flapDepthTip,
+                                       grid.y)
+
+            # correction of leading edge for elliptical planform, avoid swept forward part of the wing
+            delta = (params.leadingEdgeCorrection) * sin(interpolate(0.0, params.halfwingspan, 0.0, pi, grid.y))
+
+            grid.flapDepth = (hingeDepth_y/100)*grid.chord + delta
+            grid.hingeLine = (self.hingeOuterPoint-self.hingeInnerPoint)/(params.halfwingspan) * (grid.y) + self.hingeInnerPoint
+            grid.leadingEdge = grid.hingeLine -(grid.chord-grid.flapDepth)
+
+            # calculate trailing edge according to chordlength at this particular
+            # point along the wing
+            grid.trailingEdge = grid.leadingEdge + grid.chord
+
+            # calculate centerLine, quarterChordLine
+            grid.centerLine = grid.leadingEdge + (grid.chord/2)
+            grid.quarterChordLine = grid.leadingEdge + (grid.trailingEdge-grid.leadingEdge)/4
+
+            # append section to section-list of wing
+            self.grid.append(grid)
+
+        # calculate the area of the wing
+        self.__calculate_wingArea()
+
+        # calculate aspect ratio of the wing
+        # use "halfwingspan", as the fuselage-width has already been substracted
+        self.aspectRatio = ((params.halfwingspan*2)**2) / self.wingArea
+
+        # add offset of half of the fuselage-width to the y-coordinates
+        for element in self.grid:
+            element.y = element.y + params.fuselageWidth/2
+
+    def find_grid(self, chord):
+        return self.__get_gridDataFromChord(chord)
+
+################################################################################
+#
+# Wing class
+#
+################################################################################
+class wing:
+    # class init
+    def __init__(self):
+        # create instance of params
+        self.params = params()
+
+        # dictionary, that will store actual params in dictionary format
+        self.paramsDict = {}
+
+        # create instance of chordDistribution
+        self.chordDistribution = chordDistribution()
+
+        # create instance of planform
+        self.planform = planform()
+
+        # empty list of chords and sections
+        self.normalized_chords = []
+        self.chords = []
+        self.sections = []
+
+    def set_colours(self):
+        global cl_background
+        global cl_grid
+        global cl_quarterChordLine
+        global cl_geoCenter
+        global cl_hingeLine
+        global cl_planform
+        global cl_flapFill
+        global cl_planformFill
+        global cl_sections
+        global cl_userAirfoil
+        global cl_userAirfoil_unassigned
+        global cl_optAirfoil
+        global cl_infotext
+        global cl_diagramTitle
+        global cl_legend
+        global cl_controlPoints
+        global cl_normalizedChord
+        global cl_referenceChord
+        global cl_flapGroup
+        params = self.params
+
+        # common colors
+        cl_userAirfoil_unassigned = 'red'
+
+        # theme specific colors
+        if params.theme == 'Light':
+            # black and white theme
+            cl_background = 'dimgray'
+            cl_grid = 'black'
+            cl_quarterChordLine = 'orange'
+            cl_geoCenter = 'black'
+            cl_hingeLine = 'DeepSkyBlue'
+            cl_planform = 'white'
+            cl_flapFill = 'DeepSkyBlue'
+            cl_planformFill = 'darkgray'
+            cl_sections = 'darkgray'
+            cl_userAirfoil = 'DeepSkyBlue'
+            cl_optAirfoil = 'orange'
+            cl_infotext = 'black'
+            cl_chordlengths = 'darkgray'
+            cl_diagramTitle = 'darkgray'
+            cl_legend = 'black'
+            cl_referenceChord = 'lightgray'
+            cl_normalizedChord = 'orange'
+            cl_controlPoints = 'red'
+            cl_flapGroup = 'darkgray'
+        elif params.theme == 'Dark':
+            # dark theme
+            cl_background = 'black'
+            cl_grid = 'ghostwhite'
+            cl_quarterChordLine = 'orange'
+            cl_geoCenter = 'lightgray'
+            cl_hingeLine = 'DeepSkyBlue'
+            cl_flapFill ='DeepSkyBlue'
+            cl_planform = 'gray'
+            cl_planformFill = 'lightgray'
+            cl_sections = 'grey'
+            cl_userAirfoil = 'DeepSkyBlue'
+            cl_optAirfoil = 'orange'
+            cl_infotext = 'DeepSkyBlue'
+            cl_chordlengths = 'darkgray'
+            cl_diagramTitle = 'dimgray'
+            cl_legend = 'ghostwhite'
+            cl_referenceChord = 'gray'
+            cl_normalizedChord = 'orange'
+            cl_controlPoints = 'red'
+            cl_flapGroup = 'gray'
+        else:
+            ErrorMsg("undefined Theme: %s" %params.theme)
+
+    # compose a name from the airfoil basic name and the Re-number
+    def set_AirfoilNamesFromRe(self):
+        params = self.params
+        # loop over all airfoils (without tip and fuselage section)
+        for idx in range(params.numAirfoils):
+            Re = params.airfoilReynolds[idx]
+            airfoilName = (params.airfoilBasicName + "-%s.dat") % get_ReString(Re)
+            params.airfoilNames.append(airfoilName)
+
+
+    # set missing airfoilnames from basic name and Re-number
+    def set_AirfoilNames(self):
+        params = self.params
+        if (len(params.airfoilNames) == 0):
+            # list is empty and has to be created
+            self.set_AirfoilNamesFromRe()
+
+        # check if the .dat ending was appended to all airfoils.
+        # if not, append the ending
+        for idx in range(params.numAirfoils):
+            if (params.airfoilNames[idx].find('.dat')<0):
+                params.airfoilNames[idx] = params.airfoilNames[idx] +'.dat'
+
+
+    def insert_fuselageData(self):
+        params = self.params
+        params.airfoilNames.insert(0, params.airfoilNames[0])
+
+        # root airfoil must be of type "user", so always insert user-airfoil
+        params.userAirfoils.insert(0, params.userAirfoils[0])
+        params.airfoilTypes.insert(0, params.airfoilTypes[0])
+
+        # section has same chord, same reynolds
+        self.chords.insert(0, self.chords[0])
+        params.airfoilPositions_normalized.insert(0, 0.0)
+        params.airfoilPositions.insert(0, 0.0)
+        params.airfoilReynolds.insert(0, params.airfoilReynolds[0])
+
+
+    def insert_tipData(self):
+        params = self.params
+        params.airfoilNames.append(params.airfoilNames[-1])
+        params.airfoilTypes.append(params.airfoilTypes[-1])
+        params.airfoilPositions_normalized.append(1.0)
+        params.airfoilPositions.append(params.wingspan/2)
+
+        # is last airfoil of type "user" ?
+        if params.airfoilTypes[-1] == "user":
+            # yes, so append user-airfoil
+            params.userAirfoils.append(params.userAirfoils[-1])
+        elif params.airfoilTypes[-1] == "opt":
+            # append 'None'
+            params.userAirfoils.append(None)
+
+        reynolds = (params.tipchord / self.chords[-1]) * params.airfoilReynolds[-1]
+        params.airfoilReynolds.append(int(round(reynolds,0)))
+        self.chords.append(params.tipchord)
+        self.normalized_chords.append(params.tipchord/params.rootchord)
+
+    # get the number of user defined airfoils
+    def get_numUserAirfoils(self):
+        num = 0
+        for foilType in self.airfoilTypes:
+            if (foilType == "user"):
+                num = num + 1
+
+        return num
+
+    def apply_params(self):
+        global num_gridpoints_default
+
+        # first clean up in case this function was repeatedly called
+        self.chords.clear()
+        self.sections.clear()
+
+        params = self.params
+
+        # start modifying and applying params now
+        params.calculate_dependendValues()
+
+        # get basic shape parameters
+        (shape, shapeParams) = params.get_shapeParams()
+
+        # setup chordDistribution
+        self.chordDistribution.calculate_grid(shape, shapeParams, num_gridpoints_default)
+
+        # calculate planform
+        self.planform.calculate(self.params, self.chordDistribution)
+
+        # calculate chordlengths, either by position or reynolds of the airfoil
+        self.calculate_chordlengths()
+
+        # normalized positions: 0.0...1.0 --> positions 0.0..halfwingspan
+        params.denormalize_positions()
+
+        # calculate missing Re-numbers (if only airfoil position had been specified)
+        # CAUTION: Re-numbers will be rounded to int (loss of precision)
+        self.calculate_ReNumbers()
+
+        # calculate missing positions (if only airfoil Re-number had been specified),
+        # therefore use chordlengths (more accurate than reynolds)
+        self.calculate_Positions()
+
+        # airfoil names can be set after all re numbers are known
+        self.set_AirfoilNames()
+
+        # if there is a fuselage, insert data for the fuselage section
+        # at the beginning of the list.
+        if self.fuselageIsPresent():
+            self.insert_fuselageData()
+
+        # always insert data for the wing tip
+        self.insert_tipData()
+
+        # calculate the sections now
+        self.calculate_sections()
+
+        # assign the flap groups to the different sections
+        self.assignFlapGroups()
+
+        # set colours according to selected theme
+        self.set_colours()
+
+    # set basic data of the wing
+    def set_Data(self, dictData):
+        params = self.params
+
+        # read initial parameters from dictionary
+        params.read_fromDict(dictData)
+
+        # export initial params to dictionary
+        params.write_toDict(self.paramsDict)
+
+        # now apply params which will modify the content of params
+        self.apply_params()
 
     # get name of the user defined airfoil, as it will appear in the planform
     def get_UserAirfoilName(self, userAirfoil_idx):
@@ -709,327 +1230,187 @@ class wing:
         return None
 
 
-
     # find planform-values for a given chord-length
     def find_PlanformData(self, chord):
-        for element in self.grid:
-            if (element.chord <= chord):
-              return element
-
+        return self.planform.find_grid(chord)
 
     # copy planform-values to section
     def copy_PlanformDataToSection(self, grid, section):
+        params = self.params
         section.y = grid.y
         section.chord = grid.chord
-        section.hingeDepth = grid.hingeDepth
+        section.flapDepth = grid.flapDepth
         section.hingeLine = grid.hingeLine
         section.trailingEdge = grid.trailingEdge
         section.leadingEdge = grid.leadingEdge
         section.quarterChordLine = grid.quarterChordLine
-        section.areaCenterLine = grid.areaCenterLine
-        section.dihedral = self.dihedral
+        section.dihedral = params.dihedral
 
         # set Re of the section (only for proper airfoil naming)
-        section.Re = (section.chord / self.rootchord) * self.rootReynolds
+        section.Re = (section.chord / params.rootchord) * params.rootReynolds
 
 
     # sets the airfoilname of a section
     def set_AirfoilName(self, section):
+        params = self.params
         try:
-            section.airfoilName = self.airfoilNames[section.number-1]
+            section.airfoilName = params.airfoilNames[section.number-1]
         except:
             ErrorMsg("No airfoilName found for section %d" % section.number)
 
     def set_lastSectionAirfoilName(self, section):
-            section.airfoilName = self.airfoilNames[section.number-2]
+        params = self.params
+        section.airfoilName = params.airfoilNames[section.number-2]
 
-   # calculates a chord-distribution, which is normalized to root_chord = 1.0
-   # half wingspan = 1
-    def calculate_normalizedChordDistribution(self):
-        # calculate interval for setting up the grid
-        grid_delta_y = 1 / (self.numberOfGridChords-1)
-        normalizedTipChord = self.tipDepthPercent / 100
-        normalizedRootChord = normalizedTipChord
+    def get_params(self):
+        return self.paramsDict
 
-        # In case of curve fitting, determine the optimum parameters
-        # automatically
-        if self.planformShape == 'curve_fitting':
-##            if self.use_bezier: FIXME BEZIER
-##                # curve fitting with objective function
-##                guess = (0.6,1.0,  0.5,1.0,  0.7,0.8,  0.9,0.5,  0.95,0.4)
-##                popt, _ = curve_fit(objective_bezier_wrapper, self.planform_chord, self.planform_y, p0=guess)
-##                b1_x, b1_y, b2_x, b2_y, b3_x, b3_y, b4_x, b4_y, b5_x, b5_y = popt
-##
-##                # store bezier control points
-##                self.bezier_x = (b1_x, b2_x, b3_x, b4_x, b5_x)
-##                self.bezier_y = (b1_y, b2_y, b3_y, b4_y, b5_y)
-            #else:
-            guess = (0.18, 0.1, 0.005)
-            popt, _ = curve_fit(objective_elliptical_wrapper, self.planform_chord, self.planform_y, p0=guess, bounds=(0.0, 100.0))
-            normalizedTipChord, self.tipSharpness, self.leadingEdgeCorrection = popt
+    def get_planformName(self):
+        return self.paramsDict["planformName"]
 
-        # calculate all Grid-chords
-        for i in range(1, (self.numberOfGridChords + 1)):
-            # create new normalized grid
-            grid = normalizedGrid()
+    def get_airfoilNames(self):
+        newList = self.params.airfoilNames[:]
 
-            # calculate grid coordinates
-            grid.y = grid_delta_y * (i-1)
+        # remove duplicate tip airfoil (last element)
+        newList.pop()
 
-            # pure elliptical shaping of the wing as a reference
-            grid.referenceChord = np.sqrt(1.0-(grid.y*grid.y))
-            #if (grid.y % 0.1) < grid_delta_y:
-             #   print("%1.5f\n" % grid.referenceChord)
+        if self.fuselageIsPresent():
+            # remove duplicate root airfoil
+            newList.pop(0)
 
-            # normalized chord-length
-            if (self.planformShape == 'elliptical'):
-                # elliptical shaping of the wing
-                grid.chord = objective_elliptical(grid.y, normalizedTipChord,
-                                self.tipSharpness, self.leadingEdgeCorrection)
+        airfoilNames = []
+        for element in newList:
+            airfoilNames.append(re.sub('.dat', '', element))
 
-            elif(self.planformShape == 'curve_fitting'):
-##                if self.use_bezier: FIXME BEZIER
-##                    # curve fitting algorithm with bezier
-##                    grid.chord = objective_bezier(grid.y, b1_x, b1_y, b2_x, b2_y, b3_x, b3_y, b4_x, b4_y, b5_x, b5_y)
-##                else:
-                grid.chord = objective_elliptical(grid.y, normalizedTipChord,
-                                self.tipSharpness, self.leadingEdgeCorrection)
-
-            elif self.planformShape == 'trapezoidal':
-                # trapezoidal shaping of the wing
-                grid.chord = (1.0-grid.y) \
-                            + normalizedTipChord * (grid.y)
-
-##            # calculate hinge line
-##            grid.hinge = interpolate(0.0 , 1.0, (self.hingeDepthRoot/100),
-##                   ((self.hingeDepthTip/100) * normalizedTipChord), grid.y)
-##
-##            # calculate leadingEdge, trailingedge
-##            grid.leadingEdge = grid.hingeLine -(grid.chord-grid.hingeDepth
-
-            # append section to section-list of wing
-            self.normalizedGrid.append(grid)
-
-    # calculate planform-shape of the half-wing (high-resolution wing planform)
-    def calculate_planform(self):
-        self.hingeInnerPoint = (1-(self.hingeDepthRoot/100))*self.rootchord
-
-        # calculate tip-depth
-        self.tipDepth = self.rootchord*(self.tipDepthPercent/100)
-
-        # calculate the depth of the hinge at the tip
-        tipHingeDepth = self.tipDepth *(self.hingeDepthTip/100)
-
-        # calculate quarter-chord-lines
-        rootQuarterChord = self.rootchord/4
-        tipQuarterChord = self.tipDepth/4
-
-        # hinge line angle: convert radian measure --> degree
-        hingeLineAngle_radian = (self.hingeLineAngle/180) * pi
-
-        # calculate hingeOuterPoint from hinge line angle
-        AK = self.halfwingspan
-        GK = tan(hingeLineAngle_radian)*AK
-        self.hingeOuterPoint = self.hingeInnerPoint + GK
-
-        # calculate interval for setting up the grid
-        grid_delta_y = (self.halfwingspan / (self.numberOfGridChords-1))
-
-        # init areaCenter
-        area_Center = 0.0
-
-        # track maximum value of leading edge derivative
-        LE_derivative_max = 0.0
-
-        # track maximum value of hingeDepth
-        hingeDepthPercent_max = 0.0
-
-        # calculate all Grid-chords
-        for i in range(1, (self.numberOfGridChords + 1)):
-
-            # Get normalized grid for chordlength calculation
-            normalizedGrid = self.normalizedGrid[i-1]
-            normalizedChord = normalizedGrid.chord
-
-            # create new grid
-            grid = wingGrid()
-
-            # calculate grid coordinates
-            grid.y = grid_delta_y * (i-1)
-
-            # chord-length
-            grid.chord = self.rootchord * normalizedChord
-
-            # calculate hingeDepth in percent at this particular point along the wing
-            hingeDepth_y = interpolate(0.0, self.halfwingspan,
-                                       self.hingeDepthRoot, self.hingeDepthTip,
-                                       grid.y)
-
-            # correction of leading edge for elliptical planform, avoid swept forward part of the wing
-            #delta = self.leadingEdgeCorrection * sin(interpolate(0.0, self.halfwingspan, 0.0, pi, grid.y))#FIXME
-
-            grid.hingeDepth = (hingeDepth_y/100)*grid.chord #+ delta FIXME
-            grid.hingeLine = (self.hingeOuterPoint-self.hingeInnerPoint)/(self.halfwingspan) * (grid.y) + self.hingeInnerPoint
-            grid.leadingEdge = grid.hingeLine -(grid.chord-grid.hingeDepth)
-
-            # calculate trailing edge according to chordlength at this particular
-            # point along the wing
-            grid.trailingEdge = grid.leadingEdge + grid.chord
-
-            # calculate centerLine, quarterChordLine
-            grid.centerLine = grid.leadingEdge + (grid.chord/2)
-            grid.quarterChordLine = grid.leadingEdge + (grid.trailingEdge-grid.leadingEdge)/4
-
-            # Calculate derivative of Leading edge
-            if (i>3):
-                grid.LE_derivative = -1.0*(self.grid[i-2].leadingEdge - self.grid[i-3].leadingEdge) / (self.grid[i-2].y - self.grid[i-3].y)
-            else:
-                grid.LE_derivative = 0.0
-
-            # Tracking of LE-derative Maximum-value
-            if (grid.LE_derivative < LE_derivative_max):
-                LE_derivative_max = grid.LE_derivative
-
-            # calculate percentual hingeDepth
-            grid.hingeDepthPercent = ((grid.trailingEdge - grid.hingeLine) / grid.chord) * 100.0
-
-            # Tracking of hingeDepth maximum value
-            if (grid.hingeDepthPercent > hingeDepthPercent_max):
-                hingeDepthPercent_max = grid.hingeDepthPercent
+        return airfoilNames
 
 
-            # append section to section-list of wing
-            self.grid.append(grid)
+    def get_airfoilPositions(self):
+        airfoilPositions = []
 
-        # calculate the area of the wing
-        self.calculate_wingArea()
+        # determine number of airfoil positions from sections, without tip
+        # airfoil
+        num = len(self.sections) - 1
 
-        # calculate aspect ratio of the wing
-        self.aspectRatio = self.wingspan*self.wingspan / (self.area/100)
+        if self.fuselageIsPresent():
+             # remove root airfoil
+            startIdx = 1
+            num -= 1
+        else:
+            startIdx = 0
 
-        # add offset of half of the fuselage-width to the y-coordinates
-        for element in self.grid:
-            element.y = element.y + self.fuselageWidth/2
-            element.areaCenterLine = self.area_Center
+        for idx in range(startIdx, num):
+            # get position, scale from m to mm
+            position = self.sections[idx].y# * 1000.0 FIXME
+            airfoilPositions.append(position)
 
-        #self.draw_LE_derivative() #FIXME Debug-plot
+        return airfoilPositions
 
-        return (LE_derivative_max, hingeDepthPercent_max)
+    def get_flapPositions(self):
+        flapPos_x = []
+        flapPos_y = []
+        # get flap groups, separation lines and airfoil names at the separation lines
+        (flap_groups, flapPositions_x, flapPositions_y, airfoilNames) = self.get_flapGroups()
 
+        num = len(flapPositions_x)
+        for idx in range(num):
+            (dummy, x) = flapPositions_x[idx]
+            (dummy, y) = flapPositions_y[idx]
+            flapPos_x.append(x)
+            flapPos_y.append(y)
 
-    def calculate_wingArea(self):
-        grid_delta_y = self.grid[1].y - self.grid[0].y
-        area_Center = 0.0
-        self.area = 0.0
+        return (flapPos_x, flapPos_y)
 
-        for element in self.grid:
-            # sum up area
-            area = (grid_delta_y*10 * element.chord*10)
-            area_Center = area_Center + element.centerLine*area
-
-            # calculate area of the wing
-            self.area = self.area + area
-
-        # Calculate areaCenter (Flaechenschwerpunkt)
-        self.area_Center = area_Center / self.area
-
-        # calculate area of the whole wing
-        self.area = self.area * 2.0
-
-
-    # get chordlength from position, according to the planform-data
-    def get_chordFromPosition(self, position):
-        # valid position specified ?
-        if (position == None):
-            ErrorMsg("invalid position")
-            return None
-
-        # get chord from planform
-        for gridData in self.grid:
-            if (gridData.y >= position):
-                return gridData.chord
-        ErrorMsg("no chordlength was found for position %f" % position)
-        return None
+    def get_distributionParams(self):
+        distributionParams = (self.params.planformShape,
+        self.params.tipDepthPercent, self.params.tipSharpness,
+        self.params.ellipseCorrection)
+        return distributionParams
 
 
     # get Re from position, according to the planform-data
-    def get_ReFromPosition(self, position):
-        chord = self.get_chordFromPosition(position)
-        if (chord != None):
-            chordRatio = chord / self.rootchord
-            Re = self.airfoilReynolds[0] * chordRatio
+    def get_ReFromPosition(self, normalized_position):
+        normalized_chord = self.chordDistribution.get_chordFromPosition(normalized_position)
+        if (normalized_chord != None):
+            Re = self.params.airfoilReynolds[0] * normalized_chord
             return Re
         else:
-            ErrorMsg("no Re could not be caclulated for position %f" % position)
+            ErrorMsg("no Re could not be caclulated for position %f" % normalized_position)
             return None
 
 
     # get chordlength from position, according to the planform-data
-    def get_chordFromPositionOrReynolds(self, position, reynolds):
-        # valid reynolds number specified ?
+    def get_chordFromPositionOrReynolds(self, normalized_position, reynolds):
+        params = self.params
+        # valid reynolds number specified ? Will be preferred before position
         if (reynolds != None):
-            # calculate chord from ratio reynolds to rootReynolds
-            return (reynolds / self.rootReynolds) * self.rootchord
+            # calculate chord from reynolds to rootReynolds ratio
+            normalizedChord = (reynolds/params.rootReynolds)
+            chord = normalizedChord * params.rootchord
+            return (normalizedChord, chord)
 
         # valid position specified ?
-        elif (position != None):
-            # get chord from planform
-            for gridData in self.grid:
-                if (gridData.y >= position):
-                    return gridData.chord
+        elif (normalized_position != None):
+            # get normalized chord from chord distribution
+            normalizedChord = self.chordDistribution.get_chordFromPosition(normalized_position)
+            chord = normalizedChord * params.rootchord
+            return (normalizedChord, chord)
 
         # nothing was found
         ErrorMsg("position or reynolds not found inside planform")
-        NoteMsg("position was: %f, reynolds was %d" % (position, reynolds))
-        return None
+        NoteMsg("position was: %f, reynolds was %d" % (normalized_position, reynolds))
+        return (None, None)
 
 
     # calculate all chordlenghts from the list of airfoil positions
     # and the given planform-data
     def calculate_chordlengths(self):
-        for idx in range(len(self.airfoilPositions)):
-            position = self.airfoilPositions[idx]
-            reynolds = self.airfoilReynolds[idx]
-            chord = self.get_chordFromPositionOrReynolds(position, reynolds)
+        self.normalized_chords.clear()
+        self.chords.clear()
+        params = self.params
+        for idx in range(len(params.airfoilPositions_normalized)):
+            normalized_position = params.airfoilPositions_normalized[idx]
+            reynolds = params.airfoilReynolds[idx]
+            (normalized_chord, chord) = self.get_chordFromPositionOrReynolds(normalized_position, reynolds)
+            self.normalized_chords.append(normalized_chord)
             self.chords.append(chord)
 
-
-    def denormalize_positions(self):
-        for idx in range(len(self.airfoilPositions)):
-            if self.airfoilPositions[idx] != None:
-                self.airfoilPositions[idx] = self.airfoilPositions[idx] * self.halfwingspan
-
-
-    def calculate_positions(self):
-        for idx in range(len(self.airfoilPositions)):
-            if self.airfoilPositions[idx] == None:
+    def calculate_Positions(self):
+        '''calculates missing positions'''
+        params = self.params
+        num = len(params.airfoilPositions_normalized)
+        for idx in range(num):
+            if params.airfoilPositions_normalized[idx] == None:
                 # no position defined yet, calculate now
-                grid = self.find_PlanformData(self.chords[idx])
-                self.airfoilPositions[idx] = grid.y
+                normalized_chord = self.normalized_chords[idx]
+                normalized_position = self.chordDistribution.get_positionFromChord(normalized_chord)
+                params.airfoilPositions_normalized[idx] = normalized_position
+                params.airfoilPositions[idx] = self.params.denormalize_positionValue(normalized_position)
 
 
     # calculate missing Re-numbers from positions
     def calculate_ReNumbers(self):
-        num = len(self.airfoilReynolds)
+        num = len(self.params.airfoilReynolds)
 
         # loop over list of specified Re-numbers
         for idx in range(num):
-            if self.airfoilReynolds[idx] == None:
+            if self.params.airfoilReynolds[idx] == None:
                 # for this position no reynolds-number has been specified.
                 # calculate the number from postition now
-                Re = self.get_ReFromPosition(self.airfoilPositions[idx])
-                self.airfoilReynolds[idx] = int(round(Re ,0))
+                Re = self.get_ReFromPosition(self.params.airfoilPositions[idx])
+                self.params.airfoilReynolds[idx] = int(round(Re ,0))
 
 
     # determine weather a fuselage shall be used
     def fuselageIsPresent(self):
         # check, if a fuselageWidth > 0 was defined
-        if self.fuselageWidth >= 0.0001:
+        if self.params.fuselageWidth >= 0.0001:
             return True
         else:
             return False
 
     def getFlapPartingLines(self):
+        params = self.params
         flapPositions_x = []
         flapPositions_y =[]
         flapPositions_x_left =[]
@@ -1037,15 +1418,15 @@ class wing:
 
         # As we have a projected drawing of the wing, we must consider the
         # projection factor
-        proj_fact = cos(self.dihedral*pi/180.0)
-        proj_halfwingSpan = self.halfwingspan * proj_fact
+        proj_fact = cos(params.dihedral*pi/180.0)
+        proj_halfwingSpan = params.halfwingspan * proj_fact
 
         sections = self.sections
         numSections = len(sections)
         actualFlapGroup = 0
 
         # Calculate zero Axis (center of the wing)
-        zeroAxis = proj_halfwingSpan + self.fuselageWidth/2
+        zeroAxis = proj_halfwingSpan + params.fuselageWidth/2
 
         # check all sections
         for idx in range (0, numSections):
@@ -1071,6 +1452,38 @@ class wing:
         flapPositions_y = flapPositions_y + flapPositions_y
 
         return (flapPositions_x, flapPositions_y)
+
+    def get_flapGroups(self):
+        params = self.params
+        sections = self.sections
+        numSections = len(sections)
+        flapGroups = []
+        flapPositions_x = []
+        flapPositions_y = []
+        airfoilNames = []
+        actualFlapGroup = 0
+
+        # check all sections
+        for idx in range (0, numSections):
+            section = sections[idx]
+
+            # Change of Flap-Group or last section? -->separation line
+            if ((actualFlapGroup != section.flapGroup) or
+               ((idx == (numSections-1)) and (section.flapGroup !=0))):
+                # determine x_pos and flapDepth
+                x = section.y# * 1000.0 # m --> mm #FIXME
+                flapDepthPercent = (section.flapDepth / section.chord) * 100
+
+                # append tupel to lists
+                flapPositions_x.append((x,x))
+                flapPositions_y.append((0,flapDepthPercent))
+                flapGroups.append(section.flapGroup)
+                airfoilNames.append(re.sub('.dat', '', section.airfoilName))
+
+            # store actual flapGroup for comparison
+            actualFlapGroup = section.flapGroup
+
+        return (flapGroups, flapPositions_x, flapPositions_y, airfoilNames)
 
     # adds a section using given grid-values
     def add_sectionFromGrid(self, grid):
@@ -1105,7 +1518,7 @@ class wing:
     # add an own section for the fuselage and use rootchord
     def add_fuselageSection(self):
         # get the root grid-values
-        grid = deepcopy(self.grid[0])
+        grid = deepcopy(self.planform.grid[0])
 
         # set offset to zero so the section will start exactly in the center
         grid.y = 0
@@ -1113,10 +1526,12 @@ class wing:
         # add section now
         self.add_sectionFromGrid(grid)
 
+    def remove_fuselageSection(self):
+       del(self.sections[0])
 
     # calculate all sections of the wing, oriented at the grid
     def calculate_sections(self):
-        self.sections = []
+        self.sections.clear()
         # check if fuselageWidth is > 0
         if self.fuselageIsPresent():
             # first add section for fuselage
@@ -1137,70 +1552,82 @@ class wing:
     # e.g in FLZ-Vortex or XFLR5.
     # Also other calculations, like wing area, aspect ratio etc. get
     # more accurate
-    def interpolate_sections(self):
-        if self.interpolationSegments < 1:
+    def interpolate_sections(self, steps):
+        params = self.params
+        if steps < 1:
             # nothing to do
             return
 
         NoteMsg("Interpolation of sections was requested, interpolating each section with"\
-                " additional %d steps" % self.interpolationSegments)
+                " additional %d steps" % steps)
 
         new_positions = []
+        new_positions_normalized = []
         new_chords = []
         new_airfoilNames = []
         new_airfoilTypes = []
         new_flapGroups = []
 
-        num = len(self.airfoilPositions)
+        num = len(params.airfoilPositions)
 
         if self.fuselageIsPresent():
             # do not interpolate fuselage section
             startIdx = 1
-            new_positions.append(self.airfoilPositions[0])
+            new_positions.append(params.airfoilPositions[0])
+            new_positions_normalized.append(params.airfoilPositions_normalized[0])
             new_chords.append(self.chords[0])
-            new_airfoilNames.append(self.airfoilNames[0])
-            new_airfoilTypes.append(self.airfoilTypes[0])
-            # assinging flapGroup of fuselage not necessary, will be done
+            new_airfoilNames.append(params.airfoilNames[0])
+            new_airfoilTypes.append(params.airfoilTypes[0])
+            # assigning flapGroup of fuselage not necessary, will be done
             # in assignFlapGroups!
         else:
             startIdx = 0
 
         for idx in range(startIdx, num-1):
             # determine interpolation-distance
-            posDelta = self.airfoilPositions[idx+1]-self.airfoilPositions[idx]
-            posDelta = posDelta / float(self.interpolationSegments+1)
+            posDelta = float(params.airfoilPositions[idx+1]-params.airfoilPositions[idx])
+            posDelta /= (steps+1)
 
-            # add existiong position and name
-            new_positions.append(self.airfoilPositions[idx])
+            posDelta_normalized  = float(params.airfoilPositions_normalized[idx+1] - params.airfoilPositions_normalized[idx])
+            posDelta_normalized /= (steps+1)
+
+            # add existiog position and name
+            new_positions.append(params.airfoilPositions[idx])
+            new_positions_normalized.append(params.airfoilPositions_normalized[idx])
             new_chords.append(self.chords[idx])
-            new_airfoilNames.append(self.airfoilNames[idx])
-            new_airfoilTypes.append(self.airfoilTypes[idx])
-            new_flapGroups.append(self.flapGroups[idx])
+            new_airfoilNames.append(params.airfoilNames[idx])
+            new_airfoilTypes.append(params.airfoilTypes[idx])
+            new_flapGroups.append(params.flapGroups[idx])
 
             # add interpolated position and name
-            for n in range(self.interpolationSegments):
-                position = self.airfoilPositions[idx] + (float(n+1)*posDelta)
-                chord = self.get_chordFromPosition(position)
+            for n in range(steps):
+                position = params.airfoilPositions[idx] + float((n+1)*posDelta)
+                position_normalized = params.airfoilPositions_normalized[idx] + float((n+1)*posDelta_normalized)
                 new_positions.append(position)
+                new_positions_normalized.append(position_normalized)
+                normalized_chord = float(self.chordDistribution.get_chordFromPosition(position_normalized))
+                chord = float(normalized_chord * params.rootchord)
                 new_chords.append(chord)
-                new_airfoilNames.append(self.airfoilNames[idx])
-                new_flapGroups.append(self.flapGroups[idx])
+                new_airfoilNames.append(params.airfoilNames[idx])
+                new_flapGroups.append(params.flapGroups[idx])
                 new_airfoilTypes.append("blend")
 
         # set Tip values
-        new_positions.append(self.airfoilPositions[-1])
+        new_positions.append(params.airfoilPositions[-1])
+        new_positions_normalized.append(params.airfoilPositions_normalized[-1])
         new_chords.append(self.chords[-1])
-        new_airfoilNames.append(self.airfoilNames[-1])
-        new_airfoilTypes.append(self.airfoilTypes[-1])
+        new_airfoilNames.append(params.airfoilNames[-1])
+        new_airfoilTypes.append(params.airfoilTypes[-1])
         # assigning of flapGroup for tip not  not necessary, will be done in
         # assignFlapGroups!
 
         # assign interpolated lists
-        self.airfoilPositions = new_positions
-        self.airfoilTypes = new_airfoilTypes
-        self.airfoilNames = new_airfoilNames
+        params.airfoilPositions = new_positions
+        params.airfoilPositions_normalized = new_positions_normalized
+        params.airfoilTypes = new_airfoilTypes
+        params.airfoilNames = new_airfoilNames
         self.chords = new_chords
-        self.flapGroups = new_flapGroups
+        params.flapGroups = new_flapGroups
 
         # calculate the interpolated sections
         self.calculate_sections()
@@ -1210,131 +1637,94 @@ class wing:
 
     # assigns the user defined flap groups to the different sections
     def assignFlapGroups(self):
+        params = self.params
         if self.fuselageIsPresent():
             # add flapGroup 0 at the beginning of the list
-            self.flapGroups.insert(0,0)
+            params.flapGroups.insert(0,0)
 
         # append flapGroup for the tip section, which is the same as for the section before
-        self.flapGroups.append(self.flapGroups[-1])
+        params.flapGroups.append(params.flapGroups[-1])
+        num = len(self.sections)
+        num_flap_groups = len(params.flapGroups)
 
-        # assign flap groups now
-        for idx in range (len(self.sections)):
-            self.sections[idx].flapGroup = self.flapGroups[idx]
+        if (num_flap_groups != num):
+            ErrorMsg("number of sections %d != number of flap groups %d" %(num, num_flap_groups))
+        else:
+            # assign flap groups now
+            for idx in range (len(self.sections)):
+                self.sections[idx].flapGroup = params.flapGroups[idx]
 
     # get color for plotting
-    def get_colorFromAirfoilType(self, airfoilType):
+    def get_AirfoilTypeAndColor(self, idx):
+        global cl_userAirfoil_unassigned
+        global cl_userAirfoil
+        global cl_optAirfoil
+        global cl_sections
+
+        # get type of airfoil
+        try:
+            airfoilType = self.params.airfoilTypes[idx]
+        except:
+            airfoilType = 'blend'
+        try:
+            filename = self.params.userAirfoils[idx]
+            if (filename == 'None') or (filename == ''):
+                filename == None
+        except:
+            filename = None
+
         if (airfoilType == 'user'):
-            color = cl_userAirfoil
+            if (filename != None):
+                color = cl_userAirfoil
+            else:
+                color = cl_userAirfoil_unassigned
+                airfoilType = 'user_unassigned'
         elif (airfoilType == 'opt'):
             color = cl_optAirfoil
         else:
             color = cl_sections
 
-        return color
+        return (airfoilType, color)
 
+    def __plot_planformDataLabel(self, ax, x):
+        params = self.params
+        planform = self.planform
 
-    # plot planform of the half-wing
-    def plot_HalfWingPlanform(self, ax):
+        # scaling from square mm to square dm
+        wingArea_dm = planform.wingArea / 10000.0
+
+        proj_fact = cos(params.dihedral*pi/180.0)
+        proj_wingArea_dm = proj_fact * wingArea_dm
+        flapToWingAreaRatio = (planform.flapArea / planform.wingArea)*100
+
+        # plot label containing basic planform data
+        text = ("Wing Area: %.1f dm² / proj. wing area: %.1f dm²\nAspect ratio: %.1f\nFlap area / wing area ratio: %.1f %%" %\
+                (wingArea_dm, proj_wingArea_dm, planform.aspectRatio, flapToWingAreaRatio))
+
+        (y_min,y_max) = ax.get_ylim()
+        y_off = -1 * (fs_legend * 4)
+
+        ax.annotate(text, xy=(x, y_min), xycoords='data', xytext=(0, y_off),
+         textcoords='offset points', color = cl_legend,fontsize=fs_legend)
+
+    def plot_PlanformShape(self, ax):
+        params = self.params
+
         # create empty lists
         xValues = []
         leadingEdge = []
         trailingeEge = []
         hingeLine = []
         quarterChordLine = []
-        areaCenterLine = []
 
-        # setup empty lists for new tick locations
-        x_tick_locations = []
-        y_tick_locations = [self.rootchord]
-
-        # set axes and labels
-        self.set_AxesAndLabels(ax, "Half-wing planform")
-
-        # plot sections in reverse order
-        idx = len(self.airfoilTypes) - 1
-
-        # check if there is a fuselage section
-        if self.fuselageIsPresent():
-            # skip fuselage section
-            sectionsList = self.sections[1:]
-        else:
-            # plot all sections
-            sectionsList = self.sections
-
-        for element in reversed(sectionsList):
-            # determine type of airfoil of this section
-            try:
-                airfoilType = self.airfoilTypes[idx]
-            except:
-                airfoilType = 'blend'
-
-            labelColor = self.get_colorFromAirfoilType(airfoilType)
-
-            ax.plot([element.y, element.y] ,[element.leadingEdge, element.trailingEdge],
-            color=labelColor, linestyle = ls_sections, linewidth = lw_sections,
-            solid_capstyle="round")
-
-            # determine x and y Positions of the labels
-            xPos = element.y
-            if (self.leadingEdgeOrientation == 'up'):
-                yPosChordLabel = element.trailingEdge
-                yPosOffsetSectionLabel = 32
-            else:
-                yPosChordLabel = element.leadingEdge
-                yPosOffsetSectionLabel = -32
-
-            yPosSectionLabel = element.leadingEdge
-
-            # plot label for chordlength of section
-            try:
-                text = ("%d mm" % int(round(element.chord*1000)))
-            except:
-                text = ("0 mm" )
-                ErrorMsg("label for chordlength of section could not be plotted")
-
-            ax.annotate(text,
-            xy=(xPos, yPosChordLabel), xycoords='data',
-            xytext=(2, 5), textcoords='offset points', color = cl_chordlengths,
-            fontsize=fs_infotext, rotation='vertical')
-
-
-            # plot label for airfoil-name / section-name
-            text = ("%s" % (remove_suffix(element.airfoilName,'.dat')))
-            props=dict(arrowstyle="-", connectionstyle= "angle,angleA=-90,angleB=30,rad=10", color=labelColor)
-
-            ax.annotate(text,
-            xy=(xPos, yPosSectionLabel), xycoords='data',
-            xytext=(8, yPosOffsetSectionLabel), textcoords='offset points', color = 'white',
-            bbox=dict(boxstyle="round", facecolor = labelColor, alpha=0.5), fontsize=fs_infotext, rotation='vertical', arrowprops=props)
-
-            # append position of section to x-axis ticks
-            x_tick_locations.append(xPos)
-
-            # append position of leading edge and trailing edge to y-axis-ticks
-            y_tick_locations.append(element.leadingEdge)
-            #y_tick_locations.append(element.trailingEdge)
-            idx = idx - 1
-
-        # set new ticks for the x-axis according to the positions of the sections
-        ax.set_xticks(x_tick_locations)
-        ax.set_yticks(y_tick_locations)
-
-        # set new fontsize of the x-tick labels
-        for tick in ax.xaxis.get_major_ticks():
-            tick.label.set_fontsize(fs_tick)
-            tick.label.set_rotation('vertical')
-
-        # set new fontsize of the y-tick labels
-        for tick in ax.yaxis.get_major_ticks():
-            tick.label.set_fontsize(fs_tick)
-
-        for element in self.grid:
-            #build up list of x-values
+        grid = self.planform.grid
+        for element in grid:
+            # build up list of x-values
             xValues.append(element.y)
-            #build up lists of y-values
+
+            # build up lists of y-values
             leadingEdge.append(element.leadingEdge)
             quarterChordLine.append(element.quarterChordLine)
-            areaCenterLine.append(element.areaCenterLine)
             hingeLine.append(element.hingeLine)
             trailingeEge.append(element.trailingEdge)
 
@@ -1344,41 +1734,57 @@ class wing:
 
         # compose labels for legend
         labelHingeLine = ("hinge line (%.1f %% / %.1f %%)" %
-                           (self.hingeDepthRoot, self.hingeDepthTip))
+                           (params.flapDepthRoot, params.flapDepthTip))
 
         # plot quarter-chord-line
-        if (self.showQuarterChordLine == True):
-            ax.plot(xValues, quarterChordLine, color=cl_quarterChordLine,
-              linestyle = ls_quarterChordLine, linewidth = lw_quarterChordLine,
-              solid_capstyle="round", label = "quarter-chord line")
-
-        if (self.showTipLine == True):
-            ax.plot(xValues, areaCenterLine, color=cl_areaCenterLine,
-              linestyle = ls_areaCenterLine, linewidth = lw_areaCenterLine,
-              solid_capstyle="round", label = "area CoG line")
+        ax.plot(xValues, quarterChordLine, color=cl_quarterChordLine,
+          linestyle = ls_quarterChordLine, linewidth = lw_quarterChordLine,
+          solid_capstyle="round", label = "quarter-chord line")
 
         # plot hinge-line
-        if (self.showHingeLine == True):
-            ax.plot(xValues, hingeLine, color=cl_hingeLine,
-              linestyle = ls_hingeLine, linewidth = lw_hingeLine,
-              solid_capstyle="round", label = labelHingeLine)
+        ax.plot(xValues, hingeLine, color=cl_hingeLine,
+          linestyle = ls_hingeLine, linewidth = lw_hingeLine,
+          solid_capstyle="round", label = labelHingeLine)
+
+        # plot geometrical center
+        (center_x, center_y) = self.planform.geometricalCenter
+        (y_min,y_max) = ax.get_ylim()
+        radius = (y_max-y_min)/10
+        bullseye((center_x, center_y), radius, cl_geoCenter, ax)
 
         # plot the planform last
         ax.plot(xValues, leadingEdge, color=cl_planform,
                 linewidth = lw_planform, solid_capstyle="round")
         ax.plot(xValues, trailingeEge, color=cl_planform,
                 linewidth = lw_planform, solid_capstyle="round")
-        try:
-            airfoilType = self.airfoilTypes[0]
-        except:
-             airfoilType = 'blend'
 
-        # plot additional point (invisible) to expand the y-axis and
-        # get the labels inside the diagram
-        ax.plot(xValues[0], -1*(self.rootchord/2))
+        x_min = params.fuselageWidth/2
+        # set new ticks for the x-axis according to the positions of the sections
+        ax.set_xticks([x_min, center_x, params.wingspan/2])
+        ax.set_yticks([0.0, center_y, params.rootchord])
 
-        # place legend inside subplot
-        ax.legend(loc='lower right', fontsize = fs_legend)
+        # set new fontsize of the x-tick labels
+        for tick in ax.xaxis.get_major_ticks():
+            tick.label.set_fontsize(fs_ticks)
+            #tick.label.set_rotation('vertical')
+
+        # set new fontsize of the y-tick labels
+        for tick in ax.yaxis.get_major_ticks():
+            tick.label.set_fontsize(fs_ticks)
+
+        # x-axis: values are in mm
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # y-axis: values are in mm
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # set labels for axes
+        ax.set_xlabel("Position (mm)")
+        ax.set_ylabel("Position (mm)")
+
+        # place legend
+        ax.legend(loc='upper right', fontsize=fs_legend, labelcolor=cl_legend,
+         frameon=False)
 
         # show grid
         ax.grid(True)
@@ -1387,13 +1793,321 @@ class wing:
         ax.axis('equal')
 
         # revert y-axis on demand
-        if (self.leadingEdgeOrientation == 'up'):
+        if (params.leadingEdgeOrientation == 'up'):
+            ax.set_ylim(ax.get_ylim()[::-1])
+
+        # label with additional information concerning planform
+        #self.__plot_planformDataLabel(ax, x_min) #FIXME is this necessary ?
+
+    def plot_FlapDistribution(self, ax):
+        '''plots a diagram that shows distribution of flaps and also depth of flaps'''
+        params = self.params
+
+        # get flap groups, separation lines and airfoil names at the separation lines
+        (flap_groups, flapPositions_x, flapPositions_y, airfoilNames) = self.get_flapGroups()
+
+        # control points for flaps
+        controlPoints_x = []
+        controlPoints_y = []
+        numLines = len(flapPositions_x)
+
+        # setup empty lists for new tick locations
+        x_tick_locations = []
+
+        for idx in range(numLines):
+            (dummy, x) = flapPositions_x[idx]
+            (dummy, y) = flapPositions_y[idx]
+            controlPoints_x.append(x)
+            controlPoints_y.append(y)
+
+            text = "%2.1f %%" % y
+            ax.annotate(text,
+            xy=(x, y), xycoords='data',
+            xytext=(5, -15), textcoords='offset points', color = cl_legend,
+            fontsize=fs_legend)
+
+            # append position of section to x-axis ticks
+            x_tick_locations.append(x)
+
+        # set new ticks for the x-axis according to the positions of the flap
+        # separation lines
+        ax.set_xticks(x_tick_locations)
+
+        # get control points for root and tip only
+        x = [controlPoints_x[0], controlPoints_x[-1]]
+        y = [controlPoints_y[0], controlPoints_y[-1]]
+
+        # plot control-points (root / tip)
+        ax.scatter(x, y, color=cl_hingeLine)
+
+        # plot the flap separation lines
+        for idx in range(numLines):
+            ax.plot(flapPositions_x[idx], flapPositions_y[idx],
+            color=cl_hingeLine, linewidth = lw_hingeLine, solid_capstyle="round")
+
+        # plot the airfoil names
+        num = len(airfoilNames)
+        for idx in range (num):
+            (dummy, x) = flapPositions_x[idx]
+
+           # last element or not
+            if idx < (num-1):
+                # no, text position right beside line
+                ha = 'left'
+                xOff = 4
+            else:
+                # yes, text position left beside line
+                ha = 'right'
+                xOff = -1
+
+            ax.annotate(airfoilNames[idx],  xy=(x, 0), xycoords='data',
+            xytext=(xOff, -1*fs_legend), textcoords='offset points', color = cl_legend,
+            fontsize=fs_legend, rotation='vertical', va='top', ha=ha)
+
+        # plot the flap groups between flap separation lines.
+        # the number of flap groups is always one smaller than the number of
+        # flap separation lines
+        for idx in range (numLines-1):
+            # determine x position for the text, shall be centered
+            (x2, dummy) = flapPositions_x[idx+1]
+            (x1, dummy) = flapPositions_x[idx]
+            x = x1 + ((x2-x1)/2)
+
+            text = ("Flap %d" % flap_groups[idx])
+            ax.annotate(text,xy=(x, 0), xycoords='data',
+              xytext=(0, -0.2*fs_flapGroup), textcoords='offset points',
+              ha='center', va='top', color = cl_flapGroup, fontsize=fs_flapGroup)
+
+        # create empty lists
+        xValues = []
+        flapDepth = []
+
+        # build up list of x- and y-values
+        grid = self.planform.grid
+        for idx in range(len(grid)):
+            x = grid[idx].y# *1000.0 # m --> mm FIXME
+            depth = (grid[idx].flapDepth / grid[idx].chord) * 100
+
+            if (depth > 0.0):
+                xValues.append(x)
+                flapDepth.append(depth)
+
+        # plot flap depth in percent
+        ax.plot(xValues, flapDepth, color=cl_hingeLine,
+          linestyle = ls_hingeLine, linewidth = lw_hingeLine,
+          solid_capstyle="round", label = "Flap depth (%)")
+
+        # fill between zero line and flapDepth
+        ax.fill_between(xValues, flapDepth, color=cl_flapFill, alpha=0.4)
+
+        # helper texts, Root and Tip
+        (dummy, y) = flapPositions_y[0]
+        ax.annotate('Root',
+            xy=(0.0, y), xycoords='data',
+            xytext=(-10, 5), textcoords='offset points', color = cl_legend,
+            fontsize=fs_legend, rotation='vertical')
+
+        # plot additional point (invisible) to expand the y-axis
+        ax.plot(0.0, 1.8*y)
+
+        (dummy, y) = flapPositions_y[-1]
+        (dummy, x) = flapPositions_x[-1]
+        ax.annotate('Tip',
+            xy=(x, y), xycoords='data',
+            xytext=(10, 5), textcoords='offset points', color = cl_legend,
+            fontsize=fs_legend, rotation='vertical')
+
+        # x-axis: values are in mm
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # y-axis: values are in %
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # set labels for axes
+        ax.set_ylabel("Flap depth (%)")
+        ax.set_xlabel("Position (mm)")
+
+        # place legend
+        ax.legend(loc='upper right', fontsize=fs_legend, labelcolor=cl_legend,
+           frameon=False)
+
+        # show grid
+        ax.grid(True)
+
+        # revert y-axis
+        ax.set_ylim(ax.get_ylim()[::-1])
+
+    # plot planform of the half-wing
+    def plot_AirfoilDistribution(self, ax):
+        params = self.params
+
+        # create empty lists
+        xValues = []
+        leadingEdge = []
+        trailingeEge = []
+
+        # setup empty lists for new tick locations
+        x_tick_locations = []
+
+        # plot sections in reverse order
+        idx = len(params.airfoilTypes) - 1
+
+        # check if there is a fuselage section
+        if self.fuselageIsPresent():
+            # skip fuselage section
+            sectionsList = self.sections[1:]
+        else:
+            # plot all sections
+            sectionsList = self.sections
+
+        # compose labels for airfoil types
+        label_user_unassigned = 'airfoiltype \'user\', not assigned yet (!)'
+        label_user =  'airfoiltype \'user\''
+        label_blend = 'airfoiltype \'blend\''
+        label_opt = 'airfoiltype \'opt\''
+
+        for element in reversed(sectionsList):
+            # determine type of airfoil of this section,
+            # get labelcolor, which will also be the color of the plotted line
+            airfoilType, labelColor = self.get_AirfoilTypeAndColor(idx)
+
+            # get labeltext
+            if (airfoilType == 'user'):
+                if label_user != None:
+                    labelText = label_user[:]
+                    label_user = None
+                else:
+                    labelText = None
+            elif (airfoilType == 'user_unassigned'):
+                if label_user_unassigned != None:
+                    labelText = label_user_unassigned[:]
+                    label_user_unassigned = None
+                else:
+                    labelText = None
+            elif (airfoilType == 'opt'):
+                if label_opt != None:
+                    labelText = label_opt[:]
+                    label_opt = None
+                else:
+                    labelText = None
+            else:
+                if label_blend != None:
+                    labelText = label_blend[:]
+                    label_blend = None
+                else:
+                    labelText = None
+
+            x = element.y
+            LE = element.leadingEdge
+            TE = element.trailingEdge
+
+            ax.plot([x, x] ,[LE, TE],
+            color=labelColor, linestyle = ls_sections, linewidth = lw_sections,
+            solid_capstyle="round", label = labelText)
+
+            # determine x and y Positions of the labels
+            if (params.leadingEdgeOrientation == 'up'):
+                yPosChordLabel = TE
+                yPosOffsetSectionLabel = 32
+            else:
+                yPosChordLabel = LE
+                yPosOffsetSectionLabel = -32
+
+            # plot label for chordlength of section
+            try:
+                text = ("%d mm" % int(round(element.chord)))
+            except:
+                text = ("0 mm" )
+                ErrorMsg("label for chordlength of section could not be plotted")
+
+            ax.annotate(text,
+            xy=(x, yPosChordLabel), xycoords='data',
+            xytext=(2, 5), textcoords='offset points', color = labelColor,
+            fontsize=fs_infotext-1, rotation='vertical')
+
+            # plot label for airfoil-name / section-name
+            text = ("%s" % (remove_suffix(element.airfoilName,'.dat')))
+            props=dict(arrowstyle="-", connectionstyle= "angle,angleA=-90,angleB=30,rad=10",
+             color=labelColor)
+
+            ax.annotate(text,
+            xy=(x, LE), xycoords='data',
+            xytext=(8, yPosOffsetSectionLabel), textcoords='offset points',
+            color = labelColor,fontsize=fs_infotext, rotation='vertical', arrowprops=props)
+
+            # append position of section to x-axis ticks
+            x_tick_locations.append(x)
+            idx = idx - 1
+
+        # set new ticks for the x-axis according to the positions of the sections
+        ax.set_xticks(x_tick_locations)
+
+        # set new ticks for the y-axis
+        ax.set_yticks([0.0, params.rootchord])
+
+        # set new fontsize of the x-tick labels
+        for tick in ax.xaxis.get_major_ticks():
+            tick.label.set_fontsize(fs_ticks)
+            tick.label.set_rotation('vertical')
+
+        # set new fontsize of the y-tick labels
+        for tick in ax.yaxis.get_major_ticks():
+            tick.label.set_fontsize(fs_ticks)
+
+        # x-axis: values are in mm
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # y-axis: values are in mm
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # set labels for axes
+        ax.set_xlabel("Position (mm)")
+        ax.set_ylabel("Position (mm)")
+
+        grid = self.planform.grid
+
+        for element in grid:
+            # build up list of x-values
+            xValues.append(element.y)
+
+            # build up lists of y-values
+            leadingEdge.append(element.leadingEdge)
+            trailingeEge.append(element.trailingEdge)
+
+        # setup root- and tip-joint
+        trailingeEge[0] = leadingEdge[0]
+        trailingeEge[-1] = leadingEdge[-1]
+
+        # plot the planform last
+        ax.plot(xValues, leadingEdge, color=cl_planform,
+                linewidth = lw_planform, solid_capstyle="round")
+        ax.plot(xValues, trailingeEge, color=cl_planform,
+                linewidth = lw_planform, solid_capstyle="round")
+
+        # plot additional point (invisible) to expand the y-axis and
+        # get the labels inside the diagram
+        ax.plot(xValues[0], -1*(params.rootchord/2))
+
+        # place legend
+        ax.legend(loc='upper right', fontsize=fs_legend, labelcolor=cl_legend,
+         frameon=False)
+
+        # show grid
+        ax.grid(True)
+
+        # both axes shall be equal
+        ax.axis('equal')
+
+        # revert y-axis on demand
+        if (params.leadingEdgeOrientation == 'up'):
             ax.set_ylim(ax.get_ylim()[::-1])
 
 
     # plot planform of the complete wing
     def plot_WingPlanform(self, ax):
-        #create empty lists
+        params = self.params
+
+        # create empty lists
         xValues = []
         xValuesLeft = []
         xValuesRight = []
@@ -1408,54 +2122,59 @@ class wing:
         hingeLineRight = []
 
         # determine factor for projection of the wing according the dihedral
-        proj_fact = cos(self.dihedral*pi/180.0)
+        proj_fact = cos(params.dihedral*pi/180.0)
 
         # Halfwingspan already without fuselage
-        proj_halfwingSpan = self.halfwingspan * proj_fact
+        proj_halfwingSpan = params.halfwingspan * proj_fact
 
         # Caution, fuselageWidth does not change due to projection
-        proj_wingspan = (2*proj_halfwingSpan) + self.fuselageWidth
-
-        # set axes and labels
-        self.set_AxesAndLabels(ax, "Full-wing planform")
+        proj_wingspan = (2*proj_halfwingSpan) + params.fuselageWidth
 
         # build up list of x-values,
         # first left half-wing
-        for element in self.grid:
-            proj_y = (element.y- (self.fuselageWidth/2)) * proj_fact
+        grid = self.planform.grid
+        for element in grid:
+            proj_y = (element.y- (params.fuselageWidth/2)) * proj_fact
             xVal = proj_y#-(self.fuselageWidth/2)
             #xValues.append(xVal)
             xValuesLeft.append(xVal)
 
         # offset for beginning of right half-wing
-        xOffset = proj_halfwingSpan + self.fuselageWidth
+        xOffset = proj_halfwingSpan + params.fuselageWidth
 
         # center-section / fuselage (x)
         Left_x = xValuesLeft[-1]
-        Right_x = Left_x + self.fuselageWidth
+        Right_x = Left_x + params.fuselageWidth
         leftWingRoot_x = (Left_x, Left_x)
         rightWingRoot_x = (Right_x, Right_x)
 
         # right half-wing (=reversed right-half-wing)
-        for element in self.grid:
-            proj_y = (element.y - (self.fuselageWidth/2)) * proj_fact
+        for element in grid:
+            proj_y = (element.y - (params.fuselageWidth/2)) * proj_fact
             xVal = proj_y + xOffset
             xValues.append(xVal)
             xValuesRight.append(xVal)
 
+        # adapt coordinates of geometrical center
+        (center_x, center_y) = self.planform.geometricalCenter
+        center_x *= proj_fact
+        center_right_x = center_x +xOffset
+        center_left_x = (self.params.wingspan/2)*proj_fact - center_x
+        center_right = (center_right_x, center_y)
+        center_left = (center_left_x, center_y)
+
         # build up lists of y-values
         # left half wing
-        for element in reversed(self.grid):
+        for element in reversed(grid):
             leadingEdgeLeft.append(element.leadingEdge)
             hingeLineLeft.append(element.hingeLine)
             trailingEdgeLeft.append(element.trailingEdge)
 
         # center-section / fuselage (y)
-        #wingRoot_y = (leadingEdgeLeft[lastElement],trailingEdgeLeft[lastElement])
         wingRoot_y = (leadingEdgeLeft[-1],trailingEdgeLeft[-1])
 
         # right half wing
-        for element in (self.grid):
+        for element in grid:
             leadingEdgeRight.append(element.leadingEdge)
             hingeLineRight.append(element.hingeLine)
             trailingEdgeRight.append(element.trailingEdge)
@@ -1494,7 +2213,7 @@ class wing:
         ax.plot(leftWingRoot_x, wingRoot_y, color=cl_planform,
                 linewidth = lw_planform, solid_capstyle="round")
 
-        ax.arrow(proj_wingspan/2, 0.0, 0.0, -1*(self.rootchord/3),head_width=self.fuselageWidth/4)
+        ax.arrow(proj_wingspan/2, 0.0, 0.0, -1*(params.rootchord/3),head_width=params.fuselageWidth/4)
 
         ax.plot(rightWingRoot_x, wingRoot_y, color=cl_planform,
                 linewidth = lw_planform, solid_capstyle="round")
@@ -1503,282 +2222,252 @@ class wing:
         ax.axis('equal')
 
         # revert y-axis on demand
-        if (self.leadingEdgeOrientation == 'up'):
+        if (params.leadingEdgeOrientation == 'up'):
             ax.set_ylim(ax.get_ylim()[::-1])
-
-        # plot hinge-line
-##        if (self.showHingeLine == 'true'):
-##            ax.plot(xValuesLeft, hingeLine, color=cl_hingeLine,
-##              linestyle = ls_hingeLine, linewidth = lw_hingeLine,
-##              solid_capstyle="round")
 
         # fill the wing
         ax.fill_between(xValuesLeft, leadingEdgeLeft, hingeLineLeft, color=cl_planformFill, alpha=0.4)
-        ax.fill_between(xValuesLeft, hingeLineLeft, trailingEdgeLeft, color=cl_hingeLineFill, alpha=0.4)
+        ax.fill_between(xValuesLeft, hingeLineLeft, trailingEdgeLeft, color=cl_flapFill, alpha=0.4)
         ax.fill_between(xValuesRight, leadingEdgeRight, hingeLineRight, color=cl_planformFill, alpha=0.4)
-        ax.fill_between(xValuesRight, hingeLineRight, trailingEdgeRight, color=cl_hingeLineFill, alpha=0.4)
+        ax.fill_between(xValuesRight, hingeLineRight, trailingEdgeRight, color=cl_flapFill, alpha=0.4)
+
+        # plot geometrical center, left and right halfwing
+        (y_min,y_max) = ax.get_ylim()
+        radius = (y_max-y_min)/15
+        bullseye_BW(center_left, radius, ax)
+        bullseye_BW(center_right, radius, ax)
 
         # setup list for new x-tick locations
-        new_tick_locations = [0.0, proj_halfwingSpan, (proj_halfwingSpan + self.fuselageWidth/2),
-                             (proj_halfwingSpan + self.fuselageWidth), proj_wingspan]
+        new_tick_locations_x = [0.0, proj_halfwingSpan, center_left_x,
+                                (proj_halfwingSpan + params.fuselageWidth),
+                                center_right_x, proj_wingspan]
 
-        # set new ticks for the x-axis according to the positions of the sections
-        ax.set_xticks(new_tick_locations)
+        # x-axis: values are in mm
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # y-axis: values are in mm
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # set labels for axes
+        ax.set_xlabel("Position (mm)")
+        ax.set_ylabel("Position (mm)")
+
+        # set new ticks
+        ax.set_xticks(new_tick_locations_x)
+        ax.set_yticks([0.0, center_y, params.rootchord])
 
         # set new fontsize of the x-tick labels
         for tick in ax.xaxis.get_major_ticks():
-            tick.label.set_fontsize(fs_tick)
+            tick.label.set_fontsize(fs_ticks)
             tick.label.set_rotation('vertical')
 
         # set new fontsize of the y-tick labels
         for tick in ax.yaxis.get_major_ticks():
-            tick.label.set_fontsize(fs_tick)
+            tick.label.set_fontsize(fs_ticks)
 
+        # label with additional information concerning planform
+        self.__plot_planformDataLabel(ax, 0)
 
-    def set_AxesAndLabels(self, ax, title):
+    def draw_diagram(self, diagramType, ax, x_limits, y_limits):
+        if diagramType == diagTypes[0]:
+            self.plot_WingPlanform(ax)
+        elif diagramType == diagTypes[1]:
+            self.chordDistribution.plot(ax)
+        elif diagramType == diagTypes[2]:
+            self.plot_PlanformShape(ax)
+        elif diagramType == diagTypes[3]:
+            self.plot_AirfoilDistribution(ax)
+        elif diagramType == diagTypes[4]:
+            self.plot_FlapDistribution(ax)
+        else:
+            ErrorMsg("undefined diagramtype")
 
-        # set title of the plot
-        text = (title)
-        #ax.set_title(text, fontsize = 30, color="darkgrey")
+    def __copyAndSmooth_Airfoil(self, srcNameAndPath, destName, destPath, smooth):
+        global xfoilWorkerCall
+        global inputFilename
 
-        # customize grid
-        ax.grid(True, color='dimgrey',  linestyle='dotted', linewidth=0.4)
+        # copy airfoil from src path to destination path
+        NoteMsg("Copying airfoil \'%s\' to \'%s\'" % (srcNameAndPath, destPath))
+        shutil.copy2(srcNameAndPath, destPath)
 
+        # store current working directory and change working directory to
+        # destPath
+        workingDir = os.getcwd()
+        os.chdir(destPath)
 
-    def draw_NormalizedChordDistribution(self):
-        # set background style
-        plt.style.use(cl_background)
+        srcName = os.path.basename(srcNameAndPath)
 
-        # customize grid
-        plt.grid(True, color='dimgrey',  linestyle='dotted', linewidth=0.4)
+        # check if the airfoil shall get a new name
+        if (srcName != destName):
+            # rename the airfoil
+            NoteMsg("Renaming airfoil \'%s\' to \'%s\'" % (srcName, destName))
+            result = change_airfoilName(srcName, destName + '.dat')
 
-        normalizedHalfwingspan = []
-        normalizedChord = []
-        referenceChord = []
-        hinge = []
+            if result != 0:
+                ErrorMsg("change_airfoilName failed, errorcode %d" % result)
+                NoteMsg("working dir was %s" % getcwd())
 
-        for element in self.normalizedGrid:
-            normalizedHalfwingspan.append(element.y)
-            normalizedChord.append(element.chord)
-            referenceChord.append(element.referenceChord)
-            #hinge.append(element.hinge)
-
-        # set axes and labels
-        #self.set_AxesAndLabels(ax, "Half-wing planform")
-
-
-        plt.plot(normalizedHalfwingspan, normalizedChord, color=cl_normalizedChord,
-                linewidth = lw_planform, solid_capstyle="round",
-                label = "normalized chord")
-
-        plt.plot(normalizedHalfwingspan, referenceChord, color=cl_referenceChord,
-                linewidth = lw_planform, solid_capstyle="round",
-                label = "pure ellipse")
-
-##        plt.plot(normalizedHalfwingspan, hinge, color=cl_hingeLine,
-##                linewidth = lw_planform, solid_capstyle="round",
-##                label = "hinge line")
-
-        if self.planformShape =='curve_fitting':
-            plt.scatter(self.planform_chord, self.planform_y, color=cl_normalizedChord,
-            label = "planform points points")
-
-##            if self.use_bezier:FIXME BEZIER
-##                 plt.scatter(self.bezier_x, self.bezier_y, color=cl_controlPoints,
-##                 label = "control points")
-
-        plt.title("Normalized chord distribution")
-        plt.legend(loc='lower right', fontsize = fs_legend)
-
-        # maximize window
-        figManager = plt.get_current_fig_manager()
-        try:
-            figManager.window.Maximize(True)
-        except:
-            try:
-                figManager.window.state('zoomed')
-            except:
-                pass
-
-        # show diagram
-        plt.show()
-
-
-    def draw_LE_derivative(self):
-        # set background style
-        plt.style.use(cl_background)
-
-        # customize grid
-        plt.grid(True, color='dimgrey',  linestyle='dotted', linewidth=0.4)
-
-        x = []
-        y = []
-
-        for element in self.grid:
-            x.append(element.y)
-            if (element.LE_derivative > 0.0):
-                y.append(element.LE_derivative)
+                # change back working directory
+                os.chdir(workingDir)
+                return result
             else:
-                y.append(0.0)
+                # delete the airfoil file with original name
+                os.remove(srcName)
+
+        if (smooth):
+            NoteMsg("Smoothing airfoil \'%s\'" % destName)
+
+            # compose system-string for smoothing the airfoil
+            systemString = xfoilWorkerCall + " -w smooth -i %s -a %s -o %s" % \
+                           (inputFilename, destName +'.dat', destName)
+
+            # execute xfoil-worker / create the smoothed root-airfoil
+            result = system(systemString)
+
+        # change back working directory
+        os.chdir(workingDir)
+        return result
 
 
-        plt.plot(x, y, color=cl_normalizedChord,
-                linewidth = lw_planform, solid_capstyle="round",
-                label = "LE derivative")
+    def copy_userAirfoils(self, dest_Path):
+        airfoilNames = []
+        userAirfoils = []
+        dest_airfoilNames = []
+        result = 0
+        params = self.params
+        smooth = params.smoothUserAirfoils
 
-        # maximize window
-        figManager = plt.get_current_fig_manager()
-        try:
-            figManager.window.Maximize(True)
-        except:
-            try:
-                figManager.window.state('zoomed')
-            except:
-                pass
+        # create a list of user airfoils and destination airfoil names
+        num = len(params.airfoilTypes)
+        for idx in range(num):
+            if params.airfoilTypes[idx] == 'user':
+                userAirfoils.append(params.userAirfoils[idx])
+                dest_airfoilNames.append(params.airfoilNames[idx])
 
-        # show diagram
-        plt.show()
+        # remove all duplicates
+        userAirfoils = list(dict.fromkeys(userAirfoils))
+        dest_airfoilNames = list(dict.fromkeys(dest_airfoilNames))
 
+        # check number of list elements
+        num = len(userAirfoils)
+        if num != len(dest_airfoilNames):
+            ErrorMsg("userAirfoils and dest_airfoilNames must contain same number of elements")
+            return (-99, airfoilNames)
 
-    # draw the graph
-    def draw(self):
-        # set background style
-        plt.style.use(cl_background)
+        for idx in range(num):
+            airfoil = userAirfoils[idx]
 
-        # setup subplots
-        fig, (upper,lower) = plt.subplots(2,1)
+            if airfoil == None:
+                # no valid user airfoil
+                continue
 
-        # compose diagram-title
-        wingspan_mm = int(round(self.wingspan*1000))
-        rootchord_mm = int(round(self.rootchord*1000))
-        proj_area = self.area * cos(self.dihedral*pi/180.0)
+            dest_airfoilName = remove_suffix(dest_airfoilNames[idx], ".dat")
+            result = self.__copyAndSmooth_Airfoil(airfoil, dest_airfoilName,
+                                                  dest_Path, smooth)
 
-        text = "\"%s\"\n wingspan: %d mm, rootchord: %d mm, area: %.2f dm², proj. area: %.2f dm²\n"\
-         "aspect ratio: %.2f, hinge line angle: %.2f°\n"\
-         % (self.planformName, wingspan_mm, rootchord_mm, self.area, proj_area,
-         self.aspectRatio, self.hingeLineAngle)
-
-        fig.suptitle(text, fontsize = 12, color="darkgrey", **csfont)
-
-        # first figure, display detailed half-wing
-        self.plot_HalfWingPlanform(upper)
-
-        # second figure, display
-        self.plot_WingPlanform(lower)
-
-        # maximize window
-        figManager = plt.get_current_fig_manager()
-        try:
-            figManager.window.Maximize(True)
-        except:
-            try:
-                figManager.window.state('zoomed')
-            except:
-                pass
-
-        # show diagram
-        plt.show()
-
-    def getFigure(self):
-        # set 'dark' style
-        plt.style.use('dark_background')
-
-        # setup subplots
-        fig, (upper,lower) = plt.subplots(2,1)
-
-        # compose diagram-title
-        wingspan_mm = int(round(self.wingspan*1000))
-        text = "\"%s\"\n wingspan: %d mm, area: %.2f dm², aspect ratio: %.2f, root-tip sweep: %.2f°\n"\
-         % (self.planformName, wingspan_mm, self.area, self.aspectRatio, self.rootTipSweep)
-
-        fig.suptitle(text, fontsize = 12, color="darkgrey", **csfont)
-
-        # first figure, display detailed half-wing
-        self.plot_HalfWingPlanform(upper)
-
-        # second figure, display
-        self.plot_HalfWingPlanform(lower)
-
-        return fig
-
-################################################################################
-# find the wing in the XML-tree
-def get_wing(root, wingFinSwitch):
-    for wing in root.iter('wing'):
-        for XMLwingFinSwitch in wing.iter('isFin'):
-            # convert string to boolean value
-            if (XMLwingFinSwitch.text == 'true') or (XMLwingFinSwitch.text == 'True'):
-                value = True
+            if result == 0:
+                airfoilNames.append(dest_airfoilName)
             else:
-                value = False
+                # error
+                ErrorMsg("copyAndSmooth_Airfoil() failed, airfoil: %s, errorcode %d" %\
+                  (airfoil, result))
+                break
 
-            # check against value of wingFinswitch
-            if (value == wingFinSwitch):
-                return wing
+        return (result, airfoilNames)
 
+    def __get_rightFoilData(self, start, airfoilTypes, airfoilNames, chords):
+        end = len(airfoilTypes)
 
-# insert the planform-data into XFLR5-xml-file
-def insert_PlanformDataIntoXFLR5_File(data, inFileName, outFileName):
+        # loop over all airfoil-Types
+        for idx in range(start, end):
+            # Get the first "non-blend" airfoil beginning from "start"
+            if (airfoilTypes[idx] != "blend"):
+                return (airfoilNames[idx], chords[idx])
 
-    # basically parse the XML-file
-    tree = ET.parse(inFileName)
+        # Nothing was found
+        return (None, None)
 
-    # get root of XML-tree
-    root = tree.getroot()
+    def create_blendedAirfoils(self, dest_path):
+        params = self.params
+        my_airfoilTypes = params.airfoilTypes[:]
+        my_airfoilNames = params.airfoilNames[:]
+        my_chords = self.normalized_chords[:]
+        blendfoilNames = []
+        result = 0
 
-    # find wing-data
-    wing = get_wing(root, data.isFin)
+        if self.fuselageIsPresent():
+            # remove duplicate root airfoil
+            my_airfoilTypes.pop(0)
+            my_airfoilNames.pop(0)
 
-    if (wing == None):
-        ErrorMsg("wing not found\n")
-        return
+        # remove duplicate tip airfoil
+        my_airfoilTypes.pop()
+        my_airfoilNames.pop()
+        my_chords.pop()
 
-    # find sections-data-template
-    for sectionTemplate in wing.iter('Sections'):
-        # copy the template
-        newSection = deepcopy(sectionTemplate)
+        num = len(my_airfoilTypes)
 
-        # remove the template
-        wing.remove(sectionTemplate)
+        # check if lists contain same number of elements
+        if ((num != len(my_airfoilNames)) or
+            (num != len(my_chords))):
+            ErrorMsg("my_airfoilTypes, my_airfoilNames and my_chords must contain same number of elements")
+            return(-99, blendfoilNames)
 
-    # write the new section-data to the wing
-    for section in data.sections:
-        # copy the template
-        newSection = deepcopy(sectionTemplate)
+        # store current working directory and change working directory to
+        # destPath
+        workingDir = os.getcwd()
+        os.chdir(dest_path)
 
-        # enter the new data
-        for yPosition in newSection.iter('y_position'):
-            # convert float to text
-            yPosition.text = str(section.y)
+        # loop over all airfoil-Types
+        for idx in range(num):
+            # not a "blend" airfoil ?
+            if (my_airfoilTypes[idx] != "blend"):
+                # yes, take this airfoil as the "left-side" airfoil for blending
+                leftFoilName = my_airfoilNames[idx]
+                leftFoilChord = my_chords[idx]
+            else:
+                # no, this is a "blend" airfoil that must be created
+                blendFoilName = my_airfoilNames[idx]
+                blendFoilName = remove_suffix(blendFoilName , ".dat")
+                blendFoilChord = my_chords[idx]
 
-        for chord in newSection.iter('Chord'):
-            # convert float to text
-            chord.text = str(section.chord)
+                # get data of the "right-side" airfoil for blending
+                (rightFoilName, rightFoilChord) =\
+                  self.__get_rightFoilData((idx+1), my_airfoilTypes, my_airfoilNames, my_chords)
 
-        for xOffset in newSection.iter('xOffset'):
-            # convert float to text
-            xOffset.text = str(section.leadingEdge)
+                # check if left- and right-side airfoils exist
+                if (check_airfFoilsExist(leftFoilName, rightFoilName) == True):#FIXME refactoring, own class function
+                    NoteMsg("creating blended airfoil %s" % blendFoilName)
 
-        for dihedral in newSection.iter('Dihedral'):
-            # convert float to text
-            dihedral.text = str(section.dihedral)
+                    # calculate the blend-factor
+                    blend = calculate_Blend(leftFoilChord, blendFoilChord, rightFoilChord)#FIXME refactoring, own class function
 
-        for foilName in newSection.iter('Left_Side_FoilName'):
-            # convert float to text
-            foilName.text = remove_suffix(str(section.airfoilName), '.dat')
+                    # compose XFOIL-worker-call
+                    worker_call = xfoilWorkerCall + " -w blend %d -a %s -a2 %s -o %s"\
+                            % (blend, leftFoilName, rightFoilName, blendFoilName)
+                    print(worker_call) #Debug
 
-        for foilName in newSection.iter('Right_Side_FoilName'):
-            # convert float to text
-            foilName.text = remove_suffix(str(section.airfoilName), '.dat')
+                    # call worker now by system call
+                    workerResult = os.system(worker_call)
 
-        # add the new section to the tree
-        wing.append(newSection)
-        hingeDepthPercent = (section.hingeDepth /section.chord )*100
-        NoteMsg("Section %d: position: %.0f mm, chordlength %.0f mm, hingeDepth %.1f  %%, airfoilName %s was inserted" %
-          (section.number, section.y*1000, section.chord*1000, hingeDepthPercent, section.airfoilName))
+                    # Evaluate result
+                    if workerResult == 0:
+                        blendfoilNames.append(blendFoilName)
+                    else:
+                        # store errorcode
+                        if result == 0:
+                            result = workerResult
+                else:
+                    NoteMsg("at least one airfoil for blending does not exist,"\
+                          "skipping blending for airfoil %s" % blendFoilName)
+                    # store errorcode
+                    if result == 0:
+                        result = -1
 
-    # write all data to the new file file
-    tree.write(outFileName)
+        # change back working directory
+        os.chdir(workingDir)
+        return (result, blendfoilNames)
+
 
 ################################################################################
 # function that gets the name of the planform-data-file
@@ -1809,33 +2498,6 @@ def get_strakDataFileName(args):
     return inFileName
 
 
-def copy_userAirfoils(wingData):
-    userAirfoil_idx = 0
-
-    if wingData.fuselageIsPresent():
-        userAirfoils = wingData.userAirfoils[1:]
-        userAirfoil_idx = 1
-    else:
-        userAirfoils = wingData.userAirfoils
-        userAirfoil_idx = 0
-
-
-    for airfoil in userAirfoils:
-        splitnames = airfoil.split("\\")
-        airfoilName = splitnames[-1]
-        airfoilName = remove_suffix(airfoilName, ".dat")
-
-        if (splitnames[0]=='.'):
-            srcPath = "..\\..\\" + '\\'.join(splitnames[1:-1])
-        else:
-            srcPath = '\\'.join(splitnames[0:-1])
-
-        destName = wingData.get_UserAirfoilName(userAirfoil_idx)
-        destName = remove_suffix(destName, ".dat")
-
-        copyAndSmooth_Airfoil(xfoilWorkerCall, inputFilename, airfoilName,
-                              srcPath, destName, wingData.smoothUserAirfoils)
-        userAirfoil_idx = userAirfoil_idx + 1
 
 
 def get_rightFoilData(wingData, start):
@@ -1881,46 +2543,6 @@ def check_airfFoilsExist(name_1, name_2):
         return False
 
     return True
-
-
-
-def create_blendedArifoils(wingData):
-    num = len(wingData.airfoilTypes)
-
-    # loop over all airfoil-Types
-    for idx in range(num):
-        # not a "blend" airfoil ?
-        if (wingData.airfoilTypes[idx] != "blend"):
-            # yes, take this airfoil as the "left-side" airfoil for blending
-            leftFoilName = wingData.airfoilNames[idx]
-            leftFoilChord = wingData.chords[idx]
-        else:
-            # no, this is a "blend" airfoil that must be created
-            blendFoilName = wingData.airfoilNames[idx]
-            blendFoilName = remove_suffix(blendFoilName , ".dat")
-            blendFoilChord = wingData.chords[idx]
-
-            # get data of the "right-side" airfoil for blending
-            (rightFoilName, rightFoilChord) = get_rightFoilData(wingData, idx+1)
-            # check if left- and right-side airfoils exist
-
-            if (check_airfFoilsExist(leftFoilName, rightFoilName) == True):
-                NoteMsg("creating blended airfoil %s" % blendFoilName)
-
-                # calculate the blend-factor
-                blend = calculate_Blend(leftFoilChord, blendFoilChord, rightFoilChord)
-
-                # compose XFOIL-worker-call
-                worker_call = xfoilWorkerCall + " -w blend %d -a %s -a2 %s -o %s"\
-                        % (blend, leftFoilName, rightFoilName, blendFoilName)
-                print(worker_call) #Debug
-
-                # call worker now by system call
-                os.system(worker_call)
-            else:
-                NoteMsg("at least one airfoil for blending does not exist,"\
-                 "skipping blending for airfoil %s" % blendFoilName)
-
 
 def update_seedfoilName(wingData, strakdata):
     seedfoilIdx = 0
@@ -2138,16 +2760,324 @@ def update_strakdata(wingData):
     NoteMsg("strakdata was successfully updated")
 
 
+def update_planformdata(wingdata, dictData):
+    # update parameters in json dictionary
+    dictData["chordDistribution"] = wingdata.chordDistribution
 
-# GUI-Handling
-def on_key_press(event):
-        print("you pressed {}".format(event.key))
-        key_press_handler(event, canvas, toolbar)
+    # write json-File
+    with open(planformDataFileName, "w") as write_file:
+        json.dump(dictData, write_file, indent=4, separators=(", ", ": "), sort_keys=False)
+        write_file.close()
 
-def _quit():
-        root.quit()     # stops mainloop
-        root.destroy()  # this is necessary on Windows to prevent
-                        # Fatal Python Error: PyEval_RestoreThread: NULL tstate
+################################################################################
+#
+# planform-creator class
+#
+################################################################################
+class planform_creator:
+    def __init__(self, paramFileName):
+        '''class init'''
+        global print_disabled
+
+        # store paramFileName for later use
+        self.paramFileName = paramFileName
+
+        # check working-directory, have we been started from "scripts"-dir? (Debugging)
+        currentDir = getcwd()
+        if (currentDir.find("scripts")>=0):
+            self.startedFromScriptsFolder = True
+            chdir("..")
+        else:
+            self.startedFromScriptsFolder = False
+
+        # get current working dir
+        self.workingDir = getcwd()
+
+        # load parameters from file
+        fileContent = self.__load_paramFile()
+
+        # create a new wing
+        self.newWing:wing = wing()
+
+        # set parameters for the wing
+        self.newWing.set_Data(fileContent)
+
+    def __load_paramFile(self):
+        # try to open .json-file
+        try:
+            paramFile = open(self.paramFileName)
+        except:
+            ErrorMsg("failed to open file %s" % self.paramFileName)
+            return None
+
+        # load parameter dictionary from .json-file
+        try:
+            fileContent = json.load(paramFile)
+            paramFile.close()
+        except ValueError as e:
+            ErrorMsg('invalid json: %s' % e)
+            ErrorMsg('Error, failed to read data from file %s' % self.paramFileName)
+            paramFile.close()
+            return None
+
+        return fileContent
+
+    def __save_paramFile(self):
+        # try to open .json-file for writing / overwrite existing file
+        try:
+            paramFile = open(self.paramFileName, 'w')
+        except:
+            ErrorMsg("failed to open file %s" % self.paramFileName)
+            return -1
+
+        # get actual parameters
+        fileContent = self.newWing.get_params()
+
+        # save parameter dictionary to .json-file
+        try:
+            json.dump(fileContent, paramFile, indent=2, separators=(',', ':'))
+            paramFile.close()
+        except ValueError as e:
+            ErrorMsg('invalid json: %s' % e)
+            ErrorMsg('Error, failed to save data to file %s' % self.paramFileName)
+            paramFile.close()
+            return -1
+
+        return 0
+
+    def __export_airfoils(self):
+        # check if output (build) folder exists. If not, create folder.
+        if not os.path.exists(buildPath):
+            os.makedirs(buildPath)
+
+        # compose destination path (airfoil folder)
+        dest_path = buildPath + bs + airfoilPath
+
+        # check if airfoil folder exists. If not, create folder.
+        if not os.path.exists(dest_path):
+            os.makedirs(dest_path)
+
+        # copy and rename user-airfoils
+        (result, userAirfoils) = self.newWing.copy_userAirfoils(dest_path)
+
+        if (result != 0):
+            # error
+            ErrorMsg("copy_userAirfoils() failed")
+            return (result, userAirfoils, [])
+
+        # create blended airfoils using XFOIL_worker
+        (result, blendedAirfoils) = self.newWing.create_blendedAirfoils(dest_path)
+
+        if (result != 0):
+            # error
+            ErrorMsg("create_blendedAirfoils() failed")
+
+        return (result, userAirfoils, blendedAirfoils)
+
+    def __export_planform(self, outputPath, interpolationSteps, xPanels, yPanels,
+                        num_points, append):
+        global XFLR5_template
+        global FLZ_template
+        exportedFiles = []
+
+        # interpolation of sections, make copy first
+        interpolatedWing = deepcopy(self.newWing)
+        interpolatedWing.interpolate_sections(interpolationSteps)
+
+        # copy template files to output folder and rename
+        XFLR5_FileName = outputPath + bs + XFLR5_output
+        FLZ_FileName = outputPath + bs + FLZ_output
+
+        # DXF does not need template at the moment
+        DXF_output = self.newWing.get_planformName()
+        DXF_output = DXF_output.replace(' ', '_') + '.dxf'
+        DXF_FileName = outputPath + bs + DXF_output
+
+        # check if output folder exists
+        if (os.path.exists(outputPath) == False):
+            try:
+                os.makedirs(outputPath)
+            except:
+                ErrorMsg("creating ouputPath failed")
+                return (-1, exportedFiles)
+
+        if append == False:
+            try:
+                # remove existing files
+                if os.path.exists(XFLR5_FileName):
+                    os.remove(XFLR5_FileName)
+
+                if os.path.exists(FLZ_FileName):
+                    os.remove(FLZ_FileName)
+
+                # copy template files
+                shutil.copy2((ressourcesPath + bs + XFLR5_template), XFLR5_FileName)
+                shutil.copy2((ressourcesPath + bs + FLZ_template), FLZ_FileName)
+            except:
+                ErrorMsg("__export_planform: delete or copy template files failed")
+                return (-1, exportedFiles)
+        try:
+            result = export_toXFLR5(interpolatedWing, XFLR5_FileName, xPanels, yPanels)
+        except:
+            ErrorMsg("export_toXFLR5 failed")
+            return (-2, exportedFiles)
+
+        if result == 0:
+            exportedFiles.append(XFLR5_FileName)
+        else:
+            return (result, exportedFiles)
+
+        try:
+            result = export_toFLZ(interpolatedWing, FLZ_FileName, xPanels, yPanels)
+        except:
+            ErrorMsg("export_toFLZ failed")
+            return (-3, exportedFiles)
+
+        if result == 0:
+            exportedFiles.append(FLZ_FileName)
+
+        try:
+            result = export_toDXF(interpolatedWing, DXF_FileName, num_points)
+        except:
+            ErrorMsg("export_toDXF failed")
+            return (-4, exportedFiles)
+
+        if result == 0:
+            exportedFiles.append(DXF_FileName)
+
+        return (result, exportedFiles)
+
+    def __set_AxesAndLabels(self, ax, title):
+        global cl_grid
+        global cl_diagramTitle
+        global ls_grid
+        global lw_grid
+        global fs_diagramTitle
+        global main_font
+
+        # set title of the plot
+        text = (title)
+        ax.set_title(text, font = main_font, fontsize = fs_diagramTitle,
+           color=cl_diagramTitle)
+
+        # customize grid
+        ax.grid(True, color=cl_grid,  linestyle=ls_grid, linewidth=lw_grid)
+
+    def set_screenParams(self, width, height):
+        '''set scalings for fonts and linewidths depending on screen resolution'''
+        global scaled
+        global scaleFactor
+
+        # linewidths
+        global lw_grid
+        global lw_quarterChordLine
+        global lw_hingeLine
+        global lw_planform
+        global lw_sections
+
+        # fontsizes
+        global fs_diagramTitle
+        global fs_infotext
+        global fs_legend
+        global fs_axes
+        global fs_ticks
+        global fs_flapGroup
+
+        if (scaled == False):
+            # scale font sizes (1920 being default screen width)
+            scaleFactor = int(width/1920)
+            if (scaleFactor < 1):
+                scaleFactor = 1
+
+            # linewidths
+            lw_grid *= scaleFactor
+            lw_quarterChordLine *= scaleFactor
+            lw_hingeLine *= scaleFactor
+            lw_planform *= scaleFactor
+            lw_sections *= scaleFactor
+
+            # fontsizes
+            fs_diagramTitle *= scaleFactor
+            fs_infotext *= scaleFactor
+            fs_legend *= scaleFactor
+            fs_axes *= scaleFactor
+            fs_ticks *= scaleFactor
+            fs_flapGroup *= scaleFactor
+
+            scaled = True
+
+    def set_appearance_mode(self, theme):
+        '''applies the given theme / appearance mode'''
+        self.newWing.params.theme = theme
+        self.newWing.set_colours()
+
+    def load(self):
+        '''restores parameters that are stored in .json-file'''
+        # load parameters from file
+        fileContent = self.__load_paramFile()
+
+        if fileContent != None:
+            # set parameters for the wing
+            self.newWing.set_Data(fileContent)
+            return 0
+        else:
+            return -1
+
+    def save(self):
+        '''saves all parameters to .json-file'''
+        return self.__save_paramFile()
+
+    def reset(self):
+        '''sets all parameters to default'''
+        print("reset")
+
+    def export_airfoils(self):
+        '''exports all 'user' and 'blend' airfoils'''
+        return self.__export_airfoils()
+
+    def export_planform(self, filePath, steps,  xPanels, yPanels, num_points, append):
+        '''exports planform to given filepath'''
+        return self.__export_planform(filePath, steps, xPanels, yPanels,
+                      num_points, append)
+
+    def get_params(self):
+        '''gets parameters as a dictionary'''
+        return self.newWing.get_params()
+
+    def normalize_position(self, position):
+        return self.newWing.params.normalize_positionValue(position)
+
+    def denormalize_position(self, position):
+        return self.newWing.params.denormalize_positionValue(position)
+
+    def get_airfoilNames(self):
+        '''gets airfoilnames as a list of strings'''
+        return self.newWing.get_airfoilNames()
+
+    def get_airfoilPositions(self):
+        '''gets list of airfoilpositions in mm'''
+        return self.newWing.get_airfoilPositions()
+
+    def get_flapPositions(self):
+        '''gets list of flap positions along the halfwing and flapDepth in percent'''
+        return self.newWing.get_flapPositions()
+
+    def update_planform(self, paramDict):
+        '''applies parameters coming with paramDict'''
+        self.newWing.set_Data(paramDict)
+
+    def plot_diagram(self, diagramType, ax, x_limits, y_limits):
+        '''plots diagram to ax according to diagraType'''
+        global cl_background
+
+        # set background first (dark or light)
+        ax.set_facecolor(cl_background)
+
+        # set axes and labels
+        self.__set_AxesAndLabels(ax, diagramType)
+
+        # draw the graph
+        self.newWing.draw_diagram(diagramType, ax, x_limits, y_limits)
 
 ################################################################################
 # function that gets arguments from the commandline
@@ -2168,69 +3098,6 @@ def get_Arguments():
     return (get_planformDataFileName(args), get_strakDataFileName(args))
 
 
-def addEntryToGUI(entryName, xOffset, yOffset):
-    canvas1 = tkinter.Canvas(root, width = 400, height = 300)
-    canvas1.pack()
-
-    # add label
-    label2 = tkinter.Label(root, text=entryName)
-    label2.config(font=('helvetica', 20))
-    canvas1.create_window(xOffset, yOffset, window=label2)
-
-    # add entry-field
-    entry1 = tkinter.Entry (root)
-    entry1.setvar("2.98")
-    canvas1.create_window(xOffset + 100, yOffset, window=entry1)
-
-
-def GUI():
-    # !! WIP !!!
-    # set up GUI
-    root = tkinter.Tk()
-    root.wm_title("Planform-Creator")
-
-    # get Figure from wing-class
-    fig = newWing.getFigure()
-    canvas = FigureCanvasTkAgg(fig, master=root)  # A tk.DrawingArea.
-    canvas.draw()
-    canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
-
-    toolbar = NavigationToolbar2Tk(canvas, root)
-    toolbar.update()
-    canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
-    canvas.mpl_connect("key_press_event", on_key_press)
-
-    # define font for button
-    myFont = font.Font(size=30)
-    # add the button
-    button = tkinter.Button(master=root, text="Quit", command=_quit)
-    # apply font to the button label
-    button['font'] = myFont
-    button.pack(side=tkinter.BOTTOM)
-
-    # create parameter-GUI
-    addEntryToGUI("Wing-span", 0, 20)
-
-##
-##"wingspan": 2.98,#2.54,
-##            # shape of the planform, elliptical / trapezoidal
-##            "planformShape": 'elliptical',
-##            # orientation of the wings leading edge
-##            "leadingEdgeOrientation": 'up',
-##            # length of the root-chord in m
-##            "rootchord": 0.223,
-##            # depth of the tip in percent of the chord-length
-##            "tipDepthPercent": 8.0,
-##            # sweep of the tip of the wing in degrees
-##            "rootTipSweep": 3.2,
-##            # depth of the aileron / flap in percent of the chord-length
-##            "hingeDepthPercent": 23.5,
-##            # dihedral of the of the wing in degree
-##            "dihedral": 2.5,
-
-
-    tkinter.mainloop()
-
 # Main program
 if __name__ == "__main__":
     init()
@@ -2241,143 +3108,142 @@ if __name__ == "__main__":
     # get command-line-arguments or user-input
     (planformDataFileName, strakDataFileName) = get_Arguments()
 
-    # create a new planform
-    newWing = wing()
-
-    #debug, generate example-dictionary
-    #json.dump(PLanformDict, open("planformdata.txt",'w'))
-
     # check working-directory, have we been started from "scripts"-dir?
     if (os.getcwd().find("scripts")>=0):
         os.chdir("..")
 
-    # try to open .json-file
-    try:
-     planform = open(planformDataFileName)
-    except:
-        ErrorMsg("failed to open file %s" % planformDataFileName)
-        exit(-1)
-
-    # load dictionary of planform-data from .json-file
-    try:
-        planformData = json.load( planform)
-        planform.close()
-    except ValueError as e:
-        ErrorMsg('invalid json: %s' % e)
-        ErrorMsg('Error, failed to read data from file %s' % planformDataFileName)
-        planform.close()
-        exit(-1)
-
-    # set data for the planform
-    newWing.set_Data(planformData)
-
-    # before calculating the planform with absolute numbers,
-    # calculate normalized chord distribution
-    newWing.calculate_normalizedChordDistribution()
-    #newWing.draw_NormalizedChordDistribution()#FIXME
-
-    # denormalize position / calculate absolute numbers
-    newWing.denormalize_positions()
-
-    # calculate the grid, the chordlengths of the airfoils and the sections
-    newWing.calculate_planform()
-    newWing.calculate_ReNumbers()
-    newWing.calculate_chordlengths()
-    newWing.calculate_positions() # must be done after chordlenghts ar known
-    newWing.set_AirfoilNames()
-
-    # if there is a fuselage, insert data for the fuselage section
-    # at the beginning of the list.
-    if newWing.fuselageIsPresent():
-        newWing.insert_fuselageData()
-
-    # always insert data for the wing tip
-    newWing.insert_tipData()
-
-    # calculate the sections now
-    newWing.calculate_sections()
-
-    # assign the flap groups to the different sections
-    newWing.assignFlapGroups()
-
-    # create outputfolder, if it does not exist
-    if not os.path.exists(outputFolder):
-        os.makedirs(outputFolder)
-
-    # get current working dir
-    workingDir = os.getcwd()
-
-    # check if output-folder exists. If not, create folder.
-    if not os.path.exists(buildPath):
-        os.makedirs(buildPath)
-
-    # check if airfoil-folder exists. If not, create folder.
-    if not os.path.exists(buildPath + bs + airfoilPath):
-        os.makedirs(buildPath + bs + airfoilPath)
-
-    # change working-directory to output-directory
-    os.chdir(workingDir + bs + buildPath + bs + airfoilPath)
-
-    # copy and rename user-airfoils, the results will be copied to the
-    # airfoil-folder specified in the strak-machine
-    copy_userAirfoils(newWing)
-
-    # create blended airfoils using XFOIL_worker
-    create_blendedArifoils(newWing)
-
-    # change working-directory back
-    os.chdir(workingDir)
-
-    # update "strakdata.txt" for the strakmachine
-    update_strakdata(newWing)
-
-    # interpolation of sections, make complete 1:1 copy first
-    # in the drawing we only want to see the non-interpolated sections
-    interpolatedWing = deepcopy(newWing)
-    interpolatedWing.interpolate_sections()
-
-    # insert the generated-data into the XFLR5 File (interpolated data)
-    try:
-        # get filename of XFLR5-File
-        XFLR5_inFileName =  planformData["XFLR5_inFileName"]
-        if (XFLR5_inFileName.find(bs) < 0):
-            XFLR5_inFileName = ressourcesPath + bs + XFLR5_inFileName
-
-        # compose output-filename for planform-xml-file
-        XFLR5_outFileName =  planformData["XFLR5_outFileName"]
-        if (XFLR5_outFileName.find(bs) < 0):
-            XFLR5_outFileName = outputFolder + bs + XFLR5_outFileName
+    # create instance of planform creator
+    creatorInst = planform_creator(planformDataFileName)
 
 
-        if ((XFLR5_inFileName != None) and (XFLR5_outFileName != None)):
-            insert_PlanformDataIntoXFLR5_File(interpolatedWing, XFLR5_inFileName, XFLR5_outFileName)
-            NoteMsg("XFLR5 file \"%s\" was successfully created" % XFLR5_outFileName)
-    except:
-        NoteMsg("creating XFLR5 file was skipped")
-
-    # insert the generated-data into the FLZ-Vortex File (interpolated data)
-    try:
-        FLZ_inFileName  = planformData["FLZVortex_inFileName"]
-        if (FLZ_inFileName.find(bs) < 0):
-            FLZ_inFileName = ressourcesPath + bs + FLZ_inFileName
-
-        FLZ_outFileName = planformData["FLZVortex_outFileName"]
-        if (FLZ_outFileName.find(bs) < 0):
-            FLZ_outFileName = outputFolder + bs + FLZ_outFileName
-
-        export_toFLZ(interpolatedWing, FLZ_inFileName, FLZ_outFileName)
-        NoteMsg("FLZ vortex file \"%s\" was successfully created" % FLZ_outFileName)
-    except:
-        NoteMsg("creating FLZ vortex file was skipped")
-
-    # generate batchfile for polar creation (non interpolated data)
-    generate_polarCreationFile(newWing)
-
-    # set colours according to selected theme
-    newWing.set_colours()
-
-    # plot the normalized chord distribution
-    newWing.draw_NormalizedChordDistribution()
-
-    # plot the planform
-    newWing.draw()
+##
+##
+##    # try to open .json-file
+##    try:
+##     planform = open(planformDataFileName)
+##    except:
+##        ErrorMsg("failed to open file %s" % planformDataFileName)
+##        exit(-1)
+##
+##    # load dictionary of planform-data from .json-file
+##    try:
+##        planformData = json.load( planform)
+##        planform.close()
+##    except ValueError as e:
+##        ErrorMsg('invalid json: %s' % e)
+##        ErrorMsg('Error, failed to read data from file %s' % planformDataFileName)
+##        planform.close()
+##        exit(-1)
+##
+##    # set data for the planform
+##    newWing.set_Data(planformData)
+##
+##    # before calculating the planform with absolute numbers,
+##    # calculate normalized chord distribution
+##    newWing.calculate_normalizedChordDistribution()
+##
+##    # denormalize position / calculate absolute numbers
+##    newWing.denormalize_positions()
+##
+##    # calculate the grid, the chordlengths of the airfoils and the sections
+##    newWing.calculate_planform()
+##    newWing.calculate_ReNumbers()
+##    newWing.calculate_chordlengths()
+##    newWing.calculate_positions() # must be done after chordlenghts ar known
+##    newWing.set_AirfoilNames()
+##
+##    # if there is a fuselage, insert data for the fuselage section
+##    # at the beginning of the list.
+##    if newWing.fuselageIsPresent():
+##        newWing.insert_fuselageData()
+##
+##    # always insert data for the wing tip
+##    newWing.insert_tipData()
+##
+##    # calculate the sections now
+##    newWing.calculate_sections()
+##
+##    # assign the flap groups to the different sections
+##    newWing.assignFlapGroups()
+##
+##    # create outputfolder, if it does not exist
+##    if not os.path.exists(outputFolder):
+##        os.makedirs(outputFolder)
+##
+##    # get current working dir
+##    workingDir = os.getcwd()
+##
+##    # check if output-folder exists. If not, create folder.
+##    if not os.path.exists(buildPath):
+##        os.makedirs(buildPath)
+##
+##    # check if airfoil-folder exists. If not, create folder.
+##    if not os.path.exists(buildPath + bs + airfoilPath):
+##        os.makedirs(buildPath + bs + airfoilPath)
+##
+##    # change working-directory to output-directory
+##    os.chdir(workingDir + bs + buildPath + bs + airfoilPath)
+##
+##    # copy and rename user-airfoils, the results will be copied to the
+##    # airfoil-folder specified in the strak-machine
+##    copy_userAirfoils(newWing)
+##
+##    # create blended airfoils using XFOIL_worker
+##    create_blendedArifoils(newWing)
+##
+##    # change working-directory back
+##    os.chdir(workingDir)
+##
+##    # update "strakdata.txt" for the strakmachine
+##    update_strakdata(newWing)
+##
+##    # interpolation of sections, make complete 1:1 copy first
+##    # in the drawing we only want to see the non-interpolated sections
+##    interpolatedWing = deepcopy(newWing)
+##    interpolatedWing.interpolate_sections()
+##
+##    # insert the generated-data into the XFLR5 File (interpolated data)
+##    try:
+##        # get filename of XFLR5-File
+##        XFLR5_inFileName =  planformData["XFLR5_inFileName"]
+##        if (XFLR5_inFileName.find(bs) < 0):
+##            XFLR5_inFileName = ressourcesPath + bs + XFLR5_inFileName
+##
+##        # compose output-filename for planform-xml-file
+##        XFLR5_outFileName =  planformData["XFLR5_outFileName"]
+##        if (XFLR5_outFileName.find(bs) < 0):
+##            XFLR5_outFileName = outputFolder + bs + XFLR5_outFileName
+##
+##
+##        if ((XFLR5_inFileName != None) and (XFLR5_outFileName != None)):
+##            insert_PlanformDataIntoXFLR5_File(interpolatedWing, XFLR5_inFileName, XFLR5_outFileName)
+##            NoteMsg("XFLR5 file \"%s\" was successfully created" % XFLR5_outFileName)
+##    except:
+##        NoteMsg("creating XFLR5 file was skipped")
+##
+##    # insert the generated-data into the FLZ-Vortex File (interpolated data)
+##    try:
+##        FLZ_inFileName  = planformData["FLZVortex_inFileName"]
+##        if (FLZ_inFileName.find(bs) < 0):
+##            FLZ_inFileName = ressourcesPath + bs + FLZ_inFileName
+##
+##        FLZ_outFileName = planformData["FLZVortex_outFileName"]
+##        if (FLZ_outFileName.find(bs) < 0):
+##            FLZ_outFileName = outputFolder + bs + FLZ_outFileName
+##
+##        export_toFLZ(interpolatedWing, FLZ_inFileName, FLZ_outFileName)
+##        NoteMsg("FLZ vortex file \"%s\" was successfully created" % FLZ_outFileName)
+##    except:
+##        NoteMsg("creating FLZ vortex file was skipped")
+##
+##    # generate batchfile for polar creation (non interpolated data)
+##    generate_polarCreationFile(newWing)
+##
+##    # set colours according to selected theme
+##    newWing.set_colours()
+##
+##    # plot the normalized chord distribution
+##    newWing.draw_NormalizedChordDistribution()
+##
+##    # plot the planform
+##    newWing.draw()

@@ -14,6 +14,7 @@ md .\Strakmachine\ressources
 rem copy all script-files to strakmachine pure
 rem use copy to create exe-files
 copy .\scripts\planform_creator.py .\Strakmachine\scripts\
+copy .\scripts\planform_creator_gui.py .\Strakmachine\scripts\
 copy .\scripts\strak_machine.py .\Strakmachine\scripts\
 copy .\scripts\strak_machine_gui.py .\Strakmachine\scripts\
 copy .\scripts\xoptfoil_visualizer-jx.py .\Strakmachine\scripts\
@@ -21,6 +22,8 @@ copy .\scripts\best_airfoil.py .\Strakmachine\scripts\
 copy .\scripts\change_airfoilname.py .\Strakmachine\scripts\
 copy .\scripts\show_status.py .\Strakmachine\scripts\
 copy .\scripts\FLZ_Vortex_export.py .\Strakmachine\scripts\
+copy .\scripts\XFLR5_export.py .\Strakmachine\scripts\
+copy .\scripts\DXF_export.py .\Strakmachine\scripts\
 
 rem copy xoptfoil and xfoil-worker to bin-folder
 copy .\bin\*.exe .\Strakmachine\bin\
