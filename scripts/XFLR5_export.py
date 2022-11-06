@@ -22,6 +22,9 @@ import os, re
 from copy import deepcopy
 from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg, bs)
 
+# Scale from mm --> m
+scaleFactor = (1.0/1000.0)
+
 def get_wing(root, wingFinSwitch):
     for wing in root.iter('wing'):
         for XMLwingFinSwitch in wing.iter('isFin'):
@@ -35,7 +38,7 @@ def get_wing(root, wingFinSwitch):
             if (value == wingFinSwitch):
                 return wing
 
-def export_toXFLR5(data, FileName):
+def export_toXFLR5(data, FileName, xPanels, yPanels):
     # basically parse the XML-file
     tree = ET.parse(FileName)
 
@@ -63,17 +66,23 @@ def export_toXFLR5(data, FileName):
         newSection = deepcopy(sectionTemplate)
 
         # enter the new data
+        for x_number_of_panels in newSection.iter('x_number_of_panels'):
+            x_number_of_panels.text = str(xPanels)
+
+        for y_number_of_panels in newSection.iter('y_number_of_panels'):
+            y_number_of_panels.text = str(yPanels)
+
         for yPosition in newSection.iter('y_position'):
             # convert float to text
-            yPosition.text = str(section.y)
+            yPosition.text = str(section.y * scaleFactor)
 
         for chord in newSection.iter('Chord'):
             # convert float to text
-            chord.text = str(section.chord)
+            chord.text = str(section.chord * scaleFactor)
 
         for xOffset in newSection.iter('xOffset'):
             # convert float to text
-            xOffset.text = str(section.leadingEdge)
+            xOffset.text = str(section.leadingEdge * scaleFactor)
 
         for dihedral in newSection.iter('Dihedral'):
             # convert float to text
@@ -89,7 +98,7 @@ def export_toXFLR5(data, FileName):
         wing.append(newSection)
         hingeDepthPercent = (section.flapDepth /section.chord )*100
         NoteMsg("Section %d: position: %.0f mm, chordlength %.0f mm, hingeDepth %.1f  %%, airfoilName %s was inserted" %
-          (section.number, section.y*1000, section.chord*1000, hingeDepthPercent, section.airfoilName))
+          (section.number, section.y, section.chord, hingeDepthPercent, section.airfoilName))
 
     # delete existing file, write all data to the new file
     os.remove(FileName)

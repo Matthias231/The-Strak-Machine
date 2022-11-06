@@ -23,8 +23,9 @@ import numpy as np
 from copy import deepcopy
 from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg, bs)
 
-# scale from m --> mm
-scaleFactor = 1000.0
+# Scale from mm --> m
+scaleFactor = (1.0/1000.0)
+
 ################################################################################
 #
 # helper functions

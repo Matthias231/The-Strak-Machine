@@ -24,6 +24,10 @@ from math import atan, pi
 from copy import deepcopy
 import numpy as np
 
+# Scale from mm --> m
+scaleFactor = (1.0/1000.0)
+
+xPanels_Tag = "ANZAHL PANELS X"
 endOfHeader_Tag = "GESAMTPOLARBERECHNUNG_SCHRITTZAHL"
 startOfWing_Tag = "[FLAECHE0]"
 startOfFin_Tag = "[FLAECHE1]"
@@ -79,6 +83,7 @@ class segmentData:
         for idx in range(numSections-1):
             # calculate section width
             width = wingData.sections[idx+1].y - wingData.sections[idx].y
+            width *= scaleFactor
             widthsLeftHalfWing.append(-1.0*width)
             widthsRightHalfWing.append(width)
             idx = idx + 1
@@ -141,8 +146,9 @@ class segmentData:
 
         for idx in range(1, numSections):
             # calculate chords
-            chordsLeftHalfWing.append(wingData.sections[idx].chord)
-            chordsRightHalfWing.append(wingData.sections[idx].chord)
+            chord = wingData.sections[idx].chord * scaleFactor
+            chordsLeftHalfWing.append(chord)
+            chordsRightHalfWing.append(chord)
 
         chordsLeftHalfWing.reverse()
         chordList = chordsLeftHalfWing + chordsRightHalfWing
@@ -234,7 +240,7 @@ def write_airfoilData(airfoilName, file):
     file.write("[PROFIL ENDE]\n")
 
 
-def write_segmentData(wingData, segments, idx, file):
+def write_segmentData(wingData, segments, idx, file, yPanels):
     params = wingData.params
     klappentiefeLinks = segments.flapDepths[idx]
     klappentiefeRechts = segments.flapDepths[idx+1]
@@ -249,7 +255,7 @@ def write_segmentData(wingData, segments, idx, file):
     file.write("V-FORM_WINKEL=%.5f\n" % segments.dihedrals[idx])
     file.write("PFEILWINKEL=%.5f\n" % segments.angles[idx])
     file.write("BEZUGSPUNKT_PFEILWINKEL=%.5f\n" % Bezugspunkt)
-    file.write("ANZAHL PANELS Y=1\n")
+    file.write("ANZAHL PANELS Y=%d\n" % yPanels)
     file.write("VERTEILUNG=LINEAR\n")
     file.write("KLAPPENTIEFE LINKS,RECHTS=%.5f %.5f\n" % \
                 (klappentiefeLinks, klappentiefeRechts))
@@ -272,7 +278,6 @@ def write_segmentData(wingData, segments, idx, file):
     file.write("[SEGMENT ENDE]\n")
 
 
-
 def write_header(FLZ_fileContent, file):
     # write all lines up to end of header
     for line in FLZ_fileContent:
@@ -282,17 +287,20 @@ def write_header(FLZ_fileContent, file):
             return
 
 
-def write_wingHeader(params, file):
+def write_wingHeader(params, file, xPanels):
+    rootchord = params.rootchord * scaleFactor
+    flapDepthRoot = params.flapDepthRoot * scaleFactor
+
     file.write("[FLAECHE0]\n")
     file.write("ART=FLUEGEL\n")
     file.write("BEZEICHNUNG=%s\n" % params.planformName)
     file.write("POSITION X,Y,Z=0.00000 0.00000 0.00000\n") #FIXME position
     file.write("ALFA0_CM0_OPTIMIERUNG=TRUE\n")
     file.write("EINSTELLWINKEL=0.00000\n")
-    file.write("PROFILTIEFE=%.5f\n" % params.rootchord)
-    file.write("BEZUGSPUNKT_PROFILTIEFE=%.5f\n" % (100.0 - params.flapDepthRoot))
+    file.write("PROFILTIEFE=%.5f\n" % rootchord)
+    file.write("BEZUGSPUNKT_PROFILTIEFE=%.5f\n" % (100.0 - flapDepthRoot))
     file.write("VERWINDUNGSWINKEL=0.00000\n")
-    file.write("ANZAHL PANELS X=7\n")
+    file.write("ANZAHL PANELS X=%d\n" % xPanels)
     file.write("VERTEILUNG=SIN_L\n")
     file.write("ANZAHL PANELS VOLUMENDARSTELLUNG=30\n")
     file.write("MASSE=2.50000\n")
@@ -305,7 +313,10 @@ def write_wingHeader(params, file):
     # job is done
 
 
-def write_finHeader(params, file):
+def write_finHeader(params, file, xPanels):
+    rootchord = params.rootchord * scaleFactor
+    flapDepthRoot = params.flapDepthRoot * scaleFactor
+
     file.write("[FLAECHE1]\n")
     file.write("ART=FLUEGEL\n")
     #file.write("ART=LEITWERK\n")
@@ -313,10 +324,10 @@ def write_finHeader(params, file):
     file.write("POSITION X,Y,Z=0.88500 0.00000 0.00000\n") #FIXME position
     file.write("ALFA0_CM0_OPTIMIERUNG=TRUE\n")
     file.write("EINSTELLWINKEL=0.00000\n")
-    file.write("PROFILTIEFE=%.5f\n" % params.rootchord)
-    file.write("BEZUGSPUNKT_PROFILTIEFE=%.5f\n" % (100.0 - params.flapDepthRoot))
+    file.write("PROFILTIEFE=%.5f\n" % rootchord)
+    file.write("BEZUGSPUNKT_PROFILTIEFE=%.5f\n" % (100.0 - flapDepthRoot))
     file.write("VERWINDUNGSWINKEL=0.00000\n")
-    file.write("ANZAHL PANELS X=7\n")
+    file.write("ANZAHL PANELS X=%d\n" % xPanels)
     file.write("VERTEILUNG=SIN_L\n")
     file.write("ANZAHL PANELS VOLUMENDARSTELLUNG=30\n")
     file.write("MASSE=0.0650000\n")
@@ -368,7 +379,7 @@ def write_footer(FLZ_fileContent, file):
             file.write(line)
 
 
-def export_toFLZ(wingData, FileName):
+def export_toFLZ(wingData, FileName, xPanels, yPanels):
     # calculate segment values from wingdata
     segments = segmentData(wingData)
     params = wingData.params
@@ -399,14 +410,14 @@ def export_toFLZ(wingData, FileName):
     # kept -->copy from FLZ_fileContent
     if params.isFin:
         copy_wingData(FLZ_fileContent, FLZ_outfile)
-        write_finHeader(params, FLZ_outfile)
+        write_finHeader(params, FLZ_outfile, xPanels)
     else:
-        write_wingHeader(params, FLZ_outfile)
+        write_wingHeader(params, FLZ_outfile, xPanels)
 
 
     # loop over all sections of the wing
     for idx in range(segments.num):
-        write_segmentData(wingData, segments, idx, FLZ_outfile)
+        write_segmentData(wingData, segments, idx, FLZ_outfile, yPanels)
         idx = idx + 1
 
     # End of Wing / Fin

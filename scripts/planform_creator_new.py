@@ -33,6 +33,7 @@ from matplotlib.patches import Wedge
 from matplotlib.figure import Figure
 from matplotlib import rcParams
 from matplotlib import bezier
+from matplotlib import ticker
 import numpy as np
 from scipy.interpolate import make_interp_spline
 from scipy.interpolate import UnivariateSpline
@@ -1300,7 +1301,7 @@ class wing:
 
         for idx in range(startIdx, num):
             # get position, scale from m to mm
-            position = self.sections[idx].y * 1000.0
+            position = self.sections[idx].y# * 1000.0 FIXME
             airfoilPositions.append(position)
 
         return airfoilPositions
@@ -1470,7 +1471,7 @@ class wing:
             if ((actualFlapGroup != section.flapGroup) or
                ((idx == (numSections-1)) and (section.flapGroup !=0))):
                 # determine x_pos and flapDepth
-                x = section.y * 1000.0 # m --> mm
+                x = section.y# * 1000.0 # m --> mm #FIXME
                 flapDepthPercent = (section.flapDepth / section.chord) * 100
 
                 # append tupel to lists
@@ -1689,10 +1690,11 @@ class wing:
         params = self.params
         planform = self.planform
 
-        wingArea_dm = planform.wingArea*100
+        # scaling from square mm to square dm
+        wingArea_dm = planform.wingArea / 10000.0
 
         proj_fact = cos(params.dihedral*pi/180.0)
-        proj_wingArea_dm = proj_fact * planform.wingArea*100
+        proj_wingArea_dm = proj_fact * wingArea_dm
         flapToWingAreaRatio = (planform.flapArea / planform.wingArea)*100
 
         # plot label containing basic planform data
@@ -1764,11 +1766,21 @@ class wing:
         # set new fontsize of the x-tick labels
         for tick in ax.xaxis.get_major_ticks():
             tick.label.set_fontsize(fs_ticks)
-            tick.label.set_rotation('vertical')
+            #tick.label.set_rotation('vertical')
 
         # set new fontsize of the y-tick labels
         for tick in ax.yaxis.get_major_ticks():
             tick.label.set_fontsize(fs_ticks)
+
+        # x-axis: values are in mm
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # y-axis: values are in mm
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # set labels for axes
+        ax.set_xlabel("Position (mm)")
+        ax.set_ylabel("Position (mm)")
 
         # place legend
         ax.legend(loc='upper right', fontsize=fs_legend, labelcolor=cl_legend,
@@ -1873,7 +1885,7 @@ class wing:
         # build up list of x- and y-values
         grid = self.planform.grid
         for idx in range(len(grid)):
-            x = grid[idx].y *1000.0 # m --> mm
+            x = grid[idx].y# *1000.0 # m --> mm FIXME
             depth = (grid[idx].flapDepth / grid[idx].chord) * 100
 
             if (depth > 0.0):
@@ -1905,6 +1917,16 @@ class wing:
             xytext=(10, 5), textcoords='offset points', color = cl_legend,
             fontsize=fs_legend, rotation='vertical')
 
+        # x-axis: values are in mm
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # y-axis: values are in %
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # set labels for axes
+        ax.set_ylabel("Flap depth (%)")
+        ax.set_xlabel("Position (mm)")
+
         # place legend
         ax.legend(loc='upper right', fontsize=fs_legend, labelcolor=cl_legend,
            frameon=False)
@@ -1918,9 +1940,6 @@ class wing:
     # plot planform of the half-wing
     def plot_AirfoilDistribution(self, ax):
         params = self.params
-
-        # scale all values from m to mm
-        scaleFactor = 1000.0
 
         # create empty lists
         xValues = []
@@ -1978,10 +1997,9 @@ class wing:
                 else:
                     labelText = None
 
-            # scale all values from m to mm
-            x = element.y * scaleFactor
-            LE = element.leadingEdge * scaleFactor
-            TE = element.trailingEdge * scaleFactor
+            x = element.y
+            LE = element.leadingEdge
+            TE = element.trailingEdge
 
             ax.plot([x, x] ,[LE, TE],
             color=labelColor, linestyle = ls_sections, linewidth = lw_sections,
@@ -1997,15 +2015,15 @@ class wing:
 
             # plot label for chordlength of section
             try:
-                text = ("%d mm" % int(round(element.chord*1000)))
+                text = ("%d mm" % int(round(element.chord)))
             except:
                 text = ("0 mm" )
                 ErrorMsg("label for chordlength of section could not be plotted")
 
             ax.annotate(text,
             xy=(x, yPosChordLabel), xycoords='data',
-            xytext=(2, 5), textcoords='offset points', color = cl_chordlengths,
-            fontsize=fs_infotext, rotation='vertical')
+            xytext=(2, 5), textcoords='offset points', color = labelColor,
+            fontsize=fs_infotext-1, rotation='vertical')
 
             # plot label for airfoil-name / section-name
             text = ("%s" % (remove_suffix(element.airfoilName,'.dat')))
@@ -2036,15 +2054,25 @@ class wing:
         for tick in ax.yaxis.get_major_ticks():
             tick.label.set_fontsize(fs_ticks)
 
+        # x-axis: values are in mm
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # y-axis: values are in mm
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # set labels for axes
+        ax.set_xlabel("Position (mm)")
+        ax.set_ylabel("Position (mm)")
+
         grid = self.planform.grid
 
         for element in grid:
             # build up list of x-values
-            xValues.append(element.y * scaleFactor)
+            xValues.append(element.y)
 
             # build up lists of y-values
-            leadingEdge.append(element.leadingEdge * scaleFactor)
-            trailingeEge.append(element.trailingEdge * scaleFactor)
+            leadingEdge.append(element.leadingEdge)
+            trailingeEge.append(element.trailingEdge)
 
         # setup root- and tip-joint
         trailingeEge[0] = leadingEdge[0]
@@ -2213,6 +2241,16 @@ class wing:
         new_tick_locations_x = [0.0, proj_halfwingSpan, center_left_x,
                                 (proj_halfwingSpan + params.fuselageWidth),
                                 center_right_x, proj_wingspan]
+
+        # x-axis: values are in mm
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # y-axis: values are in mm
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+
+        # set labels for axes
+        ax.set_xlabel("Position (mm)")
+        ax.set_ylabel("Position (mm)")
 
         # set new ticks
         ax.set_xticks(new_tick_locations_x)
@@ -2430,87 +2468,6 @@ class wing:
         os.chdir(workingDir)
         return (result, blendfoilNames)
 
-
-
-
-################################################################################
-# find the wing in the XML-tree
-##def get_wing(root, wingFinSwitch):
-##    for wing in root.iter('wing'):
-##        for XMLwingFinSwitch in wing.iter('isFin'):
-##            # convert string to boolean value
-##            if (XMLwingFinSwitch.text == 'true') or (XMLwingFinSwitch.text == 'True'):
-##                value = True
-##            else:
-##                value = False
-##
-##            # check against value of wingFinswitch
-##            if (value == wingFinSwitch):
-##                return wing
-##
-##
-### insert the planform-data into XFLR5-xml-file
-##def insert_PlanformDataIntoXFLR5_File(data, FileName):
-##
-##    # basically parse the XML-file
-##    tree = ET.parse(inFileName)
-##
-##    # get root of XML-tree
-##    root = tree.getroot()
-##
-##    # find wing-data
-##    wing = get_wing(root, data.isFin)
-##
-##    if (wing == None):
-##        ErrorMsg("wing not found\n")
-##        return
-##
-##    # find sections-data-template
-##    for sectionTemplate in wing.iter('Sections'):
-##        # copy the template
-##        newSection = deepcopy(sectionTemplate)
-##
-##        # remove the template
-##        wing.remove(sectionTemplate)
-##
-##    # write the new section-data to the wing
-##    for section in data.sections:
-##        # copy the template
-##        newSection = deepcopy(sectionTemplate)
-##
-##        # enter the new data
-##        for yPosition in newSection.iter('y_position'):
-##            # convert float to text
-##            yPosition.text = str(section.y)
-##
-##        for chord in newSection.iter('Chord'):
-##            # convert float to text
-##            chord.text = str(section.chord)
-##
-##        for xOffset in newSection.iter('xOffset'):
-##            # convert float to text
-##            xOffset.text = str(section.leadingEdge)
-##
-##        for dihedral in newSection.iter('Dihedral'):
-##            # convert float to text
-##            dihedral.text = str(section.dihedral)
-##
-##        for foilName in newSection.iter('Left_Side_FoilName'):
-##            # convert float to text
-##            foilName.text = remove_suffix(str(section.airfoilName), '.dat')
-##
-##        for foilName in newSection.iter('Right_Side_FoilName'):
-##            # convert float to text
-##            foilName.text = remove_suffix(str(section.airfoilName), '.dat')
-##
-##        # add the new section to the tree
-##        wing.append(newSection)
-##        hingeDepthPercent = (section.flapDepth /section.chord )*100
-##        NoteMsg("Section %d: position: %.0f mm, chordlength %.0f mm, hingeDepth %.1f  %%, airfoilName %s was inserted" %
-##          (section.number, section.y*1000, section.chord*1000, hingeDepthPercent, section.airfoilName))
-##
-##    # write all data to the new file file
-##    tree.write(outFileName)
 
 ################################################################################
 # function that gets the name of the planform-data-file
@@ -2960,7 +2917,7 @@ class planform_creator:
                 ErrorMsg("__export_planform: delete or copy template files failed")
                 return (-1, exportedFiles)
         try:
-            result = export_toXFLR5(interpolatedWing, XFLR5_FileName)
+            result = export_toXFLR5(interpolatedWing, XFLR5_FileName, xPanels, yPanels)
         except:
             ErrorMsg("export_toXFLR5 failed")
             return (-2, exportedFiles)
@@ -2970,9 +2927,8 @@ class planform_creator:
         else:
             return (result, exportedFiles)
 
-        result = export_toFLZ(interpolatedWing, FLZ_FileName)
         try:
-            result = export_toFLZ(interpolatedWing, FLZ_FileName)
+            result = export_toFLZ(interpolatedWing, FLZ_FileName, xPanels, yPanels)
         except:
             ErrorMsg("export_toFLZ failed")
             return (-3, exportedFiles)

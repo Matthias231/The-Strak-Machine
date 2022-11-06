@@ -318,13 +318,13 @@ class control_frame():
         table = [#{"txt": "Planform name",                "variable" : params.planformName,     "unit" : None, "scaleFactor" : None},
                  #{"txt": "Planform shape",               "variable" : params.planformShape,    "unit" : None, "scaleFactor" : None },
                   {"txt": "Airfoils basic name",          "variable" : 'airfoilBasicName',      "idx": None, "unit" : None, "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
-                  {"txt": "wingspan",                     "variable" : 'wingspan',              "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0, "f_read" : None,   "f_write" :None},
-                  {"txt": "Width of fuselage",            "variable" : 'fuselageWidth',         "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0, "f_read" : None,   "f_write" :None},
-                  {"txt": "Root chord",                   "variable" : 'rootchord',             "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0, "f_read" : None,   "f_write" :None},
-                  {"txt": "Tip chord",                    "variable" : 'tipchord',              "idx": None, "unit" : "mm", "scaleFactor" : 1000,   "decimals": 0, "f_read" : None,   "f_write" :None},
+                  {"txt": "wingspan",                     "variable" : 'wingspan',              "idx": None, "unit" : "mm", "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
+                  {"txt": "Width of fuselage",            "variable" : 'fuselageWidth',         "idx": None, "unit" : "mm", "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
+                  {"txt": "Root chord",                   "variable" : 'rootchord',             "idx": None, "unit" : "mm", "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
+                  {"txt": "Tip chord",                    "variable" : 'tipchord',              "idx": None, "unit" : "mm", "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
                   {"txt": "Tip sharpness",                "variable" : 'tipSharpness',          "idx": None, "unit" : None, "scaleFactor" : None,   "decimals": 1, "f_read" : None,   "f_write" :None},
                   {"txt": "Ellipse correction",           "variable" : 'ellipseCorrection',     "idx": None, "unit" : None, "scaleFactor" : 100.0,  "decimals": 1, "f_read" : None,   "f_write" :None},
-                  {"txt": "Leading edge correction",      "variable" : 'leadingEdgeCorrection', "idx": None, "unit" : None, "scaleFactor" : 100.0,  "decimals": 1, "f_read" : None,   "f_write" :None},
+                  {"txt": "Leading edge correction",      "variable" : 'leadingEdgeCorrection', "idx": None, "unit" : None, "scaleFactor" : 0.1,    "decimals": 1, "f_read" : None,   "f_write" :None},
                   {"txt": "Dihedral",                     "variable" : 'dihedral',              "idx": None, "unit" : "°",  "scaleFactor" : None,   "decimals": 1, "f_read" : None,   "f_write" :None},
                   {"txt": "Hingeline angle @root",        "variable" : 'hingeLineAngle',        "idx": None, "unit" : "°",  "scaleFactor" : None,   "decimals": 1, "f_read" : None,   "f_write" :None},
                   {"txt": "Flap depth @root",             "variable" : 'flapDepthRoot',         "idx": None, "unit" : "%",  "scaleFactor" : None,   "decimals": 1, "f_read" : None,   "f_write" :None},
@@ -346,7 +346,7 @@ class control_frame():
         f_write = self.creatorInstances[planformIdx].normalize_position
 
         table = [
-                 {"txt": "selected Airfoil: Position",            "variable" : 'airfoilPositions', "idx": idx, "unit" : 'mm', "scaleFactor" : 1000.0, "decimals": 0, "f_read" : f_read, "f_write" :f_write},
+                 {"txt": "selected Airfoil: Position",            "variable" : 'airfoilPositions', "idx": idx, "unit" : 'mm', "scaleFactor" : None, "decimals": 0, "f_read" : f_read, "f_write" :f_write},
                  {"txt": "selected Airfoil: Re*Sqrt(Cl)",         "variable" : 'airfoilReynolds',  "idx": idx, "unit" : 'K',  "scaleFactor" : 0.001,  "decimals": 0, "f_read" : None,   "f_write" :None},
                  {"txt": "selected Airfoil: assign to flap",      "variable" : 'flapGroup',        "idx": idx, "unit" : None, "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
                 ]
@@ -754,8 +754,7 @@ class control_frame():
         params = self.params[self.master.planformIdx]
 
         # calculate position from x value (normalize)
-        position = float(x/1000.0) # mm -> m
-        position = creatorInst.normalize_position(position)
+        position = creatorInst.normalize_position(x)
 
         # limit to possible range
         position = np.clip(position, 0.0, 1.0)
@@ -1015,14 +1014,14 @@ class diagram(ctk.CTkFrame):
         zoom_factor = self.controller.get_zoom_factor()
 
         # check type of active diagram
-        if ((self.controller.activeDiagram == diagTypes[2]) or
-            (self.controller.activeDiagram == diagTypes[3])):
+        if ((self.controller.activeDiagram == diagTypes[3]) or
+            (self.controller.activeDiagram == diagTypes[4])):
             mouse_x = event.xdata
             mouse_y = event.ydata
 
             # set ranges to catch points, consider zoomfactor
             # wingspan (m -->  mm) / 50 --> * 20.0
-            catching_range = params["wingspan"] * 20.0 * zoom_factor
+            catching_range = params["wingspan"] * 0.02 * zoom_factor
         else:
             #print("not implemented yet") #FIXME
             return None
@@ -1030,7 +1029,7 @@ class diagram(ctk.CTkFrame):
         # search entry with closest coordinates.
 
         # change of FlapDepth requested ?
-        if (self.controller.activeDiagram == diagTypes[2]):
+        if (self.controller.activeDiagram == diagTypes[4]):
             # get flap positions (x-coordinate and depth)
             flapPositions_x, flapPositions_y = creatorInst.get_flapPositions()
             num = len(flapPositions_x)
@@ -1104,7 +1103,7 @@ class diagram(ctk.CTkFrame):
             if self._ind is None:
                 return
             # check type of active diagram
-            if (self.controller.activeDiagram == diagTypes[2]):
+            if (self.controller.activeDiagram == diagTypes[4]):
                 # Flap distribution
                 x, y = event.xdata, event.ydata
                 # set new flap depth
