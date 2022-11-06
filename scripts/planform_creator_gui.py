@@ -1936,7 +1936,13 @@ class App(ctk.CTk):
         for idx in range(num):
             # check if planform shall be exported
             if (self.exportFlags[idx].get() == True):
-                result, filenames = creatorInstances[idx].export_planform(planformsPath,
+                creatorInst = creatorInstances[idx]
+
+                # export airfoils first
+                result, userAirfoils, blendedAirfoils = creatorInst.export_airfoils()
+
+                # export planform afterwards
+                result, filenames = creatorInst.export_planform(planformsPath,
                   self.interpolationSteps, self.xPanels, self.yPanels, self.num_points, append)
 
                 all_filenames.extend(filenames)
