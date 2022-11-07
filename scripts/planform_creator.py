@@ -1464,8 +1464,13 @@ class wing:
             if ((actualFlapGroup != section.flapGroup) or
                ((idx == (numSections-1)) and (section.flapGroup !=0))):
                 # determine x_pos and flapDepth
-                x = section.y# * 1000.0 # m --> mm #FIXME
-                flapDepthPercent = (section.flapDepth / section.chord) * 100
+                x = section.y
+                if section.chord > 0:
+                    flapDepthPercent = (section.flapDepth / section.chord) * 100
+                else:
+                    # we assume we are exactly at the tip and tip-chord is 0
+                    # so get flap depth from params
+                    flapDepthPercent = params.flapDepthTip
 
                 # append tupel to lists
                 flapPositions_x.append((x,x))
