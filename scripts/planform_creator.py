@@ -545,13 +545,6 @@ class params:
         position += (self.fuselageWidth/2)
         return position
 
-##    def normalize_positions(self):
-##        for idx in range(len(self.airfoilPositions)):
-##            if self.airfoilPositions[idx] != None:
-##                self.airfoilPositions_normalized[idx] = self.airfoilPositions[idx] / self.halfwingspan
-##            else:
-##                self.airfoilPositions_normalized[idx] = None
-
     def denormalize_positions(self):
         self.airfoilPositions.clear()
         num = len(self.airfoilPositions_normalized)

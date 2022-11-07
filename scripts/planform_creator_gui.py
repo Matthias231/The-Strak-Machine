@@ -119,6 +119,7 @@ class control_frame():
         self.scaleFactor = scaleFactor
         self.numPlanforms = len(creatorInstances)
         self.unsavedChangesFlags = []
+        self.request_clearUnsavedChangesFlags = []
         self.label_unsavedChanges = []
         self.planformNames = []
         self.params = []
@@ -127,7 +128,7 @@ class control_frame():
         self.basicParamsTextVars = []
         self.airfoilParamsTextVars = []
         self.latestPath = []
-        self.postponeUpdate = False
+        self.performEntryUpdate = False
 
         # determine screen size
         self.width = self.master.winfo_screenwidth()
@@ -159,6 +160,7 @@ class control_frame():
         for i in range(self.numPlanforms):
             # new unsaved changes flag and label
             self.unsavedChangesFlags.append(False)
+            self.request_clearUnsavedChangesFlags.append(False)
             widget_1 = ctk.CTkLabel(master=self.frame_left, text='',
              text_color = 'red' )
             self.label_unsavedChanges.append(widget_1)
@@ -202,8 +204,8 @@ class control_frame():
         # add entries
         nextRow = self.__add_airfoilParams(self.frame_right, 3, nextRow)
 
-        # update alle entries
-        self.update_Entries(self.master.planformIdx)
+        # request update (will be done in the mainloop)
+        self.set_updateNotification()
 
         # show left frame
         self.frame_left.pack(side = 'left', fill=tk.BOTH)
@@ -218,6 +220,7 @@ class control_frame():
 
 
     def set_unsavedChangesFlag(self, planformIdx):
+        return #FIXME does not work properly, so deactivated. For example we do not have to set the flag, if we only change between the planforms
         try:
             self.unsavedChangesFlags[planformIdx] = True
             self.label_unsavedChanges[planformIdx].configure(text = 'unsaved changes')
@@ -425,9 +428,6 @@ class control_frame():
         self.airfoilParamsTextVars = []
         self.airfoilParamsEntries = []
 
-        # add Flag for recursion-check
-        self.update_airfoilEntries_active = False
-
         # get table with airfoil parameters for active planform
         airfoilParams = self.__get_airfoilParamsTable()
 
@@ -559,20 +559,20 @@ class control_frame():
             float_value = float(value)
             if (scaleFactor != None):
                 float_value = float_value / scaleFactor
-                # is there a scale function?
-                if scaleFunction != None:
-                    # carry out the scale function
-                    float_value = scaleFunction(float_value)
+            # is there a scale function?
+            if scaleFunction != None:
+                # carry out the scale function
+                float_value = scaleFunction(float_value)
             self.__setDictValue(params, variableName, idx, float_value)
 
         elif dataType == 'int':
             int_value = int(value)
             if (scaleFactor != None):
                 int_value = int(int_value / scaleFactor)
-                # is there a scale function?
-                if scaleFunction != None:
-                    # carry out the scale function
-                    int_value = scaleFunction(int_value)
+            # is there a scale function?
+            if scaleFunction != None:
+                # carry out the scale function
+                int_value = scaleFunction(int_value)
             self.__setDictValue(params, variableName, idx, int_value)
         else:
             ErrorMsg("__set_paramValue(): unimplemented handling of parameter %s" % variableName)
@@ -587,9 +587,6 @@ class control_frame():
             textVars[idx].set(self.__get_paramValue(params, paramTable[idx]))
 
     def __perform_update(self):
-        if (self.postponeUpdate == True):
-            return
-
         planformIdx = self.master.planformIdx
         params = self.params[planformIdx]
 
@@ -606,10 +603,7 @@ class control_frame():
         self.master.set_updateNeeded()
 
 
-    def update_airfoilEntries(self, planformIdx):
-        # Set Flag to avoid recursive calls
-        self.update_airfoilEntries_active = True
-
+    def __update_airfoilEntries(self, planformIdx):
         # get airfoil parameter table for active planform
         table = self.__get_airfoilParamsTable()
         textVars = self.airfoilParamsTextVars
@@ -628,22 +622,45 @@ class control_frame():
         # update entries for airfoil parameters
         self.__update_Entries(table, textVars, planformIdx)
 
-        # Clear Flag to avoid recursive calls
-        self.update_airfoilEntries_active = False
+    def set_updateNotification(self):
+        self.performEntryUpdate = True
 
+    def set_airfoilIdx(self, idx):
+        planformIdx = self.master.planformIdx
 
-    def update_Entries(self, planformIdx):
-        # get basic parameter table for active planform
-        table = self.__get_basicParamsTable()
-        textVars = self.basicParamsTextVars
+        if self.airfoilIdx[planformIdx] != idx:
+            self.airfoilIdx[planformIdx] = idx
+            self.set_updateNotification()
 
-        # update entries for basic parameters
-        self.__update_Entries(table, textVars, planformIdx)
+    def update_allEntries(self):
+        if self.performEntryUpdate == True:
+            planformIdx = self.master.planformIdx
 
-        # Check for recursion
-        if self.update_airfoilEntries_active == False:
-            # update entries for airfoil parameters
-            self.update_airfoilEntries(planformIdx)
+           # perform further steps necessary for update
+            self.__perform_update()
+
+            # get basic parameter table for active planform
+            table = self.__get_basicParamsTable()
+            textVars = self.basicParamsTextVars
+
+            # update entries for basic parameters
+            self.__update_Entries(table, textVars, planformIdx)
+
+            # update entries for airfoil parameters, also option menues etc.
+            self.__update_airfoilEntries(planformIdx)
+
+            # everything has been done, clear update flag
+            self.performEntryUpdate = False
+
+    def update_unsavedChangesFlags(self):
+        num = len(self.unsavedChangesFlags)
+        for idx in range(num):
+            if self.request_clearUnsavedChangesFlags[idx] == True:
+                self.unsavedChangesFlags[idx] = False
+                self.request_clearUnsavedChangesFlags[idx] == False
+
+    def request_clearUnsavedChangesFlag(self, idx):
+        self.request_clearUnsavedChangesFlags[idx] ==True
 
     def __update_params(self, paramTable, params, entries):
         # get instance of planform-creator
@@ -665,7 +682,7 @@ class control_frame():
             idx = idx + 1
 
         if (change_detected):
-            self.__perform_update()
+            self.set_updateNotification()
 
     def update_basicParams(self, command):
         planformIdx = self.master.planformIdx
@@ -679,16 +696,6 @@ class control_frame():
         except:
             ErrorMsg("update_basicParams() failed")
             pass
-
-         # update option menues
-        self.__update_OM_airfoilType(planformIdx)
-        self.__update_OM_airfoilChoice(planformIdx)
-
-        # Check for recursion
-        if self.update_airfoilEntries_active == False:
-            # update entries for airfoil parameters
-            self.update_airfoilEntries(planformIdx)
-
 
     def update_airfoilParams(self, command):
         planformIdx = self.master.planformIdx
@@ -742,8 +749,8 @@ class control_frame():
         else:
             params["flapDepthTip"] = depth
 
-        # carry out functions needed for update
-        self.__perform_update()
+        # request update (will be done in the mainloop)
+        self.set_updateNotification()
 
     def change_airfoilPosition(self, x, y, idx):
         if idx == None:
@@ -753,17 +760,23 @@ class control_frame():
         creatorInst:planform_creator = self.creatorInstances[self.master.planformIdx]
         params = self.params[self.master.planformIdx]
 
-        # calculate position from x value (normalize)
-        position = creatorInst.normalize_position(x)
+        airfoilPositions = creatorInst.get_airfoilPositions()
+        airfoilReynolds = params["airfoilReynolds"]
 
-        # limit to possible range
-        position = np.clip(position, 0.0, 1.0)
+        # only airfoils with a specified position and without Re are movable
+        if (airfoilPositions[idx] != None) and (airfoilReynolds[idx] == None):
+            # calculate position from x value (normalize)
+            position = creatorInst.normalize_position(x)
 
-        # set new position in dictionary
-        params["airfoilPositions"][idx] = position
+            # limit to possible range
+            position = np.clip(position, 0.0, 1.0)
 
-        # carry out functions needed for update
-        self.__perform_update()
+            # set new position in dictionary
+            params["airfoilPositions"][idx] = position
+
+            # request update (will be done in the mainloop)
+            self.set_updateNotification()
+
 
     def __create_button(self, frame, button):
         text = button["txt"]
@@ -858,14 +871,9 @@ class control_frame():
 
         # set new idx
         self.master.planformIdx = planformIdx
-        self.postponeUpdate = True
 
-        # update entry-frame
-        self.update_Entries(planformIdx)
-        self.postponeUpdate = False
-
-        # carry out functions needed for update
-        self.__perform_update()
+        # request update (will be done in the mainloop)
+        self.set_updateNotification()
 
 
     def __change_airfoil(self, airfoilName):
@@ -882,16 +890,9 @@ class control_frame():
 
         # set new idx
         self.airfoilIdx[planformIdx] = airfoilIdx
-        self.postponeUpdate = True
 
-        # Check for recursion
-        if self.update_airfoilEntries_active == False:
-            # update only airfoil entries, not basic parameter entries
-            self.update_airfoilEntries(planformIdx)
-
-        # carry out functions needed for update
-        self.postponeUpdate = False
-        self.__perform_update()
+        # request update (will be done in the mainloop)
+        self.set_updateNotification()
 
 
     def __change_airfoilType(self, airfoilType):
@@ -901,16 +902,9 @@ class control_frame():
 
         # set new type
         params["airfoilTypes"][airfoilIdx] = airfoilType
-        self.postponeUpdate = True
 
-        # Check for recursion
-        if self.update_airfoilEntries_active == False:
-            # update only airfoil entries, not basic parameter entries
-            self.update_airfoilEntries(planformIdx)
-
-        # carry out functions needed for update
-        self.postponeUpdate = False
-        self.__perform_update()
+        # request update (will be done in the mainloop)
+        self.set_updateNotification()
 
 
     def __choose_datFile(self, dummy):
@@ -939,8 +933,8 @@ class control_frame():
         # store latest path
         self.latestPath[planformIdx] = os.path.dirname(absFilename)
 
-        # carry out functions needed for update
-        self.__perform_update()
+        # request update (will be done in the mainloop)
+        self.set_updateNotification()
 
 
     def __update_datFileName(self, params, planformIdx):
@@ -1044,16 +1038,12 @@ class diagram(ctk.CTkFrame):
         # change of airfoil-position requested ?
         elif (self.controller.activeDiagram == diagTypes[3]):
             airfoilPositions = creatorInst.get_airfoilPositions()
-            airfoilReynolds = params["airfoilReynolds"]
 
             for idx in range(len(airfoilPositions)):
-                x = airfoilPositions[idx]
-                Re = airfoilReynolds[idx]
-
-                # only airfoils with a specified position and without Re are movable
-                if (x != None) and (Re == None):
-                    if ((abs(mouse_x - x) < catching_range)):
-                        return idx
+                if ((abs(mouse_x - airfoilPositions[idx]) < catching_range)):
+                    # set active airfoil idx in control frame
+                    ctrlFrame.set_airfoilIdx(idx)
+                    return idx
 
         # nothing was found
         return None
@@ -1112,7 +1102,7 @@ class diagram(ctk.CTkFrame):
                 # airfoil distribution
                 x, y = event.xdata, event.ydata
                 # set new airfoil position
-                ctrlFrame.change_airfoilPosition(x,y,self._ind)
+                ctrlFrame.change_airfoilPosition(x, y, self._ind)
         elif event.button == 3: # right mouse button
             # move visible area of the window
             self.controller.move_visibleArea(event)
@@ -1808,15 +1798,13 @@ class App(ctk.CTk):
 
         # check if everything was o.k.
         if result == 0:
-            # set appearance mode
+            # set appearance mode again
             params = creatorInst.get_params()
             params["theme"] = self.appearance_mode
 
-            # update planform
-            creatorInst.update_planform(params)
-            self.frame_bottom.update_Entries(self.planformIdx)
-            self.frame_bottom.clear_unsavedChangesFlag(self.planformIdx)
-            self.updateNeeded = True
+            # perform_update
+            self.frame_bottom.set_updateNotification()
+            self.frame_bottom.request_clearUnsavedChangesFlag(self.planformIdx)
 
             # create message text
             msgText =  "Parameters of planform \'%s\'\n" % planformName
@@ -2068,6 +2056,8 @@ class App(ctk.CTk):
             self.update_idletasks()
             self.update()
             self.frame_top.update_diagram(self)
+            self.frame_bottom.update_allEntries()
+            self.frame_bottom.update_unsavedChangesFlags()
 
         self.destroy()
 
