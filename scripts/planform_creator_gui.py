@@ -204,6 +204,9 @@ class control_frame():
         # add entries
         nextRow = self.__add_airfoilParams(self.frame_right, 3, nextRow)
 
+        # add button to start the Strak Machine
+        nextRow = self.__add_strakMachineWidgets(self.frame_right, 3, (nextRow+1))
+
         # request update (will be done in the mainloop)
         self.set_updateNotification()
 
@@ -622,6 +625,20 @@ class control_frame():
         # update entries for airfoil parameters
         self.__update_Entries(table, textVars, planformIdx)
 
+    def __update_strakMachineButton(self):
+        planformIdx = self.master.planformIdx
+        params = self.params[planformIdx]
+        airfoilTypes = params["airfoilTypes"]
+
+        if 'opt' in airfoilTypes:
+            # activate button
+            self.button_strakMachine.configure(state = "normal")
+            self.button_strakMachine.configure(fg_color='green')
+        else:
+            # deactivate button
+            self.button_strakMachine.configure(state = "disabled")
+            self.button_strakMachine.configure(fg_color='darkred')
+
     def set_updateNotification(self):
         self.performEntryUpdate = True
 
@@ -648,6 +665,9 @@ class control_frame():
 
             # update entries for airfoil parameters, also option menues etc.
             self.__update_airfoilEntries(planformIdx)
+
+            # update state of the button to start the Strak Machine
+            self.__update_strakMachineButton()
 
             # everything has been done, clear update flag
             self.performEntryUpdate = False
@@ -833,6 +853,15 @@ class control_frame():
                                   ,column, row)
         return (row + 1)
 
+    def __add_strakMachineWidgets(self, frame, column, row):
+        self.label_createOptAirfoils = self.__create_label(frame, "Start \'The Strak Machine\'", fs_label)
+        button = {"txt": "\'Engage\'", "cmd" : self.__start_strakMachine, "param" : None}
+        self.button_strakMachine = self.__create_button(frame,button)
+
+        self.__place_widgetsInRow([self.label_createOptAirfoils, self.button_strakMachine]
+                                  ,column, row)
+        return (row + 1)
+
     def __change_appearance_mode(self, new_appearanceMode):
         if (new_appearanceMode == 1) or (new_appearanceMode == 'Dark'):
             new_mode = 'Dark'
@@ -971,6 +1000,17 @@ class control_frame():
             bg_color = self.__get_bg_color(self.master.appearance_mode)
             self.label_datFile.configure(bg_color=bg_color_dark)
 
+    def __start_strakMachine(self, dummy):
+        planformIdx = self.master.planformIdx
+        creatorInst = self.creatorInstances[planformIdx]
+        #planformName = self.planformNames[planformIdx]#FIXME remove
+
+        # export / update the parameters of 'opt' airfoils
+        fileName = ressourcesPath + bs + 'strakdata_%d.txt' % planformIdx
+        creatorInst.update_strakdata(fileName)
+
+        # now start the Strak machine in a separate background thread
+        os.system("start python .\scripts\strak_machine_gui.py -s %s &" % fileName)
 
     def on_closing(self, event=0):
         self.destroy()

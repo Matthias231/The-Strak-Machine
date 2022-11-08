@@ -59,6 +59,7 @@ from termcolor import colored
 from FLZ_Vortex_export import export_toFLZ
 from XFLR5_export import export_toXFLR5
 from DXF_export import (export_toDXF, import_fromDXF)
+from Strakmachine_export import export_strakdata
 
 ################################################################################
 # some global variables
@@ -3070,6 +3071,10 @@ class planform_creator:
     def update_planform(self, paramDict):
         '''applies parameters coming with paramDict'''
         self.newWing.set_Data(paramDict)
+
+    def update_strakdata(self, fileName):
+        '''exports information for opt airfoils to json file for strak machine'''
+        export_strakdata(self.newWing, fileName)
 
     def plot_diagram(self, diagramType, ax, x_limits, y_limits):
         '''plots diagram to ax according to diagraType'''

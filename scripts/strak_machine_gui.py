@@ -21,6 +21,7 @@ import ctypes
 import tkinter as tk
 from tkinter import ttk
 import customtkinter
+import argparse
 import os
 from PIL import ImageTk, Image
 from colorama import init
@@ -1385,9 +1386,35 @@ class App(customtkinter.CTk):
             # no unsaved changes, just quit
             self.app_running = False
 
+def get_strakDataFileName(args):
+
+    if args.strakinput:
+        inFileName = args.strakinput
+    else:
+        # use Default-name
+        inFileName = ressourcesPath + bs + 'strakdata.txt'
+
+    NoteMsg("filename for strak input-data is: %s" % inFileName)
+    return inFileName
+
+def get_Arguments():
+
+    # initiate the parser
+    parser = argparse.ArgumentParser('')
+
+    parser.add_argument("-strakinput", "-s", help="filename of strakdata input"\
+                        "-file (e.g. strakdata)")
+
+    # read arguments from the command line
+    args = parser.parse_args()
+    return get_strakDataFileName(args)
+
 if __name__ == "__main__":
     # init colorama
     init()
+
+    # get command-line-arguments or user-input
+    strakDataFileName = get_Arguments()
 
     # bugfix (wrong scaling matplotlib)
     ctypes.windll.shcore.SetProcessDpiAwareness(0)
@@ -1395,7 +1422,7 @@ if __name__ == "__main__":
      # init strakmachine
     NoteMsg("Starting Strak Machine...")
     try:
-        myStrakmachine = strak_machine("ressources//strakdata.txt")
+        myStrakmachine = strak_machine(strakDataFileName)
     except:
         ErrorMsg("Strak Machine could not be started")
         input("Press any key to quit")
