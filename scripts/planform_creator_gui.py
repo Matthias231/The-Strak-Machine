@@ -64,6 +64,7 @@ bg_color_dark =  "#222222"
 
 # font sizes #FIXME: scaling for screen resolution
 fs_label = 13
+fs_headline = 15
 fs_entry = 11
 fs_unit = 13
 
@@ -108,6 +109,25 @@ def get_dataType(obj):
     else:
         ErrorMsg("get_dataType, unknown dataType")
         return None
+
+
+def center(win):
+    """
+    centers a tkinter window
+    :param win: the main window or Toplevel window to center
+    """
+    win.update_idletasks()
+    width = win.winfo_width()
+    frm_width = win.winfo_rootx() - win.winfo_x()
+    win_width = width + 2 * frm_width
+    height = win.winfo_height()
+    titlebar_height = win.winfo_rooty() - win.winfo_y()
+    win_height = height + titlebar_height + frm_width
+    x = win.winfo_screenwidth() // 2 - win_width // 2
+    y = win.winfo_screenheight() // 2 - win_height // 2
+    win.geometry('{}x{}+{}+{}'.format(width, height, x, y))
+    win.deiconify()
+
 
 # class control frame, change the input-variables / parameters of the
 # planform creator
@@ -196,8 +216,19 @@ class control_frame():
         # add entries
         nextRow = self.__add_basicParams(self.frame_right, 0, nextRow)
 
-        # second column, start at row 1
-        nextRow = self.__add_airfoilChoiceMenu(self.frame_right, 3, 1)
+        # second column, start at row 0
+        # add button to start the Strak Machine
+        nextRow = self.__add_strakMachineWidgets(self.frame_right, 3, 0)
+
+        # commands to load, save and reset parameters of the planform
+        nextRow = self.__add_parameterCommands(self.frame_right, 3, nextRow)
+
+        # commands to add, remove and export airfoils
+        nextRow = self.__add_airfoilCommands(self.frame_right, 3, nextRow)
+
+        # add widgets to view and change airfoil parameters
+        #nextRow = self.__add_airfoilParameterHeadline(self.frame_right, 3, nextRow+1)
+        nextRow = self.__add_airfoilChoiceMenu(self.frame_right, 3, nextRow+1)
         nextRow = self.__add_airfoilTypeMenu(self.frame_right, 3, nextRow)
         nextRow = self.__add_userAirfoilWidgets(self.frame_right, 3, nextRow)
 
@@ -205,13 +236,13 @@ class control_frame():
         nextRow = self.__add_airfoilParams(self.frame_right, 3, nextRow)
 
         # add button to start the Strak Machine
-        nextRow = self.__add_strakMachineWidgets(self.frame_right, 3, (nextRow+1))
+        #nextRow = self.__add_strakMachineWidgets(self.frame_right, 3, (nextRow+1))#FIXME remove
 
         # request update (will be done in the mainloop)
         self.set_updateNotification()
 
         # show left frame
-        self.frame_left.pack(side = 'left', fill=tk.BOTH)
+        self.frame_left.pack(side = 'left', fill=tk.BOTH, padx=(10,30), pady=(4,4))
 
         # show right frame
         self.container.pack(side = 'right', fill=tk.BOTH, expand=1)
@@ -402,6 +433,269 @@ class control_frame():
         widgets = [param_labels, entries, unit_labels]
         return (widgets, textVars, entries)
 
+    def __load_params(self, dummy):
+        planformIdx = self.master.planformIdx
+        creatorInst = self.creatorInstances[planformIdx]
+        planformName = self.planformNames[planformIdx]
+        filePath = bs + ressourcesPath + bs + planformFiles[planformIdx]
+
+        # FIXME use filePath, file selector dialog?
+        result = creatorInst.load()
+
+        # check if everything was o.k.
+        if result == 0:
+            # set actual appearance mode again
+            params = creatorInst.get_params()
+            params["theme"] = ctk.get_appearance_mode()
+
+            # perform_update
+            self.set_updateNotification()
+            self.request_clearUnsavedChangesFlag(planformIdx)
+
+            # create message text
+            msgText =  "Parameters of planform \'%s\'\n" % planformName
+            msgText += " have been successfully loaded from file\n\'%s\'\n" % filePath
+            messagebox.showinfo(title='Load', message=msgText)
+        else:
+            # create message text
+            msgText =  "Error, loading parameters of planform \'%s\'\n" % planformName
+            msgText += "from file \'%s\'\nfailed, errorcode %d\n" % (filePath, result)
+            messagebox.showerror(title='Load', message=msgText )
+
+    def __save_params(self, dummy):
+        planformIdx = self.master.planformIdx
+        creatorInst = self.creatorInstances[planformIdx]
+        planformName = self.planformNames[planformIdx]
+        filePath = bs + ressourcesPath + bs + planformFiles[planformIdx]
+
+        # FIXME use filePath, file selector dialog?
+        result = creatorInst.save()
+
+        # check if everything was o.k.
+        if result == 0:
+            # create message text
+            msgText =  "Parameters of planform \'%s\'\n" % planformName
+            msgText += "have been successfully saved to file \'%s\'" % filePath
+            messagebox.showinfo(title='Save', message=msgText )
+            self.clear_unsavedChangesFlag(planformIdx)
+        else:
+            # create message text
+            msgText =  "Error, saving parameters of planform \'%s\'\n" % planformName
+            msgText += "to file \'%s\'\nfailed, errorcode: %d" % (filePath, result)
+            messagebox.showerror(title='Save', message=msgText )
+
+    def __reset_params(self, dummy):
+        self.master.notImplemented_Dialog() #FIXME implement
+##        creatorInst = creatorInstances[self.planformIdx]
+##        result = creatorInst.reset()
+##        if (result == 0):
+##           self.frame_bottom.set_unsavedChangesFlag(self.planformIdx)
+##           self.updateNeeded = True
+
+
+    def __add_airfoil(self):
+        planformIdx = self.master.planformIdx
+        creatorInst = self.creatorInstances[planformIdx]
+        params = self.params[planformIdx]
+        new_position = self.new_airfoilPosition
+
+        # get current positions of all airfoils in mm
+        positions = creatorInst.get_airfoilPositions()
+        num = len(positions)
+
+        for idx in range(num):
+            if (new_position < positions[idx]):
+                # found airfoil at position greater than new position (more to the tip)
+                # at this index we will insert the new airfoil
+                break;
+
+        # calculate normalized position
+        normalized_position = self.creatorInstances[planformIdx].normalize_position(new_position)
+
+        # insert airfoil in params dictionary
+        params['airfoilTypes'].insert(idx, 'blend')
+        params['airfoilPositions'].insert(idx, normalized_position)
+        params['airfoilReynolds'].insert(idx, None)
+        flapGroup = params['flapGroup'][idx]
+        params['flapGroup'].insert(idx, flapGroup)
+        params["userAirfoils"].insert(idx, None)
+        #params["airfoilNames"].pop(idx)
+
+        # request update (will be done in the mainloop)
+        self.set_updateNotification()
+
+         # cleaning up
+        self.addWindow.destroy()
+
+        # create message text
+        msgText =  "Airfoil has been succesfully added"
+        messagebox.showinfo(title='Add airfoil', message=msgText)
+
+    def __remove_airfoil(self):
+        planformIdx = self.master.planformIdx
+        params = self.params[planformIdx]
+        idx = self.airfoilIdx[planformIdx]
+        airfoilNames = self.airfoilNames[planformIdx]
+        airfoilName = airfoilNames[idx]
+
+        # remove airfoil in params dictionary
+        params['airfoilTypes'].pop(idx)
+        params['airfoilPositions'].pop(idx)
+        params['airfoilReynolds'].pop(idx)
+        params['flapGroup'].pop(idx)
+        params["userAirfoils"].pop(idx)
+        #params["airfoilNames"].pop(idx)
+
+        # request update (will be done in the mainloop)
+        self.set_updateNotification()
+
+         # cleaning up
+        self.removeWindow.destroy()
+
+        # create message text
+        msgText =  "Airfoil %s has been succesfully removed" % airfoilName
+        messagebox.showinfo(title='Remove airfoil', message=msgText)
+
+
+    def __cancel_add_airfoil(self):
+         # cleaning up
+        self.addWindow.destroy()
+
+    def __cancel_remove_airfoil(self):
+         # cleaning up
+        self.removeWindow.destroy()
+
+    def __enter_newAirfoilPosition(self, command):
+        try:
+            self.new_airfoilPosition = int(self.newAirfoilPosition_entry.get())
+            # check if position is valid #FIXME
+        except:
+            ErrorMsg("__enter_newAirfoilPosition, invalid position")
+
+    def __add_airfoilDialog(self, dummy):
+        planformIdx = self.master.planformIdx
+        airfoilIdx = self.airfoilIdx[planformIdx]
+        params = self.params[planformIdx]
+        #removeWindow = ctk.CTkToplevel() #FIXME problems with windowsize
+
+        addWindow = tk.Toplevel() # FIXME workaround window sizing problem
+        mode = ctk.get_appearance_mode()
+        if (mode == 'Dark'):
+            addWindow.configure(bg=bg_color_dark)
+        else:
+            addWindow.configure(bg=bg_color_light)
+
+        self.addWindow = addWindow
+        addWindow.wm_title("Add airfoil")
+
+        # define width for all entries
+        entry_width = 100
+        #airfoilname = self.airfoilNames[self.airfoilIdx]
+        row = 1
+
+        # generate label showing the unit
+        enter_position_label = ctk.CTkLabel(master=addWindow, text='Enter airfoil position (mm):', anchor="e")
+        enter_position_label.grid(row=row, column=0)
+
+        # generate string var, set value to middle of the wing
+        self.new_airfoilPosition = params["wingspan"]/4
+        self.newPosition_txt = tk.StringVar(master=addWindow, value=self.new_airfoilPosition)
+
+        # generate entry
+        self.newAirfoilPosition_entry = ctk.CTkEntry(master=addWindow, show=None,
+            textvariable = self.newPosition_txt, text_font=(main_font, fs_entry),
+            width=entry_width, height=16, justify='right')
+        self.newAirfoilPosition_entry.bind('<Return>', self.__enter_newAirfoilPosition)
+        self.newAirfoilPosition_entry.grid(row=row, column=1, pady=10, padx=20, sticky="w")
+
+        row += 1
+
+        # add OK / Cancel buttons
+        button = ctk.CTkButton(addWindow, text="OK", command=self.__add_airfoil)
+        button.grid(row=row+1, column=0, pady=10, padx=20, sticky="e")
+        #self.newAirfoilOk_button = button
+
+        button = ctk.CTkButton(addWindow, text="Cancel", command=self.__cancel_add_airfoil)
+        button.grid(row=row+1, column=1, pady=10, padx=20, sticky="w")
+        center(addWindow)
+
+    def __remove_airfoilDialog(self, dummy):
+        planformIdx = self.master.planformIdx
+        airfoilIdx = self.airfoilIdx[planformIdx]
+
+        if airfoilIdx == 0:
+            # create message text
+            msgText =  "Sorry, it is not allowed to remove the root airfoil !\n\n"
+            msgText += "Please choose another airfoil in the option menu\n"
+            msgText += "\'Choose airfoil:\' below."
+            messagebox.showerror(title='Remove airfoil', message=msgText )
+            return
+
+        #removeWindow = ctk.CTkToplevel() #FIXME problems with windowsize
+        removeWindow = tk.Toplevel() # FIXME workaround window sizing problem
+        mode = ctk.get_appearance_mode()
+        if (mode == 'Dark'):
+            removeWindow.configure(bg=bg_color_dark)
+        else:
+            removeWindow.configure(bg=bg_color_light)
+
+        self.removeWindow = removeWindow
+        removeWindow.wm_title("Remove airfoil")
+
+        # define width for all entries
+        entry_width = 60
+        airfoilNames = self.airfoilNames[planformIdx]
+        airfoilname = airfoilNames[airfoilIdx]
+
+        row = 1
+        text = "Are you sure you want to remove airfoil %s ?" % airfoilname
+        label = ctk.CTkLabel(master=removeWindow, text=text, anchor="e")
+        label.grid(row=row, column=0, columnspan=2)
+
+        # add OK / Cancel buttons
+        button = ctk.CTkButton(removeWindow, text="OK", command=self.__remove_airfoil)
+        button.grid(row=row+1, column=0, pady=10, padx=20, sticky="e")
+        button = ctk.CTkButton(removeWindow, text="Cancel", command=self.__cancel_remove_airfoil)
+        button.grid(row=row+1, column=1, pady=10, padx=20, sticky="w")
+        center(removeWindow)
+
+
+    def __export_airfoils(self, dummy):
+        planformIdx = self.master.planformIdx
+        creatorInst = self.creatorInstances[planformIdx]
+        planformName = self.planformNames[planformIdx]
+        filePath = bs + buildPath + bs + airfoilPath
+        title = 'Export airfoils'
+
+        # call function of planform creator
+        (result, userAirfoils, blendedAirfoils) = creatorInst.export_airfoils()
+
+        msgExported =  "The following airfoils of planform \'%s\'\n" % planformName
+        msgExported += "have been successfully exported to path \'%s\':\n\n" % filePath
+        msgExported += "\'user\' airfoils:\n"
+        for airfoil in userAirfoils:
+            msgExported += "%s\n" % airfoil
+
+        msgExported += "\n\'blend\' airfoils:\n"
+        for airfoil in blendedAirfoils:
+            msgExported += "%s\n" % airfoil
+
+        # check if everything was o.k.
+        if result == 0:
+            # create message text
+            msgText =  msgExported
+            msgText += "\nPlease use \'The Strak Machine\' to create \'opt\' airfoils (if any):"
+            messagebox.showinfo(title=title, message=msgText)
+        else:
+            # create message text
+            msgText =  "Error, exporting airfoils of planform \'%s\'\n" % planformName
+            msgText += "to path \'%s\'\nfailed, errorcode: %d\n\n" % (filePath, result)
+            msgText += "There might be some \'user\', \'opt\' or \'blend\' airfoils missing.\n"
+            msgText += "Please make sure, that all \'user\' airfoils have been assigned correctly "
+            msgText += "and use \'The Strak Machine\' to create missing \'opt\' airfoils (if any):\n\n"
+            msgText += msgExported
+            messagebox.showerror(title=title, message=msgText )
+
     def __add_basicParams(self, frame, column, startRow):
         # init some structures to store data locally
         self.basicParamsTextVars = []
@@ -449,6 +743,47 @@ class control_frame():
             column += 1
 
         return endRow
+
+    def __add_parameterCommands(self, frame, column, startRow):
+        labels = []
+        buttonWidgets = []
+
+        labels.append("Parameter commands:")
+
+        buttons = [{"txt": "Load",  "cmd" : self.__load_params,  "param" : None},
+                   {"txt": "Save",  "cmd" : self.__save_params,  "param" : None},
+                   {"txt": "Reset", "cmd" : self.__reset_params, "param" : None}]
+
+        for button in buttons:
+            buttonWidgets.append(self.__create_button(frame, button))
+
+        # place widgets
+        self.__add_labels(frame, labels, column, startRow)
+        self.__place_widgetsInRow(buttonWidgets, column+1, startRow)
+        return (startRow+1)
+
+    def __add_airfoilCommands(self, frame, column, startRow):
+        labels = []
+        buttonWidgets = []
+
+        labels.append("Airfoil commands:")
+
+        buttons = [{"txt": "Add airfoil",     "cmd" : self.__add_airfoilDialog,    "param" : None},
+                   {"txt": "Remove airfoil",  "cmd" : self.__remove_airfoilDialog, "param" : None},
+                   {"txt": "Export airfoils", "cmd" : self.__export_airfoils,      "param" : None}]
+
+        for button in buttons:
+            buttonWidgets.append(self.__create_button(frame, button))
+
+        # place widgets
+        self.__add_labels(frame, labels, column, startRow)
+        self.__place_widgetsInRow(buttonWidgets, column+1, startRow)
+        return (startRow+1)
+
+    def __add_airfoilParameterHeadline(self, frame, column, startRow):
+        self.airfoilParameterHeadline = self.__create_label(frame, 'Airfoil parameters', fs_headline)
+        self.__place_widgetsInRow([self.airfoilParameterHeadline], column, startRow)
+        return (startRow+1)
 
     def  __getDictValueAndDataType(self, dictionary, key, idx):
         '''get value and datatype of a dictionary member, specified by key and index'''
@@ -634,10 +969,12 @@ class control_frame():
             # activate button
             self.button_strakMachine.configure(state = "normal")
             self.button_strakMachine.configure(fg_color='green')
+            self.label_strakMachine.configure(text = '')
         else:
             # deactivate button
             self.button_strakMachine.configure(state = "disabled")
             self.button_strakMachine.configure(fg_color='darkred')
+            self.label_strakMachine.configure(text = 'There are no \'opt\' airfoils in this planform')
 
     def set_updateNotification(self):
         self.performEntryUpdate = True
@@ -858,8 +1195,14 @@ class control_frame():
         button = {"txt": "\'Engage\'", "cmd" : self.__start_strakMachine, "param" : None}
         self.button_strakMachine = self.__create_button(frame,button)
 
-        self.__place_widgetsInRow([self.label_createOptAirfoils, self.button_strakMachine]
-                                  ,column, row)
+        # put all widgets into a list
+        widgets = [self.label_createOptAirfoils, self.button_strakMachine]
+        self.__place_widgetsInRow(widgets, column, row)
+
+        # add a label to show the reason, why The Strak Machine cannot be started
+        self.label_strakMachine = ctk.CTkLabel(master=frame, text='', anchor="e")
+        self.label_strakMachine.grid(row=row, column=column+2, columnspan=2)
+
         return (row + 1)
 
     def __change_appearance_mode(self, new_appearanceMode):
@@ -1736,22 +2079,6 @@ class App(ctk.CTk):
 
         # set global variable
         ctrlFrame = self.frame_bottom
-    def __center(self, win):
-        """
-        centers a tkinter window
-        :param win: the main window or Toplevel window to center
-        """
-        win.update_idletasks()
-        width = win.winfo_width()
-        frm_width = win.winfo_rootx() - win.winfo_x()
-        win_width = width + 2 * frm_width
-        height = win.winfo_height()
-        titlebar_height = win.winfo_rooty() - win.winfo_y()
-        win_height = height + titlebar_height + frm_width
-        x = win.winfo_screenwidth() // 2 - win_width // 2
-        y = win.winfo_screenheight() // 2 - win_height // 2
-        win.geometry('{}x{}+{}+{}'.format(width, height, x, y))
-        win.deiconify()
 
     def __update_interpolationSteps(self):
         try:
@@ -1789,30 +2116,13 @@ class App(ctk.CTk):
         buttons.append(buttonsColumn)
 
         # 2nd column
-        headlines.append("Planform actions")
+        headlines.append("Planform commands")
         buttonsColumn = [{"txt": "Add planform",     "cmd" : self.add_planform,     "param" : None},
                          {"txt": "Remove planform",  "cmd" : self.remove_planform,  "param" : None},
                          {"txt": "Export planforms", "cmd" : self.export_planformsDialog, "param" : None},
                          {"txt": "Import planform",  "cmd" : self.import_planformDialog, "param" : None}
                         ]
         buttons.append(buttonsColumn)
-
-        # 3nd column
-        headlines.append("Airfoil actions")
-        buttonsColumn = [{"txt": "Add airfoil",     "cmd" : self.add_airfoil,     "param" : None},
-                         {"txt": "Remove airfoil",  "cmd" : self.remove_airfoil,  "param" : None},
-                         {"txt": "Export airfoils", "cmd" : self.export_airfoils, "param" : None}
-                        ]
-        buttons.append(buttonsColumn)
-
-        # 4th column
-        headlines.append("Parameter actions")
-        buttonsColumn = [{"txt": "Load",  "cmd" : self.load,  "param" : None},
-                         {"txt": "Save",  "cmd" : self.save,  "param" : None},
-                         {"txt": "Reset", "cmd" : self.reset, "param" : None}
-                        ]
-        buttons.append(buttonsColumn)
-
 
         return (headlines, buttons)
 
@@ -1948,7 +2258,7 @@ class App(ctk.CTk):
         button.grid(row=row+1, column=0, pady=10, padx=20, sticky="e")
         button = ctk.CTkButton(exportWindow, text="Cancel", command=self.cancel_export_planforms)
         button.grid(row=row+1, column=1, pady=10, padx=20, sticky="w")
-        self.__center(exportWindow)
+        center(exportWindow)
 
     def import_planformDialog(self, dummy):
         filetypes = (('.dxf files', '*.dxf'),
@@ -2018,77 +2328,6 @@ class App(ctk.CTk):
             # create message text
             msgText =  "Error, export of selected planforms failed, errorcode %d\n" % result
             messagebox.showerror(title=title, message=msgText )
-
-    def add_airfoil(self, dummy):
-        self.notImplemented_Dialog() #FIXME implement
-
-    def remove_airfoil(self, dummy):
-        self.notImplemented_Dialog() #FIXME implement
-
-    def export_airfoils(self, dummy):
-        creatorInst = creatorInstances[self.planformIdx]
-        planformName = self.frame_bottom.planformNames[self.planformIdx]
-        filePath = bs + buildPath + bs + airfoilPath
-        title = 'Export airfoils'
-
-        # call function of planform creator
-        (result, userAirfoils, blendedAirfoils) = creatorInst.export_airfoils()
-
-        msgExported =  "The following airfoils of planform \'%s\'\n" % planformName
-        msgExported += "have been successfully exported to path \'%s\':\n\n" % filePath
-        msgExported += "\'user\' airfoils:\n"
-        for airfoil in userAirfoils:
-            msgExported += "%s\n" % airfoil
-
-        msgExported += "\n\'blend\' airfoils:\n"
-        for airfoil in blendedAirfoils:
-            msgExported += "%s\n" % airfoil
-
-        # check if everything was o.k.
-        if result == 0:
-            # create message text
-            msgText =  msgExported
-            msgText += "\nPlease use \'The Strak Machine\' to create \'opt\' airfoils (if any):"
-            messagebox.showinfo(title=title, message=msgText)
-        else:
-            # create message text
-            msgText =  "Error, exporting airfoils of planform \'%s\'\n" % planformName
-            msgText += "to path \'%s\'\nfailed, errorcode: %d\n\n" % (filePath, result)
-            msgText += "There might be some \'user\', \'opt\' or \'blend\' airfoils missing.\n"
-            msgText += "Please make sure, that all \'user\' airfoils have been assigned correctly "
-            msgText += "and use \'The Strak Machine\' to create missing \'opt\' airfoils (if any):\n\n"
-            msgText += msgExported
-            messagebox.showerror(title=title, message=msgText )
-
-    def save(self, dummy):
-        creatorInst = creatorInstances[self.planformIdx]
-        planformName = self.frame_bottom.planformNames[self.planformIdx]
-        filePath = bs + ressourcesPath + bs + planformFiles[self.planformIdx]
-
-        # FIXME use filePath, file selector dialog?
-        result = creatorInst.save()
-
-        # check if everything was o.k.
-        if result == 0:
-            # create message text
-            msgText =  "Parameters of planform \'%s\'\n" % planformName
-            msgText += "have been successfully saved to file \'%s\'" % filePath
-            messagebox.showinfo(title='Save', message=msgText )
-            self.frame_bottom.clear_unsavedChangesFlag(self.planformIdx)
-        else:
-            # create message text
-            msgText =  "Error, saving parameters of planform \'%s\'\n" % planformName
-            msgText += "to file \'%s\'\nfailed, errorcode: %d" % (filePath, result)
-            messagebox.showerror(title='Save', message=msgText )
-
-
-    def reset(self, dummy):
-        self.notImplemented_Dialog() #FIXME implement
-##        creatorInst = creatorInstances[self.planformIdx]
-##        result = creatorInst.reset()
-##        if (result == 0):
-##           self.frame_bottom.set_unsavedChangesFlag(self.planformIdx)
-##           self.updateNeeded = True
 
     def start(self):
         self.app_running = True
