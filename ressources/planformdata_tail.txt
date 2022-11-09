@@ -23,18 +23,18 @@
   ],
   "airfoilPositions":[
     null,
-    null,
-    null,
-    null,
-    null,
+    0.3218738767522666,
+    0.5918367346938775,
+    0.7578231292517007,
+    0.8748299319727891,
     null
   ],
   "airfoilReynolds":[
     80000,
-    74000,
-    63000,
-    52000,
-    40000,
+    null,
+    null,
+    null,
+    null,
     30000
   ],
   "flapGroup":[
