@@ -46,6 +46,7 @@ num_diagrams = len(diagTypes)
 diagram_width = 10
 diagram_height = 7
 ctrlFrame = None
+diagFrame = None
 creatorInstances:planform_creator = []
 interpolationSteps_default = 4  # default steps for interpolation/planform export
 xPanels_default = 15            # default number of x panels for planform export (XFRL5, FLZ)
@@ -573,6 +574,10 @@ class control_frame():
             ErrorMsg("__enter_newAirfoilPosition, invalid position")
 
     def __add_airfoilDialog(self, dummy):
+        # change diagram to airfoil distribution
+        global diagFrame
+        diagFrame.change_diagram(diagTypes[3])
+
         planformIdx = self.master.planformIdx
         airfoilIdx = self.airfoilIdx[planformIdx]
         params = self.params[planformIdx]
@@ -975,6 +980,38 @@ class control_frame():
             self.button_strakMachine.configure(state = "disabled")
             self.button_strakMachine.configure(fg_color='darkred')
             self.label_strakMachine.configure(text = 'There are no \'opt\' airfoils in this planform')
+    
+    
+    def get_validxyRange(self):
+        planformIdx = self.master.planformIdx
+        params = self.params[planformIdx]
+        airfoilIdx = self.airfoilIdx[planformIdx]
+        positions = self.creatorInstances[planformIdx].get_airfoilPositions()
+        num_airfoils = len(positions)
+
+        (x_min, x_max, y_min, y_max) = (0, 0, 0, 0)
+
+        if (diagFrame.activeDiagram == diagTypes[3]):
+            # airfoil distribution
+            y_min, y_max = 0, 0
+            if (airfoilIdx == 0):
+                # root airfoil
+                x_min = params['fuselageWidth']/2
+                x_max = positions[1]
+            elif airfoilIdx == (num_airfoils-1):
+                # tip airfoil
+                x_min = positions[airfoilIdx - 1]
+                x_max = params['wingspan']/2 - x_min
+            else:
+                # airfoil between root and tip
+                x_min = positions[airfoilIdx - 1]
+                x_max = positions[airfoilIdx + 1]
+            
+        elif (diagFrame.activeDiagram == diagTypes[4]):
+            # Flap distribution
+            (x_min, x_max, y_min, y_max) = (0, 0, 0.01, 99.99)
+            
+        return (x_min, x_max, y_min, y_max)
 
     def set_updateNotification(self):
         self.performEntryUpdate = True
@@ -1421,9 +1458,11 @@ class diagram(ctk.CTkFrame):
         # change of airfoil-position requested ?
         elif (self.controller.activeDiagram == diagTypes[3]):
             airfoilPositions = creatorInst.get_airfoilPositions()
+            airfoilReynolds = params['airfoilReynolds']
 
             for idx in range(len(airfoilPositions)):
-                if ((abs(mouse_x - airfoilPositions[idx]) < catching_range)):
+                if ((abs(mouse_x - airfoilPositions[idx]) < catching_range) and
+                    (airfoilReynolds[idx] == None)): # we cannot move airfoils, if Reynolds is specified
                     # set active airfoil idx in control frame
                     ctrlFrame.set_airfoilIdx(idx)
                     return idx
@@ -1475,17 +1514,28 @@ class diagram(ctk.CTkFrame):
         if event.button == 1:
             if self._ind is None:
                 return
+            # get the valid range for x and y postition    
+            (x_min, x_max, y_min, y_max) = ctrlFrame.get_validxyRange()
+
             # check type of active diagram
-            if (self.controller.activeDiagram == diagTypes[4]):
-                # Flap distribution
-                x, y = event.xdata, event.ydata
-                # set new flap depth
-                ctrlFrame.changeFlap(x,y,self._ind)
-            elif (self.controller.activeDiagram == diagTypes[3]):
+            if (self.controller.activeDiagram == diagTypes[3]):
                 # airfoil distribution
                 x, y = event.xdata, event.ydata
+                # check x position for valid range
+                x = min(x_max, max(x_min, x))
+                y = min(y_max, max(y_min, y))
                 # set new airfoil position
                 ctrlFrame.change_airfoilPosition(x, y, self._ind)
+            
+            elif (self.controller.activeDiagram == diagTypes[4]):
+                # Flap distribution
+                x, y = event.xdata, event.ydata
+                # check x position for valid range
+                x = min(x_max, max(x_min, x))
+                y = min(y_max, max(y_min, y))
+                # set new flap depth
+                ctrlFrame.changeFlap(x,y,self._ind)
+        
         elif event.button == 3: # right mouse button
             # move visible area of the window
             self.controller.move_visibleArea(event)
@@ -2019,6 +2069,7 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         global ctrlFrame
+        global diagFrame
         global creatorInstances
         global interpolationSteps_default
         global xPanels_default
@@ -2077,7 +2128,8 @@ class App(ctk.CTk):
          self.get_Buttons(), creatorInstances,
           scaleFactor)
 
-        # set global variable
+        # set global variables
+        diagFrame = self.frame_top
         ctrlFrame = self.frame_bottom
 
     def __update_interpolationSteps(self):

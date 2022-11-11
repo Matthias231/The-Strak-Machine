@@ -1076,6 +1076,17 @@ class wing:
         for idx in range(params.numAirfoils):
             Re = params.airfoilReynolds[idx]
             airfoilName = (params.airfoilBasicName + "-%s.dat") % get_ReString(Re)
+            
+            # count the number of airfoils with this name
+            num = 0
+            for name in params.airfoilNames:
+                if name.find(airfoilName) >= 0:
+                    num += 1
+            
+            # if there are already airfoils with this name, append number to airfoilname
+            if (num > 0):
+                airfoilName += "_%d" % num
+            
             params.airfoilNames.append(airfoilName)
 
 
