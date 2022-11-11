@@ -494,15 +494,33 @@ class control_frame():
 ##           self.updateNeeded = True
 
 
-    def __add_airfoil(self):
+    def __add_airfoil(self, str_newPosition):
+        try:
+            # convert to float
+            new_position = float(str_newPosition)
+        except:
+            msgText =  "Error, cannot convert input \'%s\' to a float number." % str_newPosition
+            messagebox.showerror(title='Add airfoil', message=msgText)
+            return
+
         planformIdx = self.master.planformIdx
         creatorInst = self.creatorInstances[planformIdx]
         params = self.params[planformIdx]
-        new_position = self.new_airfoilPosition
 
         # get current positions of all airfoils in mm
         positions = creatorInst.get_airfoilPositions()
         num = len(positions)
+        x_min = positions[0]
+        x_max = params["wingspan"]/2 - params["fuselageWidth"]/2
+        
+        # check if position is inside valid limits
+        if (new_position <= x_min) or (new_position >= x_max):
+            # invalid position
+            # create message text
+            msgText =  "Error, airfoil could not be added.\n"
+            msgText +=  "Position must be in range %.1f mm to %.1f mm." % (x_min, x_max)
+            messagebox.showerror(title='Add airfoil', message=msgText)
+            return
 
         for idx in range(num):
             if (new_position < positions[idx]):
@@ -524,9 +542,6 @@ class control_frame():
 
         # request update (will be done in the mainloop)
         self.set_updateNotification()
-
-         # cleaning up
-        self.addWindow.destroy()
 
         # create message text
         msgText =  "Airfoil has been succesfully added"
@@ -557,72 +572,20 @@ class control_frame():
         msgText =  "Airfoil %s has been succesfully removed" % airfoilName
         messagebox.showinfo(title='Remove airfoil', message=msgText)
 
-
-    def __cancel_add_airfoil(self):
-         # cleaning up
-        self.addWindow.destroy()
-
     def __cancel_remove_airfoil(self):
          # cleaning up
         self.removeWindow.destroy()
-
-    def __enter_newAirfoilPosition(self, command):
-        try:
-            self.new_airfoilPosition = int(self.newAirfoilPosition_entry.get())
-            # check if position is valid #FIXME
-        except:
-            ErrorMsg("__enter_newAirfoilPosition, invalid position")
 
     def __add_airfoilDialog(self, dummy):
         # change diagram to airfoil distribution
         global diagFrame
         diagFrame.change_diagram(diagTypes[3])
+       
+        # create dialog
+        dialog = ctk.CTkInputDialog(master=None, text='Enter airfoil position (mm):', title = 'Add airfoil')
 
-        planformIdx = self.master.planformIdx
-        airfoilIdx = self.airfoilIdx[planformIdx]
-        params = self.params[planformIdx]
-        #removeWindow = ctk.CTkToplevel() #FIXME problems with windowsize
-
-        addWindow = tk.Toplevel() # FIXME workaround window sizing problem
-        mode = ctk.get_appearance_mode()
-        if (mode == 'Dark'):
-            addWindow.configure(bg=bg_color_dark)
-        else:
-            addWindow.configure(bg=bg_color_light)
-
-        self.addWindow = addWindow
-        addWindow.wm_title("Add airfoil")
-
-        # define width for all entries
-        entry_width = 100
-        #airfoilname = self.airfoilNames[self.airfoilIdx]
-        row = 1
-
-        # generate label showing the unit
-        enter_position_label = ctk.CTkLabel(master=addWindow, text='Enter airfoil position (mm):', anchor="e")
-        enter_position_label.grid(row=row, column=0)
-
-        # generate string var, set value to middle of the wing
-        self.new_airfoilPosition = params["wingspan"]/4
-        self.newPosition_txt = tk.StringVar(master=addWindow, value=self.new_airfoilPosition)
-
-        # generate entry
-        self.newAirfoilPosition_entry = ctk.CTkEntry(master=addWindow, show=None,
-            textvariable = self.newPosition_txt, text_font=(main_font, fs_entry),
-            width=entry_width, height=16, justify='right')
-        self.newAirfoilPosition_entry.bind('<Return>', self.__enter_newAirfoilPosition)
-        self.newAirfoilPosition_entry.grid(row=row, column=1, pady=10, padx=20, sticky="w")
-
-        row += 1
-
-        # add OK / Cancel buttons
-        button = ctk.CTkButton(addWindow, text="OK", command=self.__add_airfoil)
-        button.grid(row=row+1, column=0, pady=10, padx=20, sticky="e")
-        #self.newAirfoilOk_button = button
-
-        button = ctk.CTkButton(addWindow, text="Cancel", command=self.__cancel_add_airfoil)
-        button.grid(row=row+1, column=1, pady=10, padx=20, sticky="w")
-        center(addWindow)
+        # get user input and add airfoil
+        self.__add_airfoil(dialog.get_input())
 
     def __remove_airfoilDialog(self, dummy):
         planformIdx = self.master.planformIdx
@@ -1413,6 +1376,7 @@ class diagram(ctk.CTkFrame):
         canvas.mpl_connect('button_release_event', self.on_button_release)
         canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
         canvas.mpl_connect('scroll_event', self.on_scrollwheel_turn)
+        #canvas.mpl_connect('key_press_event', self.on_key_press)
 
     def __get_ind_under_point(self, event):
         """
@@ -1494,8 +1458,6 @@ class diagram(ctk.CTkFrame):
         else:
             return
 
-
-
     def on_button_release(self, event):
         """Callback for mouse button releases."""
         if event.button == 1: # left mouse button
@@ -1504,6 +1466,18 @@ class diagram(ctk.CTkFrame):
         else:
             return
 
+    #def on_key_press(self, event):
+    #    """Callback for key pressed."""
+    #    if event.char == ' ':
+    #        # get the valid range for x and y postition    
+    #        (x_min, x_max, y_min, y_max) = ctrlFrame.get_validxyRange()
+
+    #        # check type of active diagram
+    #        if (self.controller.activeDiagram == diagTypes[3]):
+    #            # airfoil distribution
+    #            x, y = event.xdata, event.ydata
+    #            if (x > x_min) and (x < x_max):
+    #                ctrlFrame.__add_airfoil(str(x))
 
     def on_mouse_move(self, event):
         """Callback for mouse movements."""
