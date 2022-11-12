@@ -23,9 +23,30 @@ from ezdxf.addons import Importer
 import numpy as np
 from copy import deepcopy
 from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg, bs)
+#from planform_creator import wingGrid
 
 # Scale from mm --> m
 scaleFactor = (1.0/1000.0)
+
+# maximum number of points that identify a polyline as a hingeline
+max_hingelinePoints = 10
+
+################################################################################
+#
+# wingGrid class
+#
+################################################################################
+class wingGrid:
+
+    # class init
+     def __init__(self):
+        self.y = 0.0
+        self.chord = 0.0
+        self.leadingEdge = 0.0
+        self.quarterChordLine = 0.0
+        self.hingeLine = 0.0
+        self.flapDepth = 0.0
+        self.trailingEdge = 0.0
 
 ################################################################################
 #
@@ -144,7 +165,160 @@ def export_toDXF(wingData, FileName, num_points):
     NoteMsg("DXF data was successfully written.")
     return 0
 
-def import_fromDXF(FileName):
+def __create_planformShape(points):
+    planformShape = []
+    # determine total number of points
+    num_points = len(points)
+    NoteMsg("creating planformshape, %d points" % num_points)
+
+    # get coordinates along wingspan
+    y = []
+    LE = []
+    TE = []
+    idx = 0
+    root_x1 = 1000000000.0
+    root_x2 = 1000000000.0
+    max_x = -1000000000.0
+    min_y = 1000000000.0
+    max_y = -1000000000.0
+    idx_root_x1y1 = 0
+    idx_root_x2y2 = 0
+    idx_min_x = 0
+    idx_max_x = 0
+    idx_min_y = 0
+    idx_max_y = 0
+    #root = []
+    
+    # x- coordinate along wingspan (-->grid.y), y - coordinate along chord (-->grid.LE, TE)
+        
+    # find first root coordinate and tip coordinate
+    for idx in range(num_points):
+        (x, y, d1, d2, d3) = points[idx]
+        if (x < root_x1):
+            root_x1 = x
+            root_y1 = y
+            idx_root_x1y1 = idx
+        if (x > max_x):
+            max_x = x
+            idx_max_x = idx
+            
+    #root.append(idx_root_x1y1, root_x1, root_y1)
+    
+    # find second root coordinate
+    for idx in range(num_points):
+        (x, y, d1, d2, d3) = points[idx]
+        if ((x < root_x2) and (idx != idx_root_x1y1)):
+            root_x2 = x
+            root_y2 = y
+            idx_root_x2y2 = idx
+
+    #root.append(idx_root_x2y2, root_x2, root_y2)
+    
+    # calculate root chord
+    rootchord = abs(root_y2 - root_y1)
+
+    print("root_x1: %f, root_y1: %f, idx: %d" % (root_x1, root_y1, idx_root_x1y1))
+    print("root_x2: %f, root_y2: %f, idx: %d" % (root_x2, root_y2, idx_root_x2y2))
+    print("root chord: %f" % rootchord)
+    #print("max_x: %f, idx: %d" % (max_x, idx_max_x))
+    #print("min_y: %f, idx: %d" % (min_y, idx_min_y))
+    #print("max_y: %f, idx: %d" % (max_y, idx_max_y))
+    
+    # get leading edge
+    # determine where to start with LE, start at lowest y
+    if (root_y1 > root_y2):
+        startIdx = idx_root_x1y1
+    else:
+        startIdx = idx_root_x2y2
+
+    for idx in range(startIdx, idx_max_x):
+        (x, y, d1, d2, d3) = points[idx]
+        y.append(x)
+        LE.append(y)
+    
+    # get trailing edge
+    for idx in range(idx_max_x, num_points):
+        (x, y, d1, d2, d3) = points[idx]
+        y.append(x)
+        TE.append(y)
+    
+    num = len(y)
+    
+    if num == 0:
+        ErrorMsg("number of y coordinates is zero")
+        return None
+
+    if (num != len(LE)):
+        ErrorMsg("number of y coordinates %d differs from number of LE coordinates %d" % (num, len(LE)))
+        return None
+
+    if (num != len(TE)):
+        ErrorMsg("number of y coordinates %d differs from number of TE coordinates %d" % (num, len(TE)))
+        return None
+   
+    # setup the grid of the wing    
+    for idx in range (num):
+        grid = wingGrid()
+        grid.y = y[idx]
+        grid.leadingEdge = LE[idx]
+        grid.trailingEdge = TE[idx]
+        grid.chord = grid.trailingEdge - grid.leadingEdge
+        grid.quarterChordLine = grid.chord/4
+        grid.hingeLine = 0.0 # we have no hingeline at the moment
+        grid.flapDepth = 0.0  # we have no hingeline at the moment
+        grid.y
+        planformShape.append(grid)
+    
+    return planformShape
+
+def __insert_hingeline(planformShape, points):
+    return #FIXME implement
+
+def __convert_toWingData(msp, wingData):
+    # get all lines
+    lines = msp.query("LINE")
+    
+    '''# evaluate lines (should be the hingeline)
+    idx = 0
+    for line in lines:
+        print("\nLine %d:" % idx)
+        with line.points("xyseb") as points:
+            print(points)
+        idx += 1'''
+    
+    # get all polylines
+    polylines = msp.query("LWPOLYLINE")
+    
+    # evaluate polylines (should be the shape of the planform and also the hingeline)
+    # we assume that the shape of the planform is represented by one polyline
+    idx = 0
+    planformShapePoints = None
+    hingeLinePoints = None
+
+    for line in polylines:
+        print("\nPolyline %d:" % idx)
+        with line.points("xyseb") as points:
+            num_points = len(points)
+            # is it a polyline representing the shape of the planform or the hingeline?
+            if (num_points <= max_hingelinePoints):
+                NoteMsg("Found hingeline, %d points" % num_points)
+                hingeLinePoints = points
+            else:
+                NoteMsg("Found planformshape, %d points" % num_points)
+                planformShapePoints = points
+            idx += 1
+    
+    # create grid from points
+    if planformShapePoints != None:
+        planformShape = __create_planformShape(planformShapePoints)
+        if hingeLinePoints != None:
+            __insert_hingeline(planformShape, hingeLinePoints)
+
+    print ("Done")
+
+
+
+def import_fromDXF(wingData, FileName):
     try:
         sdoc = ezdxf.readfile(FileName)
     except:
@@ -172,5 +346,10 @@ def import_fromDXF(FileName):
     # This is ALWAYS the last & required step, without finalizing the target drawing is maybe invalid!
     # This step imports all additional required table entries and block definitions.
     importer.finalize()
+    
+    # Convert data and insert into wingdata
+    __convert_toWingData(sdoc.modelspace(), wingData)
     NoteMsg("import_fromDXF: planform was succesfully imported from file %s" % FileName)
+
+    
     #tdoc.saveas('imported.dxf')

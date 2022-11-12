@@ -2958,7 +2958,7 @@ class planform_creator:
         return (result, exportedFiles)
 
     def __import_planform(self, filepath):
-        return import_fromDXF(filepath)
+        return import_fromDXF(self.newWing, filepath)
 
     def __set_AxesAndLabels(self, ax, title):
         global cl_grid
