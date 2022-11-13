@@ -31,6 +31,9 @@ scaleFactor = (1.0/1000.0)
 # maximum number of points that identify a polyline as a hingeline
 max_hingelinePoints = 10
 
+# number of grid points for planformshape and chord distribution
+num_gridPoints = 1000
+
 ################################################################################
 #
 # wingGrid class
@@ -50,6 +53,20 @@ class wingGrid:
 
 ################################################################################
 #
+# normalizedGrid class
+#
+################################################################################
+class normalizedGrid:
+
+    # class init
+     def __init__(self):
+        self.y = 0.0
+        self.chord = 0.0
+        self.referenceChord = 0.0
+        self.hinge = 0.0
+
+################################################################################
+#
 # helper functions
 #
 ################################################################################
@@ -57,6 +74,30 @@ def calculate_distance(x1, x2, y1, y2):
     '''calculates the distance between two given points'''
     dist = np.sqrt(np.square(x2-x1) + np.square(y2-y1))
     return dist
+
+def distance_between(p1, p2):
+    '''calculates the distance between two given points'''
+    x1, y1 = p1
+    x2, y2 = p2
+    dist = np.sqrt(np.square(x2-x1) + np.square(y2-y1))
+    return dist
+    '''calculates angle clockwise between two given points'''
+
+def angle_between(p1, p2):
+    x1, y1 = p1
+    x2, y2 = p2
+    GK = y2-y1
+    AK = x2-x1
+    
+    if (AK > 0.0):
+        ang1 = np.arctan2(GK/AK)
+        return np.rad2deg(ang1 % (2 * np.pi))
+    else:
+        # avoid division by zero
+        if (y1 > y2):
+            return 180.0
+        else:
+            return 0.0
 
 def norm_xy(xy, wingData):
     (x, y) = xy
@@ -69,6 +110,14 @@ def denorm_xy(xy_norm, wingData):
     x = x_norm * wingData.params.halfwingspan * scaleFactor
     y = y_norm * wingData.params.rootchord * scaleFactor
     return (x, y)
+
+def interpolate(x1, x2, y1, y2, x):
+    try:
+        y = ((y2-y1)/(x2-x1)) * (x-x1) + y1
+    except:
+        ErrorMsg("Division by zero, x1:%f, x2:%f", (x1, x2))
+        y = 0.0
+    return y
 
 ################################################################################
 #
@@ -165,155 +214,373 @@ def export_toDXF(wingData, FileName, num_points):
     NoteMsg("DXF data was successfully written.")
     return 0
 
-def __create_planformShape(points):
-    planformShape = []
-    # determine total number of points
+def __get_min_max(points):
     num_points = len(points)
-    NoteMsg("creating planformshape, %d points" % num_points)
-
-    # get coordinates along wingspan
-    y = []
-    LE = []
-    TE = []
-    idx = 0
-    root_x1 = 1000000000.0
-    root_x2 = 1000000000.0
-    max_x = -1000000000.0
-    min_y = 1000000000.0
-    max_y = -1000000000.0
-    idx_root_x1y1 = 0
-    idx_root_x2y2 = 0
     idx_min_x = 0
     idx_max_x = 0
     idx_min_y = 0
     idx_max_y = 0
-    #root = []
+    min_x = -1000000000.0
+    max_x = -1000000000.0
+    min_y = 1000000000.0
+    max_y = -1000000000.0
+
+    for idx in range(num_points):
+        (x, y, d1, d2, d3) = points[idx]
+        if (x < min_x):
+            x = min_x
+            idx_min_x = idx
+        if (y < min_y):
+            y = min_y
+            idx_min_y = idx
+        if (x > max_x):
+            x = max_x
+            idx_max_x = idx
+        if (y > max_y):
+            y = max_y
+            idx_max_y = idx
     
-    # x- coordinate along wingspan (-->grid.y), y - coordinate along chord (-->grid.LE, TE)
-        
-    # find first root coordinate and tip coordinate
+    minMax_coordinates = (min_x, max_x, min_y, max_y)
+    minMax_idx =  (idx_min_x, idx_max_x, idx_min_y, idx_max_y)
+    return (minMax_idx, minMax_coordinates)
+
+def __get_root(points, idx_min_x, ):
+    num_points = len(points)
+    root_x1 = 1000000000.0
+    root_x2 = 1000000000.0
+    # find smallest y-coordinate
+    # find greatest y-coordinate
+
+    # find point with smallest x-coordinate 
     for idx in range(num_points):
         (x, y, d1, d2, d3) = points[idx]
         if (x < root_x1):
             root_x1 = x
             root_y1 = y
             idx_root_x1y1 = idx
-        if (x > max_x):
-            max_x = x
-            idx_max_x = idx
-            
-    #root.append(idx_root_x1y1, root_x1, root_y1)
-    
-    # find second root coordinate
-    for idx in range(num_points):
-        (x, y, d1, d2, d3) = points[idx]
-        if ((x < root_x2) and (idx != idx_root_x1y1)):
-            root_x2 = x
-            root_y2 = y
-            idx_root_x2y2 = idx
 
-    #root.append(idx_root_x2y2, root_x2, root_y2)
-    
-    # calculate root chord
-    rootchord = abs(root_y2 - root_y1)
+def __convert(xy, x_offset, y_offset, scaleFactor_x, scaleFactor_y):
+    x, y = xy
+    x -= x_offset
+    x *= scaleFactor_x
+    y -= y_offset
+    y *= scaleFactor_y
 
-    print("root_x1: %f, root_y1: %f, idx: %d" % (root_x1, root_y1, idx_root_x1y1))
-    print("root_x2: %f, root_y2: %f, idx: %d" % (root_x2, root_y2, idx_root_x2y2))
-    print("root chord: %f" % rootchord)
-    #print("max_x: %f, idx: %d" % (max_x, idx_max_x))
-    #print("min_y: %f, idx: %d" % (min_y, idx_min_y))
-    #print("max_y: %f, idx: %d" % (max_y, idx_max_y))
-    
-    # get leading edge
-    # determine where to start with LE, start at lowest y
-    if (root_y1 > root_y2):
-        startIdx = idx_root_x1y1
-    else:
-        startIdx = idx_root_x2y2
+    return (x,y)
 
-    for idx in range(startIdx, idx_max_x):
-        (x, y, d1, d2, d3) = points[idx]
-        y.append(x)
-        LE.append(y)
-    
-    # get trailing edge
-    for idx in range(idx_max_x, num_points):
-        (x, y, d1, d2, d3) = points[idx]
-        y.append(x)
-        TE.append(y)
-    
-    num = len(y)
+
+def __get_rootline(lines):
+    lengths = []
+    idxList = []
+    num = len(lines)
     
     if num == 0:
-        ErrorMsg("number of y coordinates is zero")
+        ErrorMsg("there are no lines")
         return None
 
-    if (num != len(LE)):
-        ErrorMsg("number of y coordinates %d differs from number of LE coordinates %d" % (num, len(LE)))
-        return None
+    # check all lines
+    for idx in range(num):
+        # check angle
+        p1, p2 = lines[idx]
+        angle = angle_between(p1, p2)
+        
+        if (((angle>179.0) and (angle<181.0)) or
+            (angle>359.0) or (angle<1.1)):
+            # line runs nearly straight up or straight down, calculate length
+            length = abs(distance_between(p1, p2))
+            lengths.append(length)
+            idxList.append(idx)
+    
+    maxLength = max(lengths)
+    rootlineIdx = lengths.index(maxLength)    
+    rootline = lines[rootlineIdx]
+       
+    # check if line has to be reverted
+    (x1, y1), (x2, y2) = rootline
+    if (y2 < y1):
+        # revert line
+        rootline = rootline[::-1]
 
-    if (num != len(TE)):
-        ErrorMsg("number of y coordinates %d differs from number of TE coordinates %d" % (num, len(TE)))
-        return None
+    # get remaining lines
+    remaining_lines =[]
+    for idx in range(num):
+        if (idx != rootlineIdx):
+            remaining_lines.append(lines[idx])
+
+    return rootline, remaining_lines
+
+def __points_match(p1, p2):
+    matching_range = 0.0001 #FIXME
+    x1, y1 = p1
+    x2, y2 = p2
+
+    if ((abs(x2-x1) <= matching_range) and
+        (abs(y2-y1) <= matching_range)):
+        return True
+    else:
+        return False
+
+def __get_matching_line(point, lines):
+    # check number of lines
+    num = len(lines)
+    if num == 0:
+        return None, None
+    
+    # search in all lines
+    for idx in range(num):
+        line = lines[idx]
+        p1 = line[0]
+        p2 = line[-1]
+        if __points_match(point, p1):
+            # return idx and line as is
+            return idx, line
+        elif __points_match(point, p2):
+            # line has to be reverted
+            line = line[::-1]
+            return idx, line
+        
+    # nothing was found
+    return None, None
    
-    # setup the grid of the wing    
-    for idx in range (num):
+# join all lines to contour
+def __create_contour(rootline, lines, polylines):
+    contour = []
+    actual_point = rootline[0]
+    endpoint = rootline[1]
+    
+    while True:
+        # check polylines
+        idx, line  = __get_matching_line(actual_point, polylines)
+        
+        if idx != None:
+            # remove from list of polylines
+            polylines.pop(idx)
+        else:
+            # check lines
+            idx, line  = __get_matching_line(actual_point, lines)
+            if idx != None:
+                # remove from list of lines
+                lines.pop(idx)
+        
+        # found a matching line ?
+        if line == None:
+            ErrorMsg("no matching line or polyline was found, contour could not be finished")
+            return contour, lines, polylines
+        else:    
+            # append to contour
+            contour.extend(line)
+            
+            # set new actual point
+            actual_point = line[-1]
+            
+            # check if we have reached the endpoint
+            if __points_match(endpoint, actual_point):
+                # we have finished
+                return contour, lines, polylines
+    
+    
+
+
+# split contour into leading edge and trailing edge
+def __split_contour(contour):
+    LE = []
+    TE = []
+    num = len(contour)
+    
+    if (num == 0):
+        ErrorMsg("__split_contour: contour has no points")
+        return (LE, TE)
+    
+    # initialize max_x with root
+    max_x, y = contour[0]
+    
+    for idx in range(num):
+        x, y = contour[idx]
+        # determine idx of max x value
+        if (x >= max_x):
+            # if we have not reached maximum, append to LE
+            max_x = x
+            maxIdx = idx
+            LE.append(contour[idx])
+        else:
+            # after we have reached maximum append to TE
+            TE.append(contour[idx])
+    
+    # revert TE
+    TE = TE[::-1]
+
+    return LE, TE  
+
+def __get_yFromX(points, x):
+    num = len(points)
+    
+    for idx in range(num):
+        xp, yp = points[idx]
+        # found identical point ?
+        if (x == xp):
+            x, y = points[idx]
+            return y
+
+        # find first point with x value > x
+        elif (xp > x) and (idx>=1):
+            x1, y1 = points[idx-1]
+            x2, y2 = points[idx]
+            y = interpolate(x1, x2, y1, y2, x)
+            return y
+    
+    ErrorMsg("__get_yFromX, xcoordinate %f not found" % x)
+    return None
+
+def __create_planformShape(wingData, lines, polylines):
+    global num_gridPoints
+    planformShape = []
+    halfwingspan = wingData.params.halfwingspan
+    rootchord = wingData.params.rootchord
+       
+    NoteMsg("creating planformshape")
+    
+    # first get rootline
+    rootline, remaining_lines = __get_rootline(lines)
+    
+    if rootline == None:
+        ErrorMsg("root line not found")
+        return None
+
+    # calculate rootchord, determine scale factor and offsets    
+    (x1, y1) , (x2, y2) = rootline
+    dxf_rootchord = y2 - y1
+    scaleFactor_y = 1 / dxf_rootchord
+    x_offset = x1
+    y_offset = y1
+    
+    # second join all remaining lines and polylines to contour/ planformshape
+    contour, remaining_lines, remaining_polylines = __create_contour(rootline, remaining_lines, polylines)
+    
+    # split contour into leading edge and trailing edge
+    LE, TE = __split_contour(contour)       
+   
+    # check number of points
+    if (len(LE) == 0):
+        ErrorMsg("number of LE points is zero")
+        return None
+
+    if (len(TE) == 0):
+        ErrorMsg("number of TE points is zero")
+        return None
+    
+    # calculate halfwingspan, determine scale factor 
+    x1, y1 = LE[0]
+    x2, y2 = LE[-1]
+
+    dxf_halfwingspan = abs(x2-x1)
+    scaleFactor_x = 1.0/dxf_halfwingspan
+    
+    # normalize LE
+    # first point, x-coordinate 0
+    LE_norm = [(0.0, 0.0)]
+    # further points
+    for idx in range(1, len(LE)):
+        LE_x, LE_y = __convert(LE[idx], x_offset, y_offset, scaleFactor_x, scaleFactor_y)
+        LE_norm.append((LE_x, LE_y))
+
+    # normalize TE
+    # first point, x-coordinate 0
+    TE_norm = [(0.0, 1.0)]
+    # further points
+    for idx in range(1, len(TE)):
+        TE_x, TE_y = __convert(TE[idx], x_offset, y_offset, scaleFactor_x, scaleFactor_y)
+        TE_norm.append((TE_x, TE_y))
+    
+    # calculate increment 
+    delta_x = 1.0 / num_gridPoints
+   
+    # start at root, which always is 0.0
+    x = 0.0
+
+    # calculate planform shape and also normalized chord distribution
+    planformShape = []
+    chordDistribution = []
+    while (x < 1.0):
+        # get normalized LE, TE
+        LE_y = __get_yFromX(LE_norm, x)
+        TE_y = __get_yFromX(TE_norm, x)
+        
+        if (LE_y == None) or (TE_y == None):
+            ErrorMsg("y-coordinate not found, planform could not be created")
+            return
+
+        # setup normalized chord distribution
+        norm_grid = normalizedGrid()
+        norm_grid.y = x
+        norm_grid.chord = TE_y-LE_y
+        norm_grid.referenceChord = 0.0 #FIXME calculate ellipse
+        chordDistribution.append(norm_grid)
+
+        # setup absolute planformshape
         grid = wingGrid()
-        grid.y = y[idx]
-        grid.leadingEdge = LE[idx]
-        grid.trailingEdge = TE[idx]
+        grid.y = x * halfwingspan
+        grid.leadingEdge = LE_y * rootchord
+        grid.trailingEdge = TE_y * rootchord
         grid.chord = grid.trailingEdge - grid.leadingEdge
         grid.quarterChordLine = grid.chord/4
         grid.hingeLine = 0.0 # we have no hingeline at the moment
         grid.flapDepth = 0.0  # we have no hingeline at the moment
-        grid.y
         planformShape.append(grid)
-    
+        
+        # increment y coordinate
+        x += delta_x
+    #FIXME setup hingeline
     return planformShape
 
 def __insert_hingeline(planformShape, points):
     return #FIXME implement
 
 def __convert_toWingData(msp, wingData):
+    num_segments = 1000
+    
+    NoteMsg("Analysing entities in dxf file")
+    for e in msp:
+        NoteMsg("found entity %s" % e.dxftype())
+    
     # get all lines
     lines = msp.query("LINE")
     
-    '''# evaluate lines (should be the hingeline)
+    # evaluate all lines and append to myLines
     idx = 0
+    myLines = []
     for line in lines:
-        print("\nLine %d:" % idx)
-        with line.points("xyseb") as points:
-            print(points)
-        idx += 1'''
+        NoteMsg("getting line %d:" % idx)
+        x1, y1, z = line.dxf.start
+        x2, y2, z = line.dxf.end
+        myLines.append(((x1, y1), (x2, y2)))   
+        idx += 1
     
+    # get all splines, convert into polylines
+    splines = msp.query("SPLINE")
+
+    idx = 0
+    for spline in splines:
+        NoteMsg("getting spline %d and converting to 2d polyline with %d segments" % (idx, num_segments))
+        bspline = spline.construction_tool()
+        xy_pts = [p.xy for p in bspline.approximate(segments=num_segments)]
+        msp.add_lwpolyline(xy_pts, format='xy')
+        idx += 1
+
     # get all polylines
     polylines = msp.query("LWPOLYLINE")
     
-    # evaluate polylines (should be the shape of the planform and also the hingeline)
-    # we assume that the shape of the planform is represented by one polyline
+    # evaluate polylines (one polyline for LE, one polyline for TE)
     idx = 0
-    planformShapePoints = None
-    hingeLinePoints = None
-
+    myPolylines = []
     for line in polylines:
-        print("\nPolyline %d:" % idx)
-        with line.points("xyseb") as points:
-            num_points = len(points)
-            # is it a polyline representing the shape of the planform or the hingeline?
-            if (num_points <= max_hingelinePoints):
-                NoteMsg("Found hingeline, %d points" % num_points)
-                hingeLinePoints = points
-            else:
-                NoteMsg("Found planformshape, %d points" % num_points)
-                planformShapePoints = points
+        NoteMsg("getting polyline %d" % idx)
+        with line.points("xy") as points:
+            # append points of polyline
+            myPolylines.append(points)    
             idx += 1
     
     # create grid from points
-    if planformShapePoints != None:
-        planformShape = __create_planformShape(planformShapePoints)
-        if hingeLinePoints != None:
-            __insert_hingeline(planformShape, hingeLinePoints)
-
+    planformShape = __create_planformShape(wingData, myLines, myPolylines)
     print ("Done")
 
 
@@ -331,7 +598,7 @@ def import_fromDXF(wingData, FileName):
     importer.import_modelspace()
 
     # import all paperspace layouts from source drawing
-    importer.import_paperspace_layouts()
+    #importer.import_paperspace_layouts()
 
     # import all CIRCLE and LINE entities from source modelspace into an arbitrary target layout.
     # create target layout
