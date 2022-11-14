@@ -2106,25 +2106,25 @@ class App(ctk.CTk):
         diagFrame = self.frame_top
         ctrlFrame = self.frame_bottom
 
-    def __update_interpolationSteps(self):
+    def __update_interpolationSteps(self, dummy):
         try:
             self.interpolationSteps = int(self.steps_entry.get())
         except:
             ErrorMsg("__update_interpolationSteps, invalid steps")
 
-    def __update_xPanels(self):
+    def __update_xPanels(self, dummy):
         try:
             self.xPanels = int(self.xPanels_entry.get())
         except:
             ErrorMsg("__update_xPanels, invalid number of xPanels")
 
-    def __update_yPanels(self):
+    def __update_yPanels(self, dummy):
         try:
             self.yPanels = int(self.yPanels_entry.get())
         except:
             ErrorMsg("__update_yPanels, invalid number of yPanels")
 
-    def __update_num_points(self):
+    def __update_num_points(self, dummy):
         try:
             self.num_points = int(self.num_points_entry.get())
         except:
