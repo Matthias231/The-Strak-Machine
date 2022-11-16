@@ -555,11 +555,14 @@ def __create_planformShape(lines):
         TE_x, TE_y = __convert(TE[idx], x_offset, y_offset, scaleFactor_x, scaleFactor_y)
         TE_norm.append((TE_x, TE_y))
     
-    # normalize hingeline
-    HL_norm = []
-    for idx in range(len(hingeline)):
-        HL_x, HL_y = __convert(hingeline[idx], x_offset, y_offset, scaleFactor_x, scaleFactor_y)
-        HL_norm.append((HL_x, HL_y))
+    if hingeline != None:
+        # normalize hingeline
+        HL_norm = []
+        for idx in range(len(hingeline)):
+            HL_x, HL_y = __convert(hingeline[idx], x_offset, y_offset, scaleFactor_x, scaleFactor_y)
+            HL_norm.append((HL_x, HL_y))
+    else:
+        HL_norm = None
 
     # calculate increment 
     delta_x = 1.0 / num_gridPoints
@@ -600,7 +603,10 @@ def __create_planformShape(lines):
         grid.chord = grid.trailingEdge - grid.leadingEdge
         grid.quarterChordLine = grid.chord/4
         grid.hingeLine = HL_y
-        grid.flapDepth = ((TE_y - HL_y) / grid.chord) * 100.0
+        if (HL_y > 0.0):
+            grid.flapDepth = ((TE_y - HL_y) / grid.chord) * 100.0
+        else:
+            grid.flapDepth = 0.0
         planformShape.append(grid)
         
         # increment y coordinate
@@ -611,8 +617,11 @@ def __create_planformShape(lines):
     flapDepthTip = planformShape[-1].flapDepth
     
     # calculate angle of hingeline
-    p1, p2 = hingeline
-    hingelineAngle = line_angle(p1, p2)# FIXME check sign
+    if (hingeline != None):
+        p1, p2 = hingeline
+        hingelineAngle = line_angle(p1, p2)
+    else: 
+        hingelineAngle = 0.0
     NoteMsg("flapDepth @root: %.1f %%, flapDepth @tip: %.1f%%, hingeline angle: %f°" %(flapDepthRoot, flapDepthTip, hingelineAngle))
     
     # return all data
