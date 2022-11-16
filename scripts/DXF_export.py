@@ -21,6 +21,7 @@ import os, re
 import ezdxf
 from ezdxf.addons import Importer
 import numpy as np
+from math import atan2,degrees
 from copy import deepcopy
 from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg, bs)
 #from planform_creator import wingGrid
@@ -33,6 +34,9 @@ max_hingelinePoints = 10
 
 # number of grid points for planformshape and chord distribution
 num_gridPoints = 1000
+
+#FIXME: take into account the scaling of the planform, e.g. wingspan. m or mm?
+matching_range = 0.1 
 
 ################################################################################
 #
@@ -99,17 +103,8 @@ def line_angle(p1, p2):
     x2, y2 = p2
     GK = (y2-y1)
     AK = (x2-x1)
+    return degrees(atan2(GK, AK))
     
-    if (AK > 0.0):
-        ang1 = np.arctan(GK/AK)
-        return np.rad2deg(ang1 % (2 * np.pi))
-    else:
-        # avoid division by zero
-        if (y1 > y2):
-            return 180.0
-        else:
-            return 0.0
-
 def norm_xy(xy, wingData):
     offset_x = wingData.params.fuselageWidth/2
     scaleFactor_x = wingData.params.halfwingspan
@@ -239,11 +234,18 @@ def export_toDXF(wingData, FileName, num_points):
     xy = norm_xy((grid[-1].y, grid[-1].hingeLine), wingData)
     hingeline.append(denorm_xy(xy, wingData))
 
+    airfoilLines = []
+    # FIXME determine lines for airfoil positions
+
     # add leightweight polylines to modelspace
     msp.add_lwpolyline(rootline)
     msp.add_lwpolyline(LE)
     msp.add_lwpolyline(TE)
-    #msp.add_lwpolyline(hingeline)
+    msp.add_lwpolyline(hingeline)
+    
+    # add lines for airfoil positions
+    for airfoilLine in airfoilLines:
+        msp.add_lwpolyline(airfoilLine)
 
     # save to file
     doc.saveas(FileName)
@@ -281,11 +283,10 @@ def __get_rootline(lines):
         # check angle, get first and last point of line (no matter, if polyline)
         p1, p2 = (line[0]), (line[-1])
         length = abs(distance_between(p1, p2))
-        angle = line_angle(p1, p2)
-        NoteMsg("checking line %d, length: %f, angle: %f" % (idx, length, angle))
+        angle_abs = abs(line_angle(p1, p2))
+        NoteMsg("checking line %d, length: %f, angle: %f" % (idx, length, angle_abs))
         
-        if (((angle>179.0) and (angle<181.0)) or
-            (angle>359.0) or (angle<1.1)):
+        if ((angle_abs>89.9) and (angle_abs<90.1)):
             NoteMsg("appending line %d to candidate list" % idx)
             # line runs nearly straight up or straight down, so is a candidate.
             # calculate length
@@ -326,8 +327,62 @@ def __get_rootline(lines):
 
     return rootline, lines
 
+def __get_hingeline(rootline, lines):
+    global matching_range
+        
+    hingeline = None
+
+    num = len(lines)
+    NoteMsg("trying to find hingeline, number of lines: %d" % num)
+
+    # get x-coordinates of rootline
+    (root_x1, root_y1), (root_x2, root_y2) = rootline
+
+    # check all lines
+    for idx in range(num):
+        line = lines[idx]
+        
+        # get coordinates of start- and endpoint
+        line_x1, line_y1 = line[0]
+        line_x2, line_y2 = line[-1]
+        
+        # check x-ccordinates for match with rootline
+        if ((abs(root_x1-line_x1) <= matching_range) or
+            (abs(root_x1-line_x2) <= matching_range)):
+            x_match = True
+        else:
+            x_match = False
+
+        # check y-ccordinates for match with rootline
+        if ((abs(root_y1-line_y1) <= matching_range) or
+            (abs(root_y1-line_y2) <= matching_range) or
+            (abs(root_y2-line_y1) <= matching_range) or
+            (abs(root_y2-line_y2) <= matching_range)):
+            y_match = True
+        else:
+            y_match = False
+        
+        # hingeline must have same x-coordinate, but must not have same y-coordinate as root
+        if ((x_match == True) and (y_match == False)):
+            NoteMsg("Found hingeline, idx: %d" % idx)
+            # found hingeline
+            hingeline = lines[idx]
+        
+            # remove from list of lines
+            lines.pop(idx)
+        
+            # check if hingeline has to be reverted
+            if (line_x2 <line_x1):
+                # revert line
+                NoteMsg("reverting hingeline")
+                hingeline = hingeline[::-1]
+            return hingeline, lines
+    
+    NoteMsg("no hingeline was found")
+    return hingeline, lines
+
 def __points_match(p1, p2):
-    matching_range = 0.1 #FIXME: take into account the scaling of the planform, e.g. wingspan. m or mm?
+    global matching_range
     x1, y1 = p1
     x2, y2 = p2
 
@@ -433,11 +488,10 @@ def __split_contour(contour):
 
     return LE, TE  
 
-def __create_planformShape(wingData, lines):
+def __create_planformShape(lines):
     global num_gridPoints
+    global matching_range
     planformShape = []
-    halfwingspan = wingData.params.halfwingspan
-    rootchord = wingData.params.rootchord
        
     NoteMsg("creating planformshape")
 
@@ -447,15 +501,21 @@ def __create_planformShape(wingData, lines):
     if rootline == None:
         ErrorMsg("root line not found")
         return None
-
+         
     # calculate rootchord, determine scale factor and offsets    
     (x1, y1) , (x2, y2) = rootline
-    dxf_rootchord = y2 - y1
-    scaleFactor_y = 1 / dxf_rootchord
+    rootchord = y2 - y1
+    scaleFactor_y = 1 / rootchord
     x_offset = x1
     y_offset = y1
-    
-    # second join all remaining lines and polylines to contour/ planformshape
+
+     # setup matching range to 0.1% of length of rootchord
+    matching_range = rootchord / 1000.0
+
+    # get hingeline, if any
+    hingeline, remaining_lines = __get_hingeline(rootline, remaining_lines)
+
+    # join remaining lines and polylines to contour/ planformshape
     contour, remaining_lines = __create_contour(rootline, remaining_lines)
     
     # split contour into leading edge and trailing edge
@@ -474,10 +534,10 @@ def __create_planformShape(wingData, lines):
     x1, y1 = LE[0]
     x2, y2 = LE[-1]
 
-    dxf_halfwingspan = abs(x2-x1)
-    scaleFactor_x = 1.0/dxf_halfwingspan
+    halfwingspan = abs(x2-x1)
+    scaleFactor_x = 1.0/halfwingspan
     
-    NoteMsg("DXF: rootchord: %f, halfwingspan: %f, x_offset: %f, y_offset: %f" % (dxf_rootchord, dxf_halfwingspan, x_offset, y_offset))
+    NoteMsg("rootchord: %f, halfwingspan: %f, x_offset: %f, y_offset: %f" % (rootchord, halfwingspan, x_offset, y_offset))
 
     # normalize LE
     # first point, x-coordinate 0
@@ -495,6 +555,12 @@ def __create_planformShape(wingData, lines):
         TE_x, TE_y = __convert(TE[idx], x_offset, y_offset, scaleFactor_x, scaleFactor_y)
         TE_norm.append((TE_x, TE_y))
     
+    # normalize hingeline
+    HL_norm = []
+    for idx in range(len(hingeline)):
+        HL_x, HL_y = __convert(hingeline[idx], x_offset, y_offset, scaleFactor_x, scaleFactor_y)
+        HL_norm.append((HL_x, HL_y))
+
     # calculate increment 
     delta_x = 1.0 / num_gridPoints
    
@@ -509,37 +575,50 @@ def __create_planformShape(wingData, lines):
         LE_y = __get_yFromX(LE_norm, x)
         TE_y = __get_yFromX(TE_norm, x)
         
+        # get normalize hingeline, if any
+        if HL_norm != None:
+            HL_y = __get_yFromX(HL_norm, x)
+        else:
+            HL_y = 0.0
+        
         if (LE_y == None) or (TE_y == None):
             ErrorMsg("y-coordinate not found, planform could not be created")
-            return
+            return None
 
         # setup normalized chord distribution
         norm_grid = normalizedGrid()
         norm_grid.y = x
         norm_grid.chord = TE_y-LE_y
-        norm_grid.referenceChord = 0.0 #FIXME calculate ellipse
+        norm_grid.referenceChord = np.sqrt(1.0-(x*x))
         chordDistribution.append(norm_grid)
 
-        # setup absolute planformshape
+        # setup normalized planformshape
         grid = wingGrid()
-        grid.y = x * halfwingspan
-        grid.leadingEdge = LE_y * rootchord
-        grid.trailingEdge = TE_y * rootchord
+        grid.y = x
+        grid.leadingEdge = LE_y
+        grid.trailingEdge = TE_y
         grid.chord = grid.trailingEdge - grid.leadingEdge
         grid.quarterChordLine = grid.chord/4
-        grid.hingeLine = 0.0 # we have no hingeline at the moment
-        grid.flapDepth = 0.0  # we have no hingeline at the moment
+        grid.hingeLine = HL_y
+        grid.flapDepth = ((TE_y - HL_y) / grid.chord) * 100.0
         planformShape.append(grid)
         
         # increment y coordinate
         x += delta_x
-    #FIXME setup hingeline
-    return planformShape
+    
+    # get flap depths
+    flapDepthRoot = planformShape[0].flapDepth
+    flapDepthTip = planformShape[-1].flapDepth
+    
+    # calculate angle of hingeline
+    p1, p2 = hingeline
+    hingelineAngle = line_angle(p1, p2)# FIXME check sign
+    NoteMsg("flapDepth @root: %.1f %%, flapDepth @tip: %.1f%%, hingeline angle: %f°" %(flapDepthRoot, flapDepthTip, hingelineAngle))
+    
+    # return all data
+    return (planformShape, chordDistribution, rootchord, halfwingspan, hingelineAngle, flapDepthRoot, flapDepthTip)
 
-def __insert_hingeline(planformShape, points):
-    return #FIXME implement
-
-def __convert_toWingData(msp, wingData):
+def __convert_toPlanform(msp):
     num_segments = 100
     
     NoteMsg("Analysing entities in dxf file")
@@ -585,11 +664,14 @@ def __convert_toWingData(msp, wingData):
             myLines.append(points)    
             idx += 1
     
-    # create grid from points
-    planformShape = __create_planformShape(wingData, myLines)
-    #FIXME insert planformshape into wingdata, etc.
-    NoteMsg("Planform has been succesfully imported")
-    return 0
+    # create planform, use lines
+    planformData = __create_planformShape(myLines)
+    
+    if planformData != None:
+        NoteMsg("Planform has been succesfully imported")
+    else:
+        ErrorMsg("Unable to import planform from modelspace")
+    return planformData
     
 ################################################################################
 #
@@ -610,7 +692,7 @@ def import_fromDXF(wingData, FileName):
     importer.import_modelspace()
 
     # import all paperspace layouts from source drawing
-    #importer.import_paperspace_layouts()
+    importer.import_paperspace_layouts()
 
     # import all CIRCLE and LINE entities from source modelspace into an arbitrary target layout.
     # create target layout
@@ -626,9 +708,16 @@ def import_fromDXF(wingData, FileName):
     # This step imports all additional required table entries and block definitions.
     importer.finalize()
     
-    # Convert data and insert into wingdata
-    __convert_toWingData(sdoc.modelspace(), wingData)
+    # Convert data to planform and chord distribution
+    __convert_toPlanform(sdoc.modelspace())
     NoteMsg("import_fromDXF: planform was succesfully imported from file %s" % FileName)
 
     
     #tdoc.saveas('imported.dxf')
+
+# Main program for testing purposes
+if __name__ == "__main__":
+    p1 = (0, 0)
+    p2 = (0, 100)
+    angle = line_angle(p1, p2)
+    print(angle)
