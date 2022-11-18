@@ -227,6 +227,7 @@ class wingGrid:
         self.chord = 0.0
         self.leadingEdge = 0.0
         self.quarterChordLine = 0.0
+        self.centerLine = 0.0
         self.hingeLine = 0.0
         self.flapDepth = 0.0
         self.trailingEdge = 0.0
@@ -245,6 +246,7 @@ class params:
         self.leadingEdgeOrientation = 'up'
         self.airfoilBasicName = 'airfoil'
         self.theme = 'Dark'
+        self.DXF_filename = None
 
         # single parameters,boolean
         self.isFin = False
@@ -460,6 +462,12 @@ class params:
             ErrorMsg("\"airfoilBasicName\" not defined and also \"airfoilNames\" not defined")
             exit(-1)
 
+        try:
+            self.DXF_filename = dictData["DXF_filename"]
+        except:
+             NoteMsg("No .dxf file specified")
+             self.DXF_filename = None
+
         # polar-generation feature
         try:
             self.polarReynolds = dictData["polar_Reynolds"]
@@ -597,6 +605,7 @@ class params:
 class chordDistribution:
     # class init
     def __init__(self):
+        self.fromDXF = False
         self.num_gridPoints = 0
         self.grid_delta = 0
         self.normalizedGrid = []
@@ -683,7 +692,13 @@ class chordDistribution:
 
     def get_normalizedGrid(self, idx):
         return self.normalizedGrid[idx]
-
+    
+    def set_fromDXF(self, normalized_grid):
+        self.normalizedGrid = normalized_grid
+        self.num_gridPoints = len(normalized_grid)
+        self.grid_delta = 1 / (self.num_gridPoints-1)
+        self.fromDXF = True
+    
     def get_numGridPoints(self):
         return self.num_gridPoints
 
@@ -865,8 +880,6 @@ class planform:
 
         return newGrid
 
-
-
     def __get_gridDataFromChord(self, chord):
         '''get interpolated grid data from chordlength'''
         # valid chord specified ?
@@ -969,6 +982,37 @@ class planform:
         # add offset of half of the fuselage-width to the y-coordinates
         for element in self.grid:
             element.y = element.y + params.fuselageWidth/2
+    
+    def set_fromDXF(self, planformShape, rootchord, halfwingspan, fuselageWidth, dihedral):
+        self.grid = planformShape #FIXME Denormalize grid points (rootchord, halfwingspan)
+        self.num_gridPoints = len(self.grid)
+        self.hingeInnerPoint = self.grid[0].hingeLine
+        self.hingeOuterPoint = self.grid[-1].hingeLine
+        '''# hinge line angle: convert radian measure --> degree
+        hingeLineAngle_radian = (params.hingeLineAngle/180) * pi
+
+        # calculate hingeOuterPoint from hinge line angle
+        AK = params.halfwingspan
+        GK = tan(hingeLineAngle_radian)*AK
+        self.hingeOuterPoint = self.hingeInnerPoint + GK'''
+
+        self.hingeLineAngle = 0.0 #FIXME calculate hingeline angle
+        self.dihedral = dihedral
+        self.wingArea = 0.0
+        self.geometricalCenter = (0.0, 0.0)
+        self.aspectRatio = 0.0
+        # calculate wing area and geometrical center
+        self.__calculate_wingArea()
+
+        # calculate aspect ratio of the wing
+        # use "halfwingspan", as the fuselage-width has already been substracted
+        self.aspectRatio = ((halfwingspan*2)**2) / self.wingArea
+        
+        # add offset of half of the fuselage-width to the y-coordinates
+        for element in self.grid:
+            element.y = element.y + fuselageWidth/2
+
+        self.fromDXF = True
 
     def find_grid(self, chord):
         return self.__get_gridDataFromChord(chord)
@@ -2958,7 +3002,20 @@ class planform_creator:
         return (result, exportedFiles)
 
     def __import_planform(self, filepath):
-        return import_fromDXF(self.newWing, filepath)
+        planformData = import_fromDXF(self.newWing, filepath)
+        if (planformData != None):
+            (planformShape, chordDist, rootchord, halfwingspan, hingelineAngle, flapDepthRoot, flapDepthTip) = planformData
+        
+            # create instance of chordDistribution
+            self.newWing.dxf_chordDistribution = chordDistribution()
+            self.newWing.dxf_chordDistribution.set_fromDXF(chordDist)
+
+            # create instance of planform
+            self.newWing.dxf_planform = planform()
+            # get params
+            params = self.newWing.params
+            # set planform
+            self.newWing.dxf_planform.set_fromDXF(planformShape, params.rootchord, params.halfwingspan, params.fuselageWidth, params.dihedral)
 
     def __set_AxesAndLabels(self, ax, title):
         global cl_grid
