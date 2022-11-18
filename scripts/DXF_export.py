@@ -51,6 +51,7 @@ class wingGrid:
         self.chord = 0.0
         self.leadingEdge = 0.0
         self.quarterChordLine = 0.0
+        self.centerLine = 0.0
         self.hingeLine = 0.0
         self.flapDepth = 0.0
         self.trailingEdge = 0.0
@@ -309,14 +310,7 @@ def __get_rootline(lines):
         lines.pop(rootlineIdx)
         lengths.pop(idx)
 
-        NoteMsg("found rootline, length is %f, idx is %d" % (maxLength, rootlineIdx))    
-        
-        # check for duplicate rootline
-        for idx in range(len(lengths)):
-            if (lengths[idx] == maxLength):
-                dupIdx = idxList[idx]
-                NoteMsg("removing duplicate rootline at idx %d" % (dupIdx))
-                lines.pop(dupIdx)
+        NoteMsg("found rootline, length is %f, idx is %d" % (maxLength, rootlineIdx))
        
         # check if rootline has to be reverted
         (x1, y1), (x2, y2) = rootline
@@ -438,20 +432,25 @@ def __create_contour(rootline, lines):
         if idx != None:
             # remove from list of polylines
             lines.pop(idx)
-          
+        
         # found a matching line ?
         if line == None:
             ErrorMsg("no matching line was found, contour could not be finished")
             return contour, lines
         else:    
             # append to contour
+            NoteMsg("Adding line %d to contour" % idx)
             contour.extend(line)
             
             # set new actual point, which is the endpoint of the current line
             actual_point = line[-1]
+            x, y = actual_point
+            NoteMsg("New point: %f, %f" % (x,y))
             
             # check if we have reached the endpoint
             if __points_match(endpoint, actual_point):
+                x,y = endpoint
+                NoteMsg("Found Endpoint of contour: %f, %f" % (x,y))
                 # we have finished
                 return contour, lines
     
@@ -488,12 +487,50 @@ def __split_contour(contour):
 
     return LE, TE  
 
+
+def __line_isDuplicate(line1, line2):
+    # check endpoints
+    if ((line1[0] == line2[0]) and
+       (line1[-1] == line2[-1])):
+        return True
+    else:
+        return False
+
+def __find_duplicates(line_idx, lines):
+    duplicates = []
+    for idx in range(line_idx+1, len(lines)):
+        if __line_isDuplicate(lines[line_idx], lines[idx]):
+            NoteMsg("found duplicate line, idx %d" % idx)
+            duplicates.append(idx)
+
+    return duplicates
+
+def __remove_duplicate_lines(lines):
+    duplicates = []
+
+    # find all duplictes, append idx to list
+    for idx in range(len(lines)):
+        duplicates.extend(__find_duplicates(idx, lines))
+    
+    # remove all duplicates
+    duplicates = duplicates[::-1]
+    for idx in duplicates:
+        NoteMsg("removed duplicate line, idx %d" % idx)
+        lines.pop(idx)
+    
+    return lines
+
+    return lines
+
 def __create_planformShape(lines):
     global num_gridPoints
     global matching_range
     planformShape = []
        
     NoteMsg("creating planformshape")
+
+    # remove duplicates, if any
+    remaining_lines = __remove_duplicate_lines(lines)  
 
     # get rootline
     rootline, remaining_lines = __get_rootline(lines)
@@ -509,8 +546,8 @@ def __create_planformShape(lines):
     x_offset = x1
     y_offset = y1
 
-     # setup matching range to 0.1% of length of rootchord
-    matching_range = rootchord / 1000.0
+     # setup matching range to 1% of length of rootchord
+    matching_range = rootchord / 100.0
 
     # get hingeline, if any
     hingeline, remaining_lines = __get_hingeline(rootline, remaining_lines)
@@ -601,8 +638,10 @@ def __create_planformShape(lines):
         grid.leadingEdge = LE_y
         grid.trailingEdge = TE_y
         grid.chord = grid.trailingEdge - grid.leadingEdge
-        grid.quarterChordLine = grid.chord/4
+        grid.centerLine = grid.leadingEdge + (grid.chord/2)
+        grid.quarterChordLine = grid.leadingEdge + (grid.trailingEdge-grid.leadingEdge)/4
         grid.hingeLine = HL_y
+     
         if (HL_y > 0.0):
             grid.flapDepth = ((TE_y - HL_y) / grid.chord) * 100.0
         else:
@@ -629,14 +668,41 @@ def __create_planformShape(lines):
 
 def __convert_toPlanform(msp):
     num_segments = 100
-    
-    NoteMsg("Analysing entities in dxf file")
-    for e in msp:
-        NoteMsg("found entity %s" % e.dxftype())
-    
+
     # empty list of lines
     myLines = []
 
+    '''NoteMsg("Analysing entities in dxf file")
+    for e in msp:
+        NoteMsg("found entity %s" % e.dxftype())'''
+    
+    # get all inserts and explode
+    inserts = msp.query("INSERT")
+    for insert in inserts:
+        insert.explode()
+
+    # get all polylines and explode
+    polylines = msp.query("POLYLINE")
+    for line in polylines:
+        points = line.points()
+        newLine = []
+        for point in points:
+            x,y,z = point
+            p = (x,y)
+            # append point to line
+            newLine.append(p)
+        # append line to list of lines
+        myLines.append(newLine)   
+        #line.to_spline()#explode()
+
+    # get all arcs and convert to spline
+    arcs = msp.query("ARC")
+    for arc in arcs:
+        arc.to_spline()
+
+    for e in msp:
+        NoteMsg("found entity %s" % e.dxftype())
+           
     # get all lines
     lines = msp.query("LINE")
     
@@ -648,9 +714,13 @@ def __convert_toPlanform(msp):
         x2, y2, z = line.dxf.end
         myLines.append(((x1, y1), (x2, y2)))   
         idx += 1
-    
+       
     # get all splines
     splines = msp.query("SPLINE")
+
+    # create new modelspace
+    doc = ezdxf.new('R2010')
+    msp_new = doc.modelspace()
 
     # evaluate all splines and convert into polylines
     idx = 0
@@ -658,21 +728,22 @@ def __convert_toPlanform(msp):
         NoteMsg("getting spline %d and converting to 2d polyline with %d segments" % (idx, num_segments))
         bspline = spline.construction_tool()
         xy_pts = [p.xy for p in bspline.approximate(segments=num_segments)]
-        msp.add_lwpolyline(xy_pts, format='xy')
+        msp_new.add_lwpolyline(xy_pts, format='xy')
         idx += 1
 
-    # get all polylines
-    polylines = msp.query("LWPOLYLINE")
+    # get all lw polylines 
+    lw_polylines = msp.query("LWPOLYLINE")
+    lw_polylines.extend(msp_new.query("LWPOLYLINE"))
     
-     # evaluate all polylines and append to myLines
+     # evaluate all lw polylines and append to myLines
     idx = 0
-    for line in polylines:
-        NoteMsg("getting polyline %d" % idx)
+    for line in lw_polylines:
+        NoteMsg("getting lw polyline %d" % idx)
         with line.points("xy") as points:
             # append points of polyline
             myLines.append(points)    
             idx += 1
-    
+   
     # create planform, use lines
     planformData = __create_planformShape(myLines)
     
@@ -718,8 +789,15 @@ def import_fromDXF(wingData, FileName):
     importer.finalize()
     
     # Convert data to planform and chord distribution
-    __convert_toPlanform(sdoc.modelspace())
-    NoteMsg("import_fromDXF: planform was succesfully imported from file %s" % FileName)
+    planformData = __convert_toPlanform(sdoc.modelspace())
+    
+    # check result
+    if planformData != None:
+        NoteMsg("import_fromDXF: planform was succesfully imported from file %s" % FileName)
+    else:
+        ErrorMsg("import_fromDXF: import from file %s failed" % FileName)
+
+    return planformData
 
     
     #tdoc.saveas('imported.dxf')
