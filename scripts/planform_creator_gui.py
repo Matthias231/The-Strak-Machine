@@ -2287,6 +2287,7 @@ class App(ctk.CTk):
         center(exportWindow)
 
     def import_planformDialog(self, dummy):
+        planformName = self.frame_bottom.planformNames[self.planformIdx]
         filetypes = (('.dxf files', '*.dxf'),
                      ('All files', '*.*'))
 
@@ -2297,16 +2298,37 @@ class App(ctk.CTk):
         if absFilename == '':
             return
 
-        # Compute the relative file path
-        relFilename = os.path.relpath(absFilename)
-
-        # import planform from .dxf
-        creatorInstances[self.planformIdx].import_planform(relFilename)
-
         # store latest path
         self.latestPath_dxf = os.path.dirname(absFilename)
-        self.notImplemented_Dialog() #FIXME implement
 
+        # Compute the relative file path
+        relFilename = os.path.relpath(absFilename)
+        fileName = os.path.basename(absFilename)
+        
+        # import planform from .dxf
+        result = creatorInstances[self.planformIdx].import_planform(relFilename)
+        
+        # check if everything was o.k.
+        if result == 0:
+            # perform_update
+            self.frame_bottom.set_updateNotification()
+            #self.frame_bottom.request_clearUnsavedChangesFlag(self.planformIdx)#FIXME
+
+            # create message text
+            msgText =  "Planform shape for planform\'%s\'\n" % planformName
+            msgText += " has been successfully imported from file\n\'%s\'\n" % fileName
+            messagebox.showinfo(title='Load', message=msgText)
+        else:
+            # create message text
+            msgText =  "Error, import planform shape for planform \'%s\'\n" % planformName
+            msgText += "from file \'%s\'\nfailed, errorcode %d\n" % (fileName, result)
+            messagebox.showerror(title='Load', message=msgText )
+
+
+        # perform_update
+            self.frame_bottom.set_updateNotification()
+            self.frame_bottom.request_clearUnsavedChangesFlag(self.planformIdx)    
+        
 
     def cancel_export_planforms(self):
         # cleaning up
