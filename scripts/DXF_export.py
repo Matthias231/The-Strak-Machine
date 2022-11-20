@@ -464,11 +464,11 @@ def __split_contour(contour):
         ErrorMsg("__split_contour: contour has no points")
         return (LE, TE)
     
-    # initialize max_x with root
+    # initialize max_x with root at TE
     max_x, y = contour[0]
     
-    # first point always LE
-    LE.append(contour[0])
+    # first point always TE
+    TE.append(contour[0])
     
     for idx in range(1, num):
         x, y = contour[idx]
@@ -477,13 +477,13 @@ def __split_contour(contour):
             # if we have not reached maximum, append to LE
             max_x = x
             maxIdx = idx
-            LE.append(contour[idx])
+            TE.append(contour[idx])
         else:
             # after we have reached maximum append to TE
-            TE.append(contour[idx])
+            LE.append(contour[idx])
     
-    # revert TE
-    TE = TE[::-1]
+    # revert LE
+    LE = LE[::-1]
 
     return LE, TE  
 
@@ -578,7 +578,7 @@ def __create_planformShape(lines):
 
     # normalize LE
     # first point, x-coordinate 0
-    LE_norm = [(0.0, 0.0)]
+    LE_norm = [(0.0, 1.0)]
     # further points
     for idx in range(1, len(LE)):
         LE_x, LE_y = __convert(LE[idx], x_offset, y_offset, scaleFactor_x, scaleFactor_y)
@@ -586,7 +586,7 @@ def __create_planformShape(lines):
 
     # normalize TE
     # first point, x-coordinate 0
-    TE_norm = [(0.0, 1.0)]
+    TE_norm = [(0.0, 0.0)]
     # further points
     for idx in range(1, len(TE)):
         TE_x, TE_y = __convert(TE[idx], x_offset, y_offset, scaleFactor_x, scaleFactor_y)
@@ -619,7 +619,8 @@ def __create_planformShape(lines):
         if HL_norm != None:
             HL_y = __get_yFromX(HL_norm, x)
         else:
-            HL_y = 0.0
+            # no flap, set hingeline to TE
+            HL_y = TE_y
         
         if (LE_y == None) or (TE_y == None):
             ErrorMsg("y-coordinate not found, planform could not be created")
@@ -628,7 +629,7 @@ def __create_planformShape(lines):
         # setup normalized chord distribution
         norm_grid = normalizedGrid()
         norm_grid.y = x
-        norm_grid.chord = TE_y-LE_y
+        norm_grid.chord = LE_y-TE_y
         norm_grid.referenceChord = np.sqrt(1.0-(x*x))
         chordDistribution.append(norm_grid)
 
@@ -637,15 +638,12 @@ def __create_planformShape(lines):
         grid.y = x
         grid.leadingEdge = LE_y
         grid.trailingEdge = TE_y
-        grid.chord = grid.trailingEdge - grid.leadingEdge
-        grid.centerLine = grid.leadingEdge + (grid.chord/2)
-        grid.quarterChordLine = grid.leadingEdge + (grid.trailingEdge-grid.leadingEdge)/4
+        grid.chord = grid.leadingEdge - grid.trailingEdge 
+        grid.centerLine = grid.leadingEdge - (grid.chord/2)
+        grid.quarterChordLine = grid.leadingEdge - (grid.chord/4)
         grid.hingeLine = HL_y
-     
-        if (HL_y > 0.0):
-            grid.flapDepth = ((TE_y - HL_y) / grid.chord) * 100.0
-        else:
-            grid.flapDepth = 0.0
+        grid.flapDepth = (HL_y / grid.chord) * 100.0
+        
         planformShape.append(grid)
         
         # increment y coordinate

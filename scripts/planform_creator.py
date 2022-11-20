@@ -292,6 +292,9 @@ class params:
         # dependend parameters int
         self.rootReynolds = 0
 
+        # dependend parameters bool
+        self.useDXF = False
+
     ################################################################################
     # function that gets a single boolean parameter from dictionary and returns a
     #  default value in case of error
@@ -464,6 +467,7 @@ class params:
 
         try:
             self.DXF_filename = dictData["DXF_filename"]
+            self.useDXF = True
         except:
              NoteMsg("No .dxf file specified")
              self.DXF_filename = None
@@ -986,20 +990,37 @@ class planform:
     def __denormalize(self, rootchord, halfwingspan):
          for element in self.grid:
             element.y *= halfwingspan
+            element.chord *= rootchord
             element.leadingEdge *= rootchord
             element.quarterChordLine *= rootchord
             element.centerLine *= rootchord
             element.hingeLine *= rootchord
             element.trailingEdge *= rootchord
+            # flapDepth is already o.k.
 
-    def set_fromDXF(self, planformShape, rootchord, halfwingspan, fuselageWidth, dihedral):
-        self.grid = planformShape #FIXME Denormalize grid points (rootchord, halfwingspan)
-        self.num_gridPoints = len(self.grid)
-        self.__denormalize(rootchord, halfwingspan)
+    def __get_hingelineFromFlapDepth(self, grid, flapDepth):
+        trailingEdge = grid.trailingEdge
+        chord = grid.chord 
+        hingeline = trailingEdge + ((flapDepth / 100.0) * chord)
+        return hingeline 
 
-        # calculate hingeline and hingeline angle
-        self.hingeInnerPoint = self.grid[0].hingeLine
-        self.hingeOuterPoint = self.grid[-1].hingeLine
+    def __apply_hingeline(self, flapDepthRoot, flapDepthTip):
+        self.hingeInnerPoint = self.__get_hingelineFromFlapDepth(self.grid[0], flapDepthRoot)
+        self.hingeOuterPoint = self.__get_hingelineFromFlapDepth(self.grid[-1], flapDepthTip)
+
+        # setup parameters for interpolation
+        x1 = self.grid[0].y
+        x2 = self.grid[-1].y
+        y1 = self.hingeInnerPoint
+        y2 = self.hingeOuterPoint 
+
+        # calculate hingeline along the half wing
+        for grid in self.grid:
+            grid.hingeLine = interpolate(x1, x2, y1, y2, grid.y)
+            grid.flapDepth = ((grid.hingeLine - grid.trailingEdge) / grid.chord) * 100.0
+            
+    
+    def __calculate_hingelineAngle(self):
         '''# hinge line angle: convert radian measure --> degree
         hingeLineAngle_radian = (params.hingeLineAngle/180) * pi
 
@@ -1007,20 +1028,40 @@ class planform:
         AK = params.halfwingspan
         GK = tan(hingeLineAngle_radian)*AK
         self.hingeOuterPoint = self.hingeInnerPoint + GK'''
+        return 0.0 #FIXMe implement
+    
+    def set_fromDXF(self, planformShape, params, dxf_params):
+        (dxf_rootchord, dxf_halfwingspan, dxf_hingelineAngle, dxf_flapDepthRoot, dxf_flapDepthTip) = dxf_params
+        self.grid = planformShape #FIXME Denormalize grid points (rootchord, halfwingspan)
+        self.num_gridPoints = len(self.grid)
+        self.__denormalize(params.rootchord, params.halfwingspan)
+       
+        # check points of hingeline
+        if ((self.grid[0].hingeLine == self.grid[0].trailingEdge) and 
+            (self.grid[-1].hingeLine == self.grid[-1].trailingEdge)):
+            # no hingeline, apply from params
+            self.__apply_hingeline(params.flapDepthRoot, params.flapDepthTip)
+        else:
+            # apply points of hingeline from grid
+            self.hingeInnerPoint = self.grid[0].hingeLine
+            self.hingeOuterPoint = self.grid[-1].hingeLine
 
-        self.hingeLineAngle = 0.0 #FIXME calculate hingeline angle
-        self.dihedral = dihedral
+        # calulate the hingeline angle
+        self.hingeLineAngle = self.__calculate_hingelineAngle()
+        
+        # set dihedral
+        self.dihedral = params.dihedral
           
         # calculate wing area and geometrical center
         self.__calculate_wingArea()
 
         # calculate aspect ratio of the wing
         # use "halfwingspan", as the fuselage-width has already been substracted
-        self.aspectRatio = ((halfwingspan*2)**2) / self.wingArea
+        self.aspectRatio = ((params.halfwingspan*2)**2) / self.wingArea
         
         # add offset of half of the fuselage-width to the y-coordinates
         for element in self.grid:
-            element.y = element.y + fuselageWidth/2
+            element.y = element.y + params.fuselageWidth/2
 
         self.fromDXF = True
     
@@ -1029,11 +1070,12 @@ class planform:
         
         # correct grid
         for element in self.grid:
-            element.leadingEdge = (element.leadingEdge - rootchord) * -1.0
-            element.quarterChordLine = (element.quarterChordLine - rootchord) * -1.0
-            element.centerLine = (element.centerLine - rootchord) * -1.0
-            element.hingeLine = (element.hingeLine - rootchord) * -1.0
-            element.trailingEdge = (element.trailingEdge - rootchord) * -1.0
+            element.leadingEdge =  rootchord - element.leadingEdge 
+            element.quarterChordLine =  rootchord - element.quarterChordLine
+            element.centerLine =  rootchord - element.centerLine
+            element.hingeLine =  rootchord - element.hingeLine
+            element.trailingEdge =  rootchord - element.trailingEdge 
+            # chord is already o.k.
         
         # correct hingeline / -angle
         self.hingeInnerPoint = self.grid[0].hingeLine
@@ -1042,7 +1084,7 @@ class planform:
         
         # correct y-coordinate of geometrical center
         x, y = self.geometricalCenter
-        y = (y - rootchord) * -1.0
+        y = rootchord - y
         self.geometricalCenter = (x, y)
         
     def find_grid(self, chord):
@@ -1292,6 +1334,10 @@ class wing:
 
         # export initial params to dictionary
         params.write_toDict(self.paramsDict)
+        
+        # check if planform shape shall be imported from dxf
+        if params.DXF_filename != None:
+            self.import_dxf(params.DXF_filename)
 
         # now apply params which will modify the content of params
         self.apply_params()
@@ -1802,7 +1848,13 @@ class wing:
             return self.dxf_planform.grid
         else:
             return self.planform.grid
-    
+
+    def __get_geometrical_center(self):
+        if (self.useDXF == True):
+            return self.dxf_planform.geometricalCenter
+        else:
+            return self.planform.geometricalCenter
+        
     def plot_PlanformShape(self, ax):
         params = self.params
 
@@ -1843,7 +1895,7 @@ class wing:
           solid_capstyle="round", label = labelHingeLine)
 
         # plot geometrical center
-        (center_x, center_y) = self.planform.geometricalCenter
+        (center_x, center_y) = self.__get_geometrical_center()
         (y_min,y_max) = ax.get_ylim()
         radius = (y_max-y_min)/10
         bullseye((center_x, center_y), radius, cl_geoCenter, ax)
@@ -2252,7 +2304,7 @@ class wing:
             xValuesRight.append(xVal)
 
         # adapt coordinates of geometrical center
-        (center_x, center_y) = self.planform.geometricalCenter
+        (center_x, center_y) = self.__get_geometrical_center()
         center_x *= proj_fact
         center_right_x = center_x +xOffset
         center_left_x = (self.params.wingspan/2)*proj_fact - center_x
@@ -3051,7 +3103,7 @@ class planform_creator:
 
         return (result, exportedFiles)
 
-    def __import_planform(self, filepath):
+    def import_dxf(self, filepath):
         params = self.newWing.params
         planformData = import_fromDXF(self.newWing, filepath)
         
@@ -3064,7 +3116,8 @@ class planform_creator:
 
             # create instance of planform
             dxf_planform = planform()
-            dxf_planform.set_fromDXF(planformShape, params.rootchord, params.halfwingspan, params.fuselageWidth, params.dihedral)
+            dxf_params = (rootchord, halfwingspan, hingelineAngle, flapDepthRoot, flapDepthTip)
+            dxf_planform.set_fromDXF(planformShape, params, dxf_params)
             dxf_planform.flip_horizontal()
             
             # assign to new wing
@@ -3170,7 +3223,7 @@ class planform_creator:
 
     def import_planform(self, filePath):
         '''imports planform from given filepath (.dxf file)'''
-        return self.__import_planform(filePath)
+        return self.import_dxf(filePath)
 
     def get_params(self):
         '''gets parameters as a dictionary'''
