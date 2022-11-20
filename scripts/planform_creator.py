@@ -1041,14 +1041,15 @@ class planform:
             (self.grid[-1].hingeLine == self.grid[-1].trailingEdge)):
             # no hingeline, apply from params
             self.__apply_hingeline(params.flapDepthRoot, params.flapDepthTip)
+            
+            # calulate the hingeline angle
+            self.hingeLineAngle = self.__calculate_hingelineAngle()
         else:
             # apply points of hingeline from grid
             self.hingeInnerPoint = self.grid[0].hingeLine
             self.hingeOuterPoint = self.grid[-1].hingeLine
-
-        # calulate the hingeline angle
-        self.hingeLineAngle = self.__calculate_hingelineAngle()
-        
+            self.hingeLineAngle = dxf_hingelineAngle
+                
         # set dihedral
         self.dihedral = params.dihedral
           
@@ -1363,7 +1364,10 @@ class wing:
 
     # find planform-values for a given chord-length
     def find_PlanformData(self, chord):
-        return self.planform.find_grid(chord)
+        if self.useDXF:
+            return self.dxf_planform.find_grid(chord)
+        else:
+            return self.planform.find_grid(chord)
 
     # copy planform-values to section
     def copy_PlanformDataToSection(self, grid, section):
@@ -1461,7 +1465,10 @@ class wing:
 
     # get Re from position, according to the planform-data
     def get_ReFromPosition(self, normalized_position):
-        normalized_chord = self.chordDistribution.get_chordFromPosition(normalized_position)
+        if self.useDXF:
+            normalized_chord = self.dxf_chordDistribution.get_chordFromPosition(normalized_position)
+        else:
+            normalized_chord = self.chordDistribution.get_chordFromPosition(normalized_position)
         if (normalized_chord != None):
             Re = self.params.airfoilReynolds[0] * normalized_chord
             return Re
@@ -1483,7 +1490,10 @@ class wing:
         # valid position specified ?
         elif (normalized_position != None):
             # get normalized chord from chord distribution
-            normalizedChord = self.chordDistribution.get_chordFromPosition(normalized_position)
+            if self.useDXF:
+                normalizedChord = self.dxf_chordDistribution.get_chordFromPosition(normalized_position)
+            else:    
+                normalizedChord = self.chordDistribution.get_chordFromPosition(normalized_position)
             chord = normalizedChord * params.rootchord
             return (normalizedChord, chord)
 
@@ -1514,7 +1524,11 @@ class wing:
             if params.airfoilPositions_normalized[idx] == None:
                 # no position defined yet, calculate now
                 normalized_chord = self.normalized_chords[idx]
-                normalized_position = self.chordDistribution.get_positionFromChord(normalized_chord)
+                if self.useDXF:
+                    normalized_position = self.dxf_chordDistribution.get_positionFromChord(normalized_chord)
+                else:
+                    normalized_position = self.chordDistribution.get_positionFromChord(normalized_chord)
+              
                 params.airfoilPositions_normalized[idx] = normalized_position
                 params.airfoilPositions[idx] = self.params.denormalize_positionValue(normalized_position)
 
@@ -1654,7 +1668,10 @@ class wing:
     # add an own section for the fuselage and use rootchord
     def add_fuselageSection(self):
         # get the root grid-values
-        grid = deepcopy(self.planform.grid[0])
+        if self.useDXF:
+            grid = deepcopy(self.dxf_planform.grid[0])
+        else:
+            grid = deepcopy(self.planform.grid[0])
 
         # set offset to zero so the section will start exactly in the center
         grid.y = 0
@@ -1741,7 +1758,10 @@ class wing:
                 position_normalized = params.airfoilPositions_normalized[idx] + float((n+1)*posDelta_normalized)
                 new_positions.append(position)
                 new_positions_normalized.append(position_normalized)
-                normalized_chord = float(self.chordDistribution.get_chordFromPosition(position_normalized))
+                if self.useDXF:
+                    normalized_chord = float(self.dxf_chordDistribution.get_chordFromPosition(position_normalized))
+                else:
+                    normalized_chord = float(self.chordDistribution.get_chordFromPosition(position_normalized))
                 chord = float(normalized_chord * params.rootchord)
                 new_chords.append(chord)
                 new_airfoilNames.append(params.airfoilNames[idx])
@@ -3033,6 +3053,7 @@ class planform_creator:
         global XFLR5_template
         global FLZ_template
         exportedFiles = []
+        params = self.newWing.params
 
         # interpolation of sections, make copy first
         interpolatedWing = deepcopy(self.newWing)
@@ -3091,9 +3112,13 @@ class planform_creator:
             exportedFiles.append(FLZ_FileName)
 
         try:
-            # for dxf export we want to have trailing edge at coordinate 0, 0
-            interpolatedWing.planform.flip_horizontal()
-            result = export_toDXF(interpolatedWing, DXF_FileName, num_points)
+            if (interpolatedWing.useDXF == True):
+                planform = interpolatedWing.dxf_planform
+            else:
+                planform = interpolatedWing.planform
+            # change orientation of LE, TE for export--> TE @ coordinate 0, 0    
+            planform.flip_horizontal()
+            result = export_toDXF(params, planform, DXF_FileName, num_points)
         except:
             ErrorMsg("export_toDXF failed")
             return (-4, exportedFiles)

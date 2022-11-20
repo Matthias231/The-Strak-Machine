@@ -106,20 +106,20 @@ def line_angle(p1, p2):
     AK = (x2-x1)
     return degrees(atan2(GK, AK))
     
-def norm_xy(xy, wingData):
-    offset_x = wingData.params.fuselageWidth/2
-    scaleFactor_x = wingData.params.halfwingspan
-    scaleFactor_y = wingData.params.rootchord
+def norm_xy(xy, params):
+    offset_x = params.fuselageWidth/2
+    scaleFactor_x = params.halfwingspan
+    scaleFactor_y = params.rootchord
 
     (x, y) = xy
     x_norm = (x-offset_x) / scaleFactor_x
     y_norm = y / scaleFactor_y
     return (x_norm, y_norm)
 
-def denorm_xy(xy_norm, wingData):
+def denorm_xy(xy_norm, params):
     global scaleFactor
-    scaleFactor_x = wingData.params.halfwingspan
-    scaleFactor_y = wingData.params.rootchord
+    scaleFactor_x = params.halfwingspan
+    scaleFactor_y = params.rootchord
     
     (x_norm, y_norm) = xy_norm
     x = x_norm * scaleFactor_x * scaleFactor
@@ -159,15 +159,14 @@ def __get_yFromX(points, x):
 # main function, export
 #
 ################################################################################
-def export_toDXF(wingData, FileName, num_points):
-    params = wingData.params
+def export_toDXF(params, planform, FileName, num_points):
 
     # create new dxf
     doc = ezdxf.new('R2010')
     msp = doc.modelspace()
     
     # get grid from wingData
-    grid = wingData.planform.grid
+    grid = planform.grid
     
     # setup root line (trailing edge --> leading edge)
     rootline = []
@@ -181,13 +180,13 @@ def export_toDXF(wingData, FileName, num_points):
     LE_norm = []
     # add points of leading edge from root --> tip
     for idx in range(num):
-        x, y = norm_xy((grid[idx].y, grid[idx].leadingEdge), wingData)
+        x, y = norm_xy((grid[idx].y, grid[idx].leadingEdge), params)
         LE_norm.append((x, y))
     
     TE_norm = []
     # add points of trailing edge from root --> tip
     for idx in range(num):
-        x, y = norm_xy((grid[idx].y, grid[idx].trailingEdge), wingData)
+        x, y = norm_xy((grid[idx].y, grid[idx].trailingEdge), params)
         TE_norm.append((x, y))
 
     # calculate length of LE and TE (normalized)
@@ -206,12 +205,12 @@ def export_toDXF(wingData, FileName, num_points):
         # get x from length table
         x = __get_yFromX(LE_length_table, length)
         y = __get_yFromX(LE_norm, x)
-        xy = denorm_xy((x,y), wingData)
+        xy = denorm_xy((x,y), params)
         LE.append(xy)
         length += LE_delta_length
 
     # append last point of LE
-    xy = denorm_xy(LE_norm[-1], wingData)
+    xy = denorm_xy(LE_norm[-1], params)
     LE.append(xy)   
 
     # setup points of TE
@@ -220,20 +219,20 @@ def export_toDXF(wingData, FileName, num_points):
     while length < TE_length:
         x = __get_yFromX(TE_length_table, length)
         y = __get_yFromX(TE_norm, x)
-        xy = denorm_xy((x,y), wingData)
+        xy = denorm_xy((x,y), params)
         TE.append(xy)
         length += TE_delta_length
       
     # append last point of TE
-    xy = denorm_xy(TE_norm[-1], wingData)
+    xy = denorm_xy(TE_norm[-1], params)
     TE.append(xy)
 
     # add hingeline #FIXME if we have more points than just start and end we must change algorithm here
     hingeline = []
-    xy = norm_xy((grid[0].y, grid[0].hingeLine), wingData)
-    hingeline.append(denorm_xy(xy, wingData))
-    xy = norm_xy((grid[-1].y, grid[-1].hingeLine), wingData)
-    hingeline.append(denorm_xy(xy, wingData))
+    xy = norm_xy((grid[0].y, grid[0].hingeLine), params)
+    hingeline.append(denorm_xy(xy, params))
+    xy = norm_xy((grid[-1].y, grid[-1].hingeLine), params)
+    hingeline.append(denorm_xy(xy, params))
 
     airfoilLines = []
     # FIXME determine lines for airfoil positions
