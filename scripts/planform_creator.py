@@ -1017,7 +1017,7 @@ class planform:
         # calculate hingeline along the half wing
         for grid in self.grid:
             grid.hingeLine = interpolate(x1, x2, y1, y2, grid.y)
-            grid.flapDepth = ((grid.hingeLine - grid.trailingEdge) / grid.chord) * 100.0
+            grid.flapDepth = grid.hingeLine - grid.trailingEdge
             
     
     def __calculate_hingelineAngle(self):
@@ -1090,7 +1090,13 @@ class planform:
         
     def find_grid(self, chord):
         return self.__get_gridDataFromChord(chord)
-
+    
+    def get_grid(self):
+        return self.grid
+    
+    def get_geometrical_center(self):
+        return self.geometricalCenter
+      
 ################################################################################
 #
 # Wing class
@@ -1364,10 +1370,8 @@ class wing:
 
     # find planform-values for a given chord-length
     def find_PlanformData(self, chord):
-        if self.useDXF:
-            return self.dxf_planform.find_grid(chord)
-        else:
-            return self.planform.find_grid(chord)
+        planform = self.__get_planform()
+        return planform.find_grid(chord)
 
     # copy planform-values to section
     def copy_PlanformDataToSection(self, grid, section):
@@ -1465,10 +1469,9 @@ class wing:
 
     # get Re from position, according to the planform-data
     def get_ReFromPosition(self, normalized_position):
-        if self.useDXF:
-            normalized_chord = self.dxf_chordDistribution.get_chordFromPosition(normalized_position)
-        else:
-            normalized_chord = self.chordDistribution.get_chordFromPosition(normalized_position)
+        chordDistribution = self.__get_chordDistribution()
+        normalized_chord = chordDistribution.get_chordFromPosition(normalized_position)
+        
         if (normalized_chord != None):
             Re = self.params.airfoilReynolds[0] * normalized_chord
             return Re
@@ -1490,10 +1493,8 @@ class wing:
         # valid position specified ?
         elif (normalized_position != None):
             # get normalized chord from chord distribution
-            if self.useDXF:
-                normalizedChord = self.dxf_chordDistribution.get_chordFromPosition(normalized_position)
-            else:    
-                normalizedChord = self.chordDistribution.get_chordFromPosition(normalized_position)
+            chordDistribution = self.__get_chordDistribution()  
+            normalizedChord = chordDistribution.get_chordFromPosition(normalized_position)
             chord = normalizedChord * params.rootchord
             return (normalizedChord, chord)
 
@@ -1501,7 +1502,18 @@ class wing:
         ErrorMsg("position or reynolds not found inside planform")
         NoteMsg("position was: %f, reynolds was %d" % (normalized_position, reynolds))
         return (None, None)
+    
+    def __get_planform(self):
+        if self.useDXF:
+            return self.dxf_planform
+        else:
+            return self.planform
 
+    def __get_chordDistribution(self):
+        if self.useDXF:
+            return self.dxf_chordDistribution
+        else:
+            return self.chordDistribution
 
     # calculate all chordlenghts from the list of airfoil positions
     # and the given planform-data
@@ -1524,11 +1536,8 @@ class wing:
             if params.airfoilPositions_normalized[idx] == None:
                 # no position defined yet, calculate now
                 normalized_chord = self.normalized_chords[idx]
-                if self.useDXF:
-                    normalized_position = self.dxf_chordDistribution.get_positionFromChord(normalized_chord)
-                else:
-                    normalized_position = self.chordDistribution.get_positionFromChord(normalized_chord)
-              
+                chordDistribution = self.__get_chordDistribution()
+                normalized_position = chordDistribution.get_positionFromChord(normalized_chord)
                 params.airfoilPositions_normalized[idx] = normalized_position
                 params.airfoilPositions[idx] = self.params.denormalize_positionValue(normalized_position)
 
@@ -1667,12 +1676,10 @@ class wing:
 
     # add an own section for the fuselage and use rootchord
     def add_fuselageSection(self):
+        planform = self.__get_planform()
         # get the root grid-values
-        if self.useDXF:
-            grid = deepcopy(self.dxf_planform.grid[0])
-        else:
-            grid = deepcopy(self.planform.grid[0])
-
+        grid = deepcopy(planform.grid[0])
+    
         # set offset to zero so the section will start exactly in the center
         grid.y = 0
 
@@ -1758,10 +1765,8 @@ class wing:
                 position_normalized = params.airfoilPositions_normalized[idx] + float((n+1)*posDelta_normalized)
                 new_positions.append(position)
                 new_positions_normalized.append(position_normalized)
-                if self.useDXF:
-                    normalized_chord = float(self.dxf_chordDistribution.get_chordFromPosition(position_normalized))
-                else:
-                    normalized_chord = float(self.chordDistribution.get_chordFromPosition(position_normalized))
+                chordDistribution = self.__get_chordDistribution()
+                normalized_chord = float(chordDistribution.get_chordFromPosition(position_normalized))
                 chord = float(normalized_chord * params.rootchord)
                 new_chords.append(chord)
                 new_airfoilNames.append(params.airfoilNames[idx])
@@ -1864,17 +1869,9 @@ class wing:
          textcoords='offset points', color = cl_legend,fontsize=fs_legend)
     
     def __get_planformGrid(self):
-        if (self.useDXF == True):
-            return self.dxf_planform.grid
-        else:
-            return self.planform.grid
-
-    def __get_geometrical_center(self):
-        if (self.useDXF == True):
-            return self.dxf_planform.geometricalCenter
-        else:
-            return self.planform.geometricalCenter
-        
+        planform = self.__get_planform()
+        return planform.grid
+            
     def plot_PlanformShape(self, ax):
         params = self.params
 
@@ -1884,8 +1881,10 @@ class wing:
         trailingeEge = []
         hingeLine = []
         quarterChordLine = []
+        
+        planform = self.__get_planform()
+        grid = planform.get_grid()
 
-        grid = self.__get_planformGrid()
         for element in grid:
             # build up list of x-values
             xValues.append(element.y)
@@ -1915,7 +1914,7 @@ class wing:
           solid_capstyle="round", label = labelHingeLine)
 
         # plot geometrical center
-        (center_x, center_y) = self.__get_geometrical_center()
+        (center_x, center_y) = planform.get_geometrical_center()
         (y_min,y_max) = ax.get_ylim()
         radius = (y_max-y_min)/10
         bullseye((center_x, center_y), radius, cl_geoCenter, ax)
@@ -2051,7 +2050,9 @@ class wing:
         flapDepth = []
 
         # build up list of x- and y-values
-        grid = self.__get_planformGrid()
+        planform = self.__get_planform()
+        grid = planform.get_grid()
+
         for idx in range(len(grid)):
             x = grid[idx].y# *1000.0 # m --> mm FIXME
             depth = (grid[idx].flapDepth / grid[idx].chord) * 100
@@ -2297,10 +2298,11 @@ class wing:
 
         # Caution, fuselageWidth does not change due to projection
         proj_wingspan = (2*proj_halfwingSpan) + params.fuselageWidth
-
+        
         # build up list of x-values,
         # first left half-wing
-        grid = self.__get_planformGrid()
+        planform = self.__get_planform()
+        grid = planform.get_grid()
         for element in grid:
             proj_y = (element.y- (params.fuselageWidth/2)) * proj_fact
             xVal = proj_y#-(self.fuselageWidth/2)
@@ -2324,7 +2326,7 @@ class wing:
             xValuesRight.append(xVal)
 
         # adapt coordinates of geometrical center
-        (center_x, center_y) = self.__get_geometrical_center()
+        (center_x, center_y) = planform.get_geometrical_center()
         center_x *= proj_fact
         center_right_x = center_x +xOffset
         center_left_x = (self.params.wingspan/2)*proj_fact - center_x
@@ -2436,11 +2438,9 @@ class wing:
         # label with additional information concerning planform
         self.__plot_planformDataLabel(ax, 0)
     
-    def plot_chordDistribution(self, ax):        
-        if (self.useDXF == True):
-            self.dxf_chordDistribution.plot(ax)
-        else:
-            self.chordDistribution.plot(ax)
+    def plot_chordDistribution(self, ax):
+        chordDistribution = self.__get_chordDistribution()
+        chordDistribution.plot(ax)
     
     def draw_diagram(self, diagramType, ax, x_limits, y_limits):
         if diagramType == diagTypes[0]:
