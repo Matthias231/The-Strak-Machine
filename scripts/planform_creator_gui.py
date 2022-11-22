@@ -56,6 +56,9 @@ dxf_num_points_default = 100    # default number of points for dxf planform expo
 # path to airfoils library
 airfoilLibrary_path = 'airfoil_library'
 
+# path to planforms library
+planformLibrary_path = 'planform_library'
+
 # names of the planformfiles
 planformFiles = ["planformdata_wing.txt", "planformdata_tail.txt"]
 #planformFiles = ["planformdataNew_tail.txt"]
@@ -149,6 +152,7 @@ class control_frame():
         self.basicParamsTextVars = []
         self.airfoilParamsTextVars = []
         self.latestPath = []
+        self.latestPath_dxf = []
         self.performEntryUpdate = False
 
         # determine screen size
@@ -204,6 +208,7 @@ class control_frame():
 
             # append latest path
             self.latestPath.append(os.getcwd() + bs + airfoilLibrary_path)
+            self.latestPath_dxf.append(os.getcwd() + bs + planformLibrary_path)
 
         # add different widgets to upper frame (not scrollable)
         (labels, buttons) = labelsAndButtons
@@ -213,6 +218,9 @@ class control_frame():
 
         # right frame (scrollable)
         nextRow = self.__add_planformChoiceMenu(self.frame_right, 0, 0)
+
+        # widgets for choosing optonal dxf file for importing planform shape
+        nextRow = self.__add_dxfChoiceWidgets(self.frame_right, 0, nextRow)
 
         # add entries
         nextRow = self.__add_basicParams(self.frame_right, 0, nextRow)
@@ -296,9 +304,10 @@ class control_frame():
                 row.append(None)
         return row
 
-    def __get_bg_color(self, theme):
+    def __get_bg_color(self):
         '''get background color according to \'theme\''''
-        if (theme == 'Dark'):
+        mode = ctk.get_appearance_mode()
+        if (mode == 'Dark'):
             return bg_color_dark
         else:
             return bg_color_light
@@ -840,6 +849,15 @@ class control_frame():
             datFileNames.append(name)
 
         return datFileNames
+    
+    def __getDxfFileName(self, params):
+        name = params["DXF_filename"]
+        
+        if (name != None):
+            name = os.path.basename(name)
+            return name
+        else:
+            return None
 
     def __set_paramValue(self, params, tableEntry, value:str):
         # get additional information from param tableEntry
@@ -999,6 +1017,9 @@ class control_frame():
 
             # update entries for basic parameters
             self.__update_Entries(table, textVars, planformIdx)
+            
+            # update name of dxf file, if any
+            self.__update_dxf_FileName(planformIdx)
 
             # update entries for airfoil parameters, also option menues etc.
             self.__update_airfoilEntries(planformIdx)
@@ -1190,6 +1211,17 @@ class control_frame():
                                   ,column, row)
         return (row + 1)
 
+    def __add_dxfChoiceWidgets(self, frame, column, row):
+        self.label_dxf_planform = self.__create_label(frame, "Optional: planform from .dxf file", fs_label)
+        self.label_dxf_File = self.__create_label(frame, '', fs_entry)
+
+        button = {"txt": "Choose file", "cmd" : self.__choose_dxf_File, "param" : None}
+        self.button_dxf_File = self.__create_button(frame,button)
+
+        self.__place_widgetsInRow([self.label_dxf_planform, self.label_dxf_File, self.button_dxf_File]
+                                  ,column, row)
+        return (row + 1)
+
     def __add_strakMachineWidgets(self, frame, column, row):
         self.label_createOptAirfoils = self.__create_label(frame, "Start \'The Strak Machine\'", fs_label)
         button = {"txt": "\'Engage\'", "cmd" : self.__start_strakMachine, "param" : None}
@@ -1212,11 +1244,10 @@ class control_frame():
             new_mode = 'Light'
 
         ctk.set_appearance_mode(new_mode)
-        self.master.appearance_mode = new_mode
 
         # change the color of the scrollable frame manually,as this is not a
         # ctk frame
-        bg_color = self.__get_bg_color(new_mode)
+        bg_color = self.__get_bg_color()
         self.frame_right.configure(bg = bg_color)
         self.canvas.configure(bg = bg_color)
 
@@ -1307,6 +1338,36 @@ class control_frame():
 
         # request update (will be done in the mainloop)
         self.set_updateNotification()
+    
+    def __choose_dxf_File(self, dummy):
+        planformIdx = self.master.planformIdx
+        params = self.params[planformIdx]
+
+        # clear old filename
+        self.DXF_filename = params["DXF_filename"] = None
+
+        filetypes = (('.dxf files', '*.dxf'),
+                     ('All files', '*.*'))
+
+        absFilename = tk.filedialog.askopenfilename(
+                    title='Open a file',
+                    initialdir=self.latestPath_dxf[planformIdx],
+                    filetypes=filetypes)
+        if absFilename == '':
+            return
+
+        # Compute the relative file path
+        relFilename = os.path.relpath(absFilename)
+
+        # update name of .dat file in params (None is allowed value)
+        params["DXF_filename"] = relFilename
+        self.__update_dxf_FileName(planformIdx)
+
+        # store latest path
+        self.latestPath_dxf[planformIdx] = os.path.dirname(absFilename)
+
+        # request update (will be done in the mainloop)
+        self.set_updateNotification()
 
 
     def __update_datFileName(self, params, planformIdx):
@@ -1340,9 +1401,29 @@ class control_frame():
             self.label_datFile.configure(text='')
 
             # hide the label by configuring it to background color
-            bg_color = self.__get_bg_color(self.master.appearance_mode)
-            self.label_datFile.configure(bg_color=bg_color_dark)
+            bg_color = self.__get_bg_color()
+            self.label_datFile.configure(bg_color=bg_color)
 
+    def __update_dxf_FileName(self, planformIdx):
+        params = self.params[planformIdx]
+  
+        # activate file selection button
+        self.button_datFile.configure(state = "normal")
+
+        # name of the .dxf file shall be shown
+        filename = self.__getDxfFileName(params)
+
+        # check valid filename
+        if (filename == None) or (filename == 'None') or (filename == ''):
+            # no valid filename, this is o.k.
+            self.label_dxf_File.configure(text='None')
+            bg_color = self.__get_bg_color()
+            self.label_dxf_File.configure(bg_color=bg_color)
+        else:
+            # valid filename, everything o.k.
+            self.label_dxf_File.configure(text=filename)
+            self.label_dxf_File.configure(bg_color='dim gray')
+     
     def __start_strakMachine(self, dummy):
         planformIdx = self.master.planformIdx
         creatorInst = self.creatorInstances[planformIdx]
@@ -2146,7 +2227,7 @@ class App(ctk.CTk):
         buttonsColumn = [{"txt": "Add planform",     "cmd" : self.add_planform,     "param" : None},
                          {"txt": "Remove planform",  "cmd" : self.remove_planform,  "param" : None},
                          {"txt": "Export planforms", "cmd" : self.export_planformsDialog, "param" : None},
-                         {"txt": "Import planform",  "cmd" : self.import_planformDialog, "param" : None}
+                         #{"txt": "Import planform",  "cmd" : self.import_planformDialog, "param" : None}#FIXME function for Jochen
                         ]
         buttons.append(buttonsColumn)
 

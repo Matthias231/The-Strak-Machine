@@ -756,7 +756,7 @@ def __convert_toPlanform(msp):
 #
 ################################################################################
 
-def import_fromDXF(wingData, FileName):
+def import_fromDXF(FileName):
     try:
         sdoc = ezdxf.readfile(FileName)
     except:

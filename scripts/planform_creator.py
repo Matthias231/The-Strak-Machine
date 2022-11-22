@@ -526,6 +526,7 @@ class params:
         dictData["airfoilBasicName"] = self.airfoilBasicName
         dictData["polar_Reynolds"] = self.polarReynolds[:]
         dictData["polar_Ncrit"] = self.NCrit
+        dictData["DXF_filename"] = self.DXF_filename
 
         # set additional boolean data
         dictData["smoothUserAirfoils"] = self.smoothUserAirfoils
@@ -842,11 +843,15 @@ class planform:
             # the total wing area / flap area
             self.wingArea += area
             self.flapArea += flapArea
-
-        # Calculate geometrical center of the halfwing
-        center_x /= self.wingArea
-        center_y /= self.wingArea
-        self.geometricalCenter = (center_x, center_y)
+        
+        if (self.wingArea > 0):
+            # Calculate geometrical center of the halfwing
+            center_x /= self.wingArea
+            center_y /= self.wingArea
+            self.geometricalCenter = (center_x, center_y)
+        else:
+            ErrorMsg("geometricalCenter: wingArea is zero")
+            self.geometricalCenter = (0.0, 0.0)
 
         # calculate area/ flap area of the whole wing
         self.wingArea *= 2.0
@@ -1055,18 +1060,22 @@ class planform:
           
         # calculate wing area and geometrical center
         self.__calculate_wingArea()
-
-        # calculate aspect ratio of the wing
-        # use "halfwingspan", as the fuselage-width has already been substracted
-        self.aspectRatio = ((params.halfwingspan*2)**2) / self.wingArea
         
+        if (self.wingArea > 0):
+            # calculate aspect ratio of the wing
+            # use "halfwingspan", as the fuselage-width has already been substracted
+            self.aspectRatio = ((params.halfwingspan*2)**2) / self.wingArea
+        else:
+            ErrorMsg("aspectRatio: wingArea is zero")
+            self.aspectRatio = 0.0
+
         # add offset of half of the fuselage-width to the y-coordinates
         for element in self.grid:
             element.y = element.y + params.fuselageWidth/2
 
         self.fromDXF = True
     
-    def flip_horizontal(self):
+    def flip_LE_TE(self):
         rootchord = self.grid[0].chord
         
         # correct grid
@@ -1276,6 +1285,31 @@ class wing:
                 num = num + 1
 
         return num
+    
+    def import_dxf(self, filepath):
+        params = self.params
+        planformData = import_fromDXF(filepath)
+        
+        if (planformData != None):
+            (planformShape, chordDist, rootchord, halfwingspan, hingelineAngle, flapDepthRoot, flapDepthTip) = planformData
+        
+            # create instance of chordDistribution
+            dxf_chordDistribution = chordDistribution()
+            dxf_chordDistribution.set_fromDXF(chordDist)
+
+            # create instance of planform
+            dxf_planform = planform()
+            dxf_params = (rootchord, halfwingspan, hingelineAngle, flapDepthRoot, flapDepthTip)
+            dxf_planform.set_fromDXF(planformShape, params, dxf_params)
+            dxf_planform.flip_LE_TE()
+            
+            # assign to new wing
+            self.dxf_chordDistribution = dxf_chordDistribution
+            self.dxf_planform = dxf_planform
+            self.useDXF = True
+            return 0
+        else:
+            return -1
 
     def apply_params(self):
         global num_gridpoints_default
@@ -1288,15 +1322,16 @@ class wing:
 
         # start modifying and applying params now
         params.calculate_dependendValues()
+        
+        if (self.useDXF == False):
+            # get basic shape parameters
+            (shape, shapeParams) = params.get_shapeParams()
 
-        # get basic shape parameters
-        (shape, shapeParams) = params.get_shapeParams()
+            # setup chordDistribution
+            self.chordDistribution.calculate_grid(shape, shapeParams, num_gridpoints_default)
 
-        # setup chordDistribution
-        self.chordDistribution.calculate_grid(shape, shapeParams, num_gridpoints_default)
-
-        # calculate planform
-        self.planform.calculate(self.params, self.chordDistribution)
+            # calculate planform
+            self.planform.calculate(self.params, self.chordDistribution)
 
         # calculate chordlengths, either by position or reynolds of the airfoil
         self.calculate_chordlengths()
@@ -1342,6 +1377,9 @@ class wing:
         # export initial params to dictionary
         params.write_toDict(self.paramsDict)
         
+        # start modifying and applying params now
+        params.calculate_dependendValues()
+
         # check if planform shape shall be imported from dxf
         if params.DXF_filename != None:
             self.import_dxf(params.DXF_filename)
@@ -1849,7 +1887,7 @@ class wing:
 
     def __plot_planformDataLabel(self, ax, x):
         params = self.params
-        planform = self.planform
+        planform = self.__get_planform()
 
         # scaling from square mm to square dm
         wingArea_dm = planform.wingArea / 10000.0
@@ -3117,7 +3155,7 @@ class planform_creator:
             else:
                 planform = interpolatedWing.planform
             # change orientation of LE, TE for export--> TE @ coordinate 0, 0    
-            planform.flip_horizontal()
+            planform.flip_LE_TE()
             result = export_toDXF(params, planform, DXF_FileName, num_points)
         except:
             ErrorMsg("export_toDXF failed")
@@ -3127,32 +3165,7 @@ class planform_creator:
             exportedFiles.append(DXF_FileName)
 
         return (result, exportedFiles)
-
-    def import_dxf(self, filepath):
-        params = self.newWing.params
-        planformData = import_fromDXF(self.newWing, filepath)
-        
-        if (planformData != None):
-            (planformShape, chordDist, rootchord, halfwingspan, hingelineAngle, flapDepthRoot, flapDepthTip) = planformData
-        
-            # create instance of chordDistribution
-            dxf_chordDistribution = chordDistribution()
-            dxf_chordDistribution.set_fromDXF(chordDist)
-
-            # create instance of planform
-            dxf_planform = planform()
-            dxf_params = (rootchord, halfwingspan, hingelineAngle, flapDepthRoot, flapDepthTip)
-            dxf_planform.set_fromDXF(planformShape, params, dxf_params)
-            dxf_planform.flip_horizontal()
-            
-            # assign to new wing
-            self.newWing.dxf_chordDistribution = dxf_chordDistribution#FIXME newWing.set_dxf
-            self.newWing.dxf_planform = dxf_planform
-            self.newWing.useDXF = True
-            return 0
-        else:
-            return -1
-
+ 
     def __set_AxesAndLabels(self, ax, title):
         global cl_grid
         global cl_diagramTitle
@@ -3248,7 +3261,7 @@ class planform_creator:
 
     def import_planform(self, filePath):
         '''imports planform from given filepath (.dxf file)'''
-        return self.import_dxf(filePath)
+        return self.newWing.import_dxf(filePath)
 
     def get_params(self):
         '''gets parameters as a dictionary'''

@@ -167,7 +167,7 @@ def interpolate(x1, x2, y1, y2, x):
     try:
         y = ((y2-y1)/(x2-x1)) * (x-x1) + y1
     except:
-        ErrorMsg("Division by zero, x1:%f, x2:%f", (x1, x2))
+        ErrorMsg("Division by zero, x1:%f, x2:%f" % (x1, x2))
         y = 0.0
     return y
 
