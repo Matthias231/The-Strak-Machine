@@ -153,6 +153,7 @@ class control_frame():
         self.airfoilParamsTextVars = []
         self.latestPath = []
         self.latestPath_dxf = []
+        self.dxf_asOverlay = []
         self.performEntryUpdate = False
 
         # determine screen size
@@ -209,6 +210,9 @@ class control_frame():
             # append latest path
             self.latestPath.append(os.getcwd() + bs + airfoilLibrary_path)
             self.latestPath_dxf.append(os.getcwd() + bs + planformLibrary_path)
+
+            # append switch variables
+            self.dxf_asOverlay.append(tk.IntVar(value=1))
 
         # add different widgets to upper frame (not scrollable)
         (labels, buttons) = labelsAndButtons
@@ -1020,6 +1024,10 @@ class control_frame():
             
             # update name of dxf file, if any
             self.__update_dxf_FileName(planformIdx)
+            
+            # update flag for using dxf as overlay
+            params = self.params[planformIdx]
+            self.dxf_asOverlay[planformIdx].set(params["DXF_asOverlay"])
 
             # update entries for airfoil parameters, also option menues etc.
             self.__update_airfoilEntries(planformIdx)
@@ -1215,7 +1223,7 @@ class control_frame():
         self.label_dxf_planform = self.__create_label(frame, "Optional: planform from .dxf file", fs_label)
         self.label_dxf_File = self.__create_label(frame, '', fs_entry)
 
-        button = {"txt": "Choose file", "cmd" : self.__choose_dxf_File, "param" : None}
+        button = {"txt": "Configure .dxf", "cmd" : self.__configure_dxf_usage, "param" : None}
         self.button_dxf_File = self.__create_button(frame,button)
 
         self.__place_widgetsInRow([self.label_dxf_planform, self.label_dxf_File, self.button_dxf_File]
@@ -1339,7 +1347,56 @@ class control_frame():
         # request update (will be done in the mainloop)
         self.set_updateNotification()
     
-    def __choose_dxf_File(self, dummy):
+    def __configure_dxf_usage(self, dummy):
+        planformIdx = self.master.planformIdx
+        DXF_configWindow = tk.Toplevel() # FIXMe workaround window sizing problem
+        mode = ctk.get_appearance_mode()
+        if (mode == 'Dark'):
+            DXF_configWindow.configure(bg=bg_color_dark)
+        else:
+            DXF_configWindow.configure(bg=bg_color_light)
+
+        self.DXF_configWindow = DXF_configWindow
+        DXF_configWindow.wm_title("Configure DXF")
+
+        row = 1
+        '''label = ctk.CTkLabel(master=DXF_configWindow, text=".dxf as planform",
+        text_font=(main_font, fs_label), pady=10, padx=20, anchor="e")
+        label.grid(row=row, column=0)'''
+        
+        switch_var = self.dxf_asOverlay[planformIdx]
+        switch = ctk.CTkSwitch(master=self.DXF_configWindow, text=".dxf as overlay", variable = switch_var)
+        switch.grid(row=row, column=0, pady=10, padx=20, sticky="w")
+        row += 2
+        
+        # add buttons
+        button = ctk.CTkButton(DXF_configWindow, text="choose .dxf file", command=self.__choose_dxf_File)
+        button.grid(row=row, column=0, pady=10, padx=20)
+        button = ctk.CTkButton(DXF_configWindow, text="remove .dxf file", command=self.__remove_dxf_File)
+        button.grid(row=row, column=1, pady=10, padx=20)
+        button = ctk.CTkButton(DXF_configWindow, text="Cancel", command=self.__cancel_DXF_config)
+        button.grid(row=row, column=2, pady=10, padx=20)
+        center(DXF_configWindow)        
+    
+    def __cancel_DXF_config(self):
+        self.DXF_configWindow.destroy()
+
+    def __remove_dxf_File(self):
+        planformIdx = self.master.planformIdx
+        params = self.params[planformIdx]
+        
+        # clear filename
+        params["DXF_filename"] = None
+        params["DXF_asOverlay"] = False
+        params["DXF_asPlanform"] = False
+        self.__update_dxf_FileName(planformIdx)
+        
+        # request update (will be done in the mainloop)
+        self.set_updateNotification()
+        self.DXF_configWindow.destroy()
+
+    def __choose_dxf_File(self):
+        self.DXF_configWindow.destroy()
         planformIdx = self.master.planformIdx
         params = self.params[planformIdx]
 
@@ -1361,6 +1418,15 @@ class control_frame():
 
         # update name of .dat file in params (None is allowed value)
         params["DXF_filename"] = relFilename
+        
+        # set flags for dxf-usage
+        if (self.dxf_asOverlay[planformIdx].get() == True):
+            params["DXF_asOverlay"] = True
+            params["DXF_asPlanform"] = False
+        else:
+            params["DXF_asOverlay"] = False
+            params["DXF_asPlanform"] = True
+
         self.__update_dxf_FileName(planformIdx)
 
         # store latest path

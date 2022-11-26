@@ -5,13 +5,13 @@
   "wingspan":2930,
   "fuselageWidth":35,
   "planformShape":"elliptical",
-  "tipSharpness":0.1,
-  "leadingEdgeCorrection":8,
-  "ellipseCorrection":0.027000000000000003,
-  "tipchord":17,
-  "hingeLineAngle":-1.1,
-  "flapDepthRoot":26.5,
-  "flapDepthTip":16.0,
+  "tipSharpness":1.3,
+  "leadingEdgeCorrection":7.5,
+  "ellipseCorrection":0.004,
+  "tipchord":41,
+  "hingeLineAngle":-0.6,
+  "flapDepthRoot":26.0,
+  "flapDepthTip":17.3,
   "dihedral":3.0,
   "airfoilTypes":[
     "user",
@@ -25,7 +25,7 @@
   ],
   "airfoilPositions":[
     null,
-    0.23073208987659927,
+    0.22075419997354354,
     0.4386047961902604,
     0.6090604153674624,
     null,
@@ -48,10 +48,10 @@
     1,
     2,
     2,
-    3,
-    3,
-    3,
-    3
+    2,
+    2,
+    2,
+    2
   ],
   "userAirfoils":[
     "airfoil_library\\F3B_F3F\\JX\\JX-GT\\JX-GT-15.dat",
@@ -82,6 +82,9 @@
     1000000
   ],
   "polar_Ncrit":7.0,
+  "DXF_filename":"planform_library\\VJX.dxf",
   "smoothUserAirfoils":false,
-  "isFin":false
+  "isFin":false,
+  "DXF_asOverlay":true,
+  "DXF_asPlanform":false
 }

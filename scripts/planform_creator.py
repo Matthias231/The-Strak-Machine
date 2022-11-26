@@ -88,6 +88,7 @@ cl_geoCenter = None
 cl_hingeLine = None
 cl_flapFill = None
 cl_planform = None
+cl_overlay = None
 cl_planformFill = None
 cl_sections = None
 cl_userAirfoil = None
@@ -293,7 +294,8 @@ class params:
         self.rootReynolds = 0
 
         # dependend parameters bool
-        self.useDXF = False
+        self.DXF_asPlanform = False
+        self.DXF_asOverlay = False
 
     ################################################################################
     # function that gets a single boolean parameter from dictionary and returns a
@@ -467,7 +469,6 @@ class params:
 
         try:
             self.DXF_filename = dictData["DXF_filename"]
-            self.useDXF = True
         except:
              NoteMsg("No .dxf file specified")
              self.DXF_filename = None
@@ -485,6 +486,8 @@ class params:
 
         # evaluate additional boolean data
         self.isFin = self.__get_booleanParameterFromDict(dictData, "isFin", self.isFin)
+        self.DXF_asPlanform = self.__get_booleanParameterFromDict(dictData, "DXF_asPlanform", self.DXF_asPlanform)
+        self.DXF_asOverlay = self.__get_booleanParameterFromDict(dictData, "DXF_asOverlay", self.DXF_asOverlay)
 
         self.smoothUserAirfoils = self.__get_booleanParameterFromDict(dictData,
                                   "smoothUserAirfoils", self.smoothUserAirfoils)
@@ -531,6 +534,8 @@ class params:
         # set additional boolean data
         dictData["smoothUserAirfoils"] = self.smoothUserAirfoils
         dictData["isFin"] = self.isFin
+        dictData["DXF_asOverlay"] = self.DXF_asOverlay
+        dictData["DXF_asPlanform"] = self.DXF_asPlanform
 
     def calculate_dependendValues(self):
         # calculate dependent parameters
@@ -567,7 +572,7 @@ class params:
             normalized_position = self.airfoilPositions_normalized[idx]
             if normalized_position != None:
                 position = self.denormalize_positionValue(normalized_position)
-                self.airfoilPositions.append(normalized_position)
+                self.airfoilPositions.append(position)
             else:
                 self.airfoilPositions.append(None)
 
@@ -645,7 +650,10 @@ class chordDistribution:
         chord = (1.0-delta) * np.sqrt(1.0-(x*x)) + delta
 
         # correct chord with ellipseCorrection
-        chord = chord - ellipseCorrection * sin(interpolate(0.0, 1.0, 0.0, pi, x))
+        chord = chord + ellipseCorrection * sin(interpolate(0.0, 1.0, 0.0, pi, x))
+        
+        # limit to 1.0
+        chord = min(1.0, chord)
 
         return chord
 
@@ -768,7 +776,7 @@ class chordDistribution:
         return (0.0)
 
 
-    def plot(self, ax):
+    def plot(self, ax, bOverlay):
         global cl_referenceChord
         global cl_normalizedChord
 
@@ -781,23 +789,29 @@ class chordDistribution:
             normalizedHalfwingspan.append(element.y)
             normalizedChord.append(element.chord)
             referenceChord.append(element.referenceChord)
-
-        # plot reference chord (pure ellipse)
-        ax.plot(normalizedHalfwingspan, referenceChord, color=cl_referenceChord,
+        
+        if bOverlay:
+            # plot normalized chord that will be taken for planform generation
+            ax.plot(normalizedHalfwingspan, normalizedChord, color=cl_overlay,
+                 linewidth = lw_planform, solid_capstyle="round",
+                 label = "normalized chord from .dxf")
+        else: 
+            # plot reference chord (pure ellipse)
+            ax.plot(normalizedHalfwingspan, referenceChord, color=cl_referenceChord,
                 linewidth = lw_planform, solid_capstyle="round",
                 label = "pure ellipse")
 
-        # plot normalized chord that will be taken for planform generation
-        ax.plot(normalizedHalfwingspan, normalizedChord, color=cl_normalizedChord,
+            # plot normalized chord that will be taken for planform generation
+            ax.plot(normalizedHalfwingspan, normalizedChord, color=cl_normalizedChord,
                  linewidth = lw_planform, solid_capstyle="round",
                  label = "normalized chord")
 
-        ax.annotate('Root',
+            ax.annotate('Root',
             xy=(0.0, 0.0), xycoords='data',
             xytext=(0, 5), textcoords='offset points', color = cl_legend,
             fontsize=fs_legend, rotation='vertical')
 
-        ax.annotate('Tip',
+            ax.annotate('Tip',
             xy=(1.0, 0.0), xycoords='data',
             xytext=(5, 5), textcoords='offset points', color = cl_legend,
             fontsize=fs_legend, rotation='vertical')
@@ -857,21 +871,21 @@ class planform:
         self.wingArea *= 2.0
         self.flapArea *= 2.0
 
-    def __interpolate_grid(self, grid_left, grid_right, chord):
+    def __interpolate_grid(self, grid_left, grid_right, position):
         # create new instance of wing grid
         newGrid = wingGrid()
 
         # interpolate for better precision
-        chord_left = grid_left.chord
         y_left = grid_left.y
+        chord_left = grid_left.chord
         leadingEdge_left = grid_left.leadingEdge
         quarterChordLine_left = grid_left.quarterChordLine
         hingeLine_left = grid_left.hingeLine
         flapDepth_left = grid_left.flapDepth
         trailingEdge_left = grid_left.trailingEdge
 
-        chord_right = grid_right.chord
         y_right = grid_right.y
+        chord_right = grid_right.chord
         leadingEdge_right = grid_right.leadingEdge
         quarterChordLine_right = grid_right.quarterChordLine
         hingeLine_right = grid_right.hingeLine
@@ -879,40 +893,39 @@ class planform:
         trailingEdge_right = grid_right.trailingEdge
 
         # perform interpolation
-        newGrid.chord = chord
-        newGrid.y = interpolate(chord_left, chord_right, y_left, y_right, chord)
-        newGrid.leadingEdge = interpolate(chord_left, chord_right, leadingEdge_left, leadingEdge_right, chord)
-        newGrid.trailingEdge = interpolate(chord_left, chord_right, trailingEdge_left, trailingEdge_right, chord)
-        newGrid.quarterChordLine = interpolate(chord_left, chord_right, quarterChordLine_left, quarterChordLine_right, chord)
-        newGrid.hingeLine = interpolate(chord_left, chord_right, hingeLine_left, hingeLine_right, chord)
-        newGrid.flapDepth = interpolate(chord_left, chord_right, flapDepth_left, flapDepth_right, chord)
+        newGrid.y = position
+        newGrid.chord = interpolate(y_left, y_right, chord_left, chord_right, position)
+        newGrid.leadingEdge = interpolate(y_left, y_right, leadingEdge_left, leadingEdge_right, position)
+        newGrid.trailingEdge = interpolate(y_left, y_right, trailingEdge_left, trailingEdge_right, position)
+        newGrid.quarterChordLine = interpolate(y_left, y_right, quarterChordLine_left, quarterChordLine_right, position)
+        newGrid.hingeLine = interpolate(y_left, y_right, hingeLine_left, hingeLine_right, position)
+        newGrid.flapDepth = interpolate(y_left, y_right, flapDepth_left, flapDepth_right, position)
 
         return newGrid
 
-    def __get_gridDataFromChord(self, chord):
-        '''get interpolated grid data from chordlength'''
-        # valid chord specified ?
-        if (chord == None):
-            ErrorMsg("invalid chord")
+    def get_gridDataFromPosition(self, position):
+        '''get interpolated grid data from position'''
+        # valid position specified ?
+        if (position == None):
+            ErrorMsg("invalid position")
             return None
 
-        # search in grid for the desired chord.
-        # CAUTION: we assume that chordlength is constantly decreasing !!
+        # search in grid for the desired position.
         grid = self.grid
         maxIdx = len(grid)
 
         for idx in range(maxIdx):
-            if (grid[idx].chord < chord):
-                # found chordlength smaller than the given chord
+            if (grid[idx].y >= position):
+                # found position greater than the given position
                 # first value?
                 if idx==0:
                     return grid[0]
                 else:
                     # interpolate for better precision
-                    newGrid = self.__interpolate_grid(grid[idx-1], grid[idx], chord)
+                    newGrid = self.__interpolate_grid(grid[idx-1], grid[idx], position)
                     return newGrid
 
-        ErrorMsg("no grid data was found for chord %f" % chord)
+        ErrorMsg("no grid data was found for position %f" % position)
         return grid[-1]
 
     # calculate planform-shape of the half-wing (high-resolution wing planform)
@@ -1129,8 +1142,7 @@ class wing:
         # provide variables for dxf planform shape
         self.dxf_chordDistribution = None
         self.dxf_planform = None
-        self.useDXF = False
-
+        
         # empty list of chords and sections
         self.normalized_chords = []
         self.chords = []
@@ -1143,6 +1155,7 @@ class wing:
         global cl_geoCenter
         global cl_hingeLine
         global cl_planform
+        global cl_overlay
         global cl_flapFill
         global cl_planformFill
         global cl_sections
@@ -1170,6 +1183,7 @@ class wing:
             cl_geoCenter = 'black'
             cl_hingeLine = 'DeepSkyBlue'
             cl_planform = 'white'
+            cl_overlay = 'lightgray'
             cl_flapFill = 'DeepSkyBlue'
             cl_planformFill = 'darkgray'
             cl_sections = 'darkgray'
@@ -1192,6 +1206,7 @@ class wing:
             cl_hingeLine = 'DeepSkyBlue'
             cl_flapFill ='DeepSkyBlue'
             cl_planform = 'gray'
+            cl_overlay = 'green'#FIXME
             cl_planformFill = 'lightgray'
             cl_sections = 'grey'
             cl_userAirfoil = 'DeepSkyBlue'
@@ -1306,7 +1321,6 @@ class wing:
             # assign to new wing
             self.dxf_chordDistribution = dxf_chordDistribution
             self.dxf_planform = dxf_planform
-            self.useDXF = True
             return 0
         else:
             return -1
@@ -1323,7 +1337,7 @@ class wing:
         # start modifying and applying params now
         params.calculate_dependendValues()
         
-        if (self.useDXF == False):
+        if (params.DXF_asPlanform == False):
             # get basic shape parameters
             (shape, shapeParams) = params.get_shapeParams()
 
@@ -1404,12 +1418,6 @@ class wing:
 
         # nothing was found
         return None
-
-
-    # find planform-values for a given chord-length
-    def find_PlanformData(self, chord):
-        planform = self.__get_planform()
-        return planform.find_grid(chord)
 
     # copy planform-values to section
     def copy_PlanformDataToSection(self, grid, section):
@@ -1542,16 +1550,28 @@ class wing:
         return (None, None)
     
     def __get_planform(self):
-        if self.useDXF:
+        if self.params.DXF_asPlanform:
             return self.dxf_planform
         else:
             return self.planform
+    
+    def __get_planformOverlay(self):
+        if self.params.DXF_asOverlay:
+            return self.dxf_planform
+        else:
+            return None
 
     def __get_chordDistribution(self):
-        if self.useDXF:
+        if self.params.DXF_asPlanform:
             return self.dxf_chordDistribution
         else:
             return self.chordDistribution
+
+    def __get_chordDistributionOverlay(self):
+        if self.params.DXF_asOverlay:
+            return self.dxf_chordDistribution
+        else:
+            return None   
 
     # calculate all chordlenghts from the list of airfoil positions
     # and the given planform-data
@@ -1571,13 +1591,18 @@ class wing:
         params = self.params
         num = len(params.airfoilPositions_normalized)
         for idx in range(num):
-            if params.airfoilPositions_normalized[idx] == None:
-                # no position defined yet, calculate now
-                normalized_chord = self.normalized_chords[idx]
-                chordDistribution = self.__get_chordDistribution()
-                normalized_position = chordDistribution.get_positionFromChord(normalized_chord)
-                params.airfoilPositions_normalized[idx] = normalized_position
-                params.airfoilPositions[idx] = self.params.denormalize_positionValue(normalized_position)
+            if (idx == 0):#FIXME
+                # root airfoil is always at normalized position 0.0
+                params.airfoilPositions_normalized[idx] = 0.0
+                params.airfoilPositions[idx] = self.params.denormalize_positionValue(0.0)
+            else:
+                if params.airfoilPositions_normalized[idx] == None:
+                    # no position defined yet, calculate now
+                    normalized_chord = self.normalized_chords[idx]
+                    chordDistribution = self.__get_chordDistribution()
+                    normalized_position = chordDistribution.get_positionFromChord(normalized_chord)
+                    params.airfoilPositions_normalized[idx] = normalized_position
+                    params.airfoilPositions[idx] = self.params.denormalize_positionValue(normalized_position)
 
 
     # calculate missing Re-numbers from positions
@@ -1589,7 +1614,7 @@ class wing:
             if self.params.airfoilReynolds[idx] == None:
                 # for this position no reynolds-number has been specified.
                 # calculate the number from postition now
-                Re = self.get_ReFromPosition(self.params.airfoilPositions[idx])
+                Re = self.get_ReFromPosition(self.params.airfoilPositions_normalized[idx])
                 self.params.airfoilReynolds[idx] = int(round(Re ,0))
 
 
@@ -1700,13 +1725,13 @@ class wing:
         self.set_AirfoilName(section)
 
 
-    # adds a section using given chord
-    def add_sectionFromChord(self, chord):
-        # find grid-values matching the chordlength of the section
-        grid = self.find_PlanformData(chord)
-
+    # adds a section using given position
+    def add_sectionFromPosition(self, position):
+        planform = self.__get_planform()
+        grid = planform.get_gridDataFromPosition(position)
+        
         if (grid == None):
-            ErrorMsg("chord-length %f not found in planform-data\n" % chord)
+            ErrorMsg("position %f not found in planform-data\n" % position)
             exit(-1)
         else:
             self.add_sectionFromGrid(grid)
@@ -1729,7 +1754,9 @@ class wing:
 
     # calculate all sections of the wing, oriented at the grid
     def calculate_sections(self):
+        params = self.params
         self.sections.clear()
+
         # check if fuselageWidth is > 0
         if self.fuselageIsPresent():
             # first add section for fuselage
@@ -1738,11 +1765,15 @@ class wing:
         else:
             startIdx = 0
 
-        # create all sections, according to the precalculated chords
+        '''# create all sections, according to the precalculated chords
         for chord in self.chords[startIdx:]:
             startIdx = 0
             # add section according to chord
-            self.add_sectionFromChord(chord)
+            self.add_sectionFromChord(chord)'''
+        for position in params.airfoilPositions[startIdx:]:
+            startIdx = 0
+            # add section according to position
+            self.add_sectionFromPosition(position)
 
 
     # function to interpolate within sections. This is very useful to get a very
@@ -1936,7 +1967,7 @@ class wing:
         # setup root- and tip-joint
         trailingeEge[0] = leadingEdge[0]
         trailingeEge[-1] = leadingEdge[-1]
-
+        
         # compose labels for legend
         labelHingeLine = ("hinge line (%.1f %% / %.1f %%)" %
                            (params.flapDepthRoot, params.flapDepthTip))
@@ -1962,6 +1993,37 @@ class wing:
                 linewidth = lw_planform, solid_capstyle="round")
         ax.plot(xValues, trailingeEge, color=cl_planform,
                 linewidth = lw_planform, solid_capstyle="round")
+
+        # in case we have an overlay, plot also the overlay
+        overlay = self.__get_planformOverlay()
+        if (overlay != None):
+            OL_xValues = []
+            OL_leadingEdge = []
+            OL_hingeLine = []
+            OL_trailingeEge = []
+
+            grid = overlay.get_grid()
+
+            for element in grid:
+                # build up list of x-values
+                OL_xValues.append(element.y)
+
+                # build up lists of y-values
+                OL_leadingEdge.append(element.leadingEdge)
+                OL_hingeLine.append(element.hingeLine)
+                OL_trailingeEge.append(element.trailingEdge)
+
+            # setup root- and tip-joint
+            OL_trailingeEge[0] = OL_leadingEdge[0]
+            OL_trailingeEge[-1] = OL_leadingEdge[-1]
+
+            ax.plot(OL_xValues, OL_hingeLine, color=cl_overlay,
+                 linewidth = lw_hingeLine, solid_capstyle="round")
+            ax.plot(OL_xValues, OL_leadingEdge, color=cl_overlay,
+                linewidth = lw_planform, solid_capstyle="round")
+            ax.plot(OL_xValues, OL_trailingeEge, color=cl_overlay,
+                linewidth = lw_planform, solid_capstyle="round")
+
 
         x_min = params.fuselageWidth/2
         # set new ticks for the x-axis according to the positions of the sections
@@ -2089,12 +2151,23 @@ class wing:
 
         # build up list of x- and y-values
         planform = self.__get_planform()
-        grid = planform.get_grid()
+        planform_grid = planform.get_grid()
 
-        for idx in range(len(grid)):
-            x = grid[idx].y# *1000.0 # m --> mm FIXME
-            depth = (grid[idx].flapDepth / grid[idx].chord) * 100
+        for grid in planform_grid:
+            x = grid.y
+            if (grid.chord > 0.0):
+                depth = (grid.flapDepth / grid.chord) * 100
+            else: 
+                depth = 0.0
 
+            # limit to 100 percent
+            depth = min(depth, 100.0)
+
+            if x >= controlPoints_x[-1]:
+                # no flap depth beyond last control point
+                break
+    
+           # append only values with depth > 0
             if (depth > 0.0):
                 xValues.append(x)
                 flapDepth.append(depth)
@@ -2478,7 +2551,10 @@ class wing:
     
     def plot_chordDistribution(self, ax):
         chordDistribution = self.__get_chordDistribution()
-        chordDistribution.plot(ax)
+        chordDistribution.plot(ax, False)
+        # check if overlay shall also be plotted
+        if (self.params.DXF_asOverlay) and (self.dxf_chordDistribution != None):
+            self.dxf_chordDistribution.plot(ax, True)
     
     def draw_diagram(self, diagramType, ax, x_limits, y_limits):
         if diagramType == diagTypes[0]:
@@ -3150,10 +3226,7 @@ class planform_creator:
             exportedFiles.append(FLZ_FileName)
 
         try:
-            if (interpolatedWing.useDXF == True):
-                planform = interpolatedWing.dxf_planform
-            else:
-                planform = interpolatedWing.planform
+            planform = interpolatedWing.__get_planform()
             # change orientation of LE, TE for export--> TE @ coordinate 0, 0    
             planform.flip_LE_TE()
             result = export_toDXF(params, planform, DXF_FileName, num_points)
