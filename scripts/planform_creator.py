@@ -1549,7 +1549,7 @@ class wing:
         NoteMsg("position was: %f, reynolds was %d" % (normalized_position, reynolds))
         return (None, None)
     
-    def __get_planform(self):
+    def get_planform(self):
         if self.params.DXF_asPlanform:
             return self.dxf_planform
         else:
@@ -1727,7 +1727,7 @@ class wing:
 
     # adds a section using given position
     def add_sectionFromPosition(self, position):
-        planform = self.__get_planform()
+        planform = self.get_planform()
         grid = planform.get_gridDataFromPosition(position)
         
         if (grid == None):
@@ -1739,7 +1739,7 @@ class wing:
 
     # add an own section for the fuselage and use rootchord
     def add_fuselageSection(self):
-        planform = self.__get_planform()
+        planform = self.get_planform()
         # get the root grid-values
         grid = deepcopy(planform.grid[0])
     
@@ -1918,7 +1918,7 @@ class wing:
 
     def __plot_planformDataLabel(self, ax, x):
         params = self.params
-        planform = self.__get_planform()
+        planform = self.get_planform()
 
         # scaling from square mm to square dm
         wingArea_dm = planform.wingArea / 10000.0
@@ -1938,7 +1938,7 @@ class wing:
          textcoords='offset points', color = cl_legend,fontsize=fs_legend)
     
     def __get_planformGrid(self):
-        planform = self.__get_planform()
+        planform = self.get_planform()
         return planform.grid
             
     def plot_PlanformShape(self, ax):
@@ -1951,7 +1951,7 @@ class wing:
         hingeLine = []
         quarterChordLine = []
         
-        planform = self.__get_planform()
+        planform = self.get_planform()
         grid = planform.get_grid()
 
         for element in grid:
@@ -2150,7 +2150,7 @@ class wing:
         flapDepth = []
 
         # build up list of x- and y-values
-        planform = self.__get_planform()
+        planform = self.get_planform()
         planform_grid = planform.get_grid()
 
         for grid in planform_grid:
@@ -2412,7 +2412,7 @@ class wing:
         
         # build up list of x-values,
         # first left half-wing
-        planform = self.__get_planform()
+        planform = self.get_planform()
         grid = planform.get_grid()
         for element in grid:
             proj_y = (element.y- (params.fuselageWidth/2)) * proj_fact
@@ -3226,7 +3226,8 @@ class planform_creator:
             exportedFiles.append(FLZ_FileName)
 
         try:
-            planform = interpolatedWing.__get_planform()
+            planform = interpolatedWing.get_planform()
+        
             # change orientation of LE, TE for export--> TE @ coordinate 0, 0    
             planform.flip_LE_TE()
             result = export_toDXF(params, planform, DXF_FileName, num_points)
