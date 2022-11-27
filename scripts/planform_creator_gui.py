@@ -565,8 +565,14 @@ class control_frame():
         planformIdx = self.master.planformIdx
         params = self.params[planformIdx]
         idx = self.airfoilIdx[planformIdx]
+        
+        # check if idx belongs to root airfoil
+        if idx == 0:
+            return
+
         airfoilNames = self.airfoilNames[planformIdx]
         airfoilName = airfoilNames[idx]
+        maxIdx = len(airfoilNames)-1
 
         # remove airfoil in params dictionary
         params['airfoilTypes'].pop(idx)
@@ -575,6 +581,10 @@ class control_frame():
         params['flapGroup'].pop(idx)
         params["userAirfoils"].pop(idx)
         #params["airfoilNames"].pop(idx)
+        
+        # check if we have removed the last airfoil
+        if idx == maxIdx:
+            self.airfoilIdx[planformIdx] -= 1
 
         # request update (will be done in the mainloop)
         self.set_updateNotification()
