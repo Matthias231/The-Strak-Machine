@@ -778,7 +778,7 @@ def __convert_toPlanform(msp):
     planformData = __create_planformShape(myLines)
     
     if planformData != None:
-        NoteMsg("Planform has been succesfully imported")
+        NoteMsg("Planform has been successfully imported")
     else:
         ErrorMsg("Unable to import planform from modelspace")
     return planformData
