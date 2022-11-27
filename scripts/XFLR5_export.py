@@ -25,6 +25,9 @@ from strak_machine import (ErrorMsg, WarningMsg, NoteMsg, DoneMsg, bs)
 # Scale from mm --> m
 scaleFactor = (1.0/1000.0)
 
+# Minimum chord (in mm) in case chord is exactly 0.0
+min_chord = 2.0
+
 def get_wing(root, wingFinSwitch):
     for wing in root.iter('wing'):
         for XMLwingFinSwitch in wing.iter('isFin'):
@@ -77,8 +80,12 @@ def export_toXFLR5(data, FileName, xPanels, yPanels):
             yPosition.text = str(section.y * scaleFactor)
 
         for chord in newSection.iter('Chord'):
+            # limit chord to values >= 1 mm
+            chord_float = max(min_chord, section.chord)
+            # scale chord to m
+            chord_float *= scaleFactor
             # convert float to text
-            chord.text = str(section.chord * scaleFactor)
+            chord.text = str(chord_float)
 
         for xOffset in newSection.iter('xOffset'):
             # convert float to text
@@ -96,7 +103,10 @@ def export_toXFLR5(data, FileName, xPanels, yPanels):
 
         # add the new section to the tree
         wing.append(newSection)
-        hingeDepthPercent = (section.flapDepth /section.chord )*100
+        if (section.chord > 0.0):
+            hingeDepthPercent = (section.flapDepth /section.chord )*100
+        else:
+            hingeDepthPercent = 0.0
         NoteMsg("Section %d: position: %.0f mm, chordlength %.0f mm, hingeDepth %.1f  %%, airfoilName %s was inserted" %
           (section.number, section.y, section.chord, hingeDepthPercent, section.airfoilName))
 
