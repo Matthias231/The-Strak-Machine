@@ -247,6 +247,16 @@ def write_airfoilData(airfoilName, file):
     file.write("[PROFIL ENDE]\n")
 
 
+def write_replacement_airfoilData(params, segments, idx, file):
+        # FIXME implement better algorithm than writing root airfoil
+        replacementFileName = params.airfoilNames[0]
+        
+        print("airfoil %s not found, writing replacement airfoil %s instead" %\
+             (segments.airfoilNames[idx], replacementFileName))
+        write_airfoilData(replacementFileName, file)
+        return
+
+
 def write_segmentData(wingData, segments, idx, file, yPanels):
     params = wingData.params
     klappentiefeLinks = segments.flapDepths[idx]
@@ -280,9 +290,8 @@ def write_segmentData(wingData, segments, idx, file, yPanels):
     try:
         write_airfoilData(segments.airfoilNames[idx], file)
     except:
-        print("airfoil %s not found, writing airfoil data of %s (root airfoil) instead" %\
-        (segments.airfoilNames[idx], params.airfoilNames[0]))
-        write_airfoilData(params.airfoilNames[0], file)
+        write_replacement_airfoilData(params, segments, idx, file)
+        
 
     # insert end of segment
     file.write("[SEGMENT ENDE]\n")
@@ -423,7 +432,6 @@ def export_toFLZ(wingData, FileName, xPanels, yPanels):
         write_finHeader(params, FLZ_outfile, xPanels)
     else:
         write_wingHeader(params, FLZ_outfile, xPanels)
-
 
     # loop over all sections of the wing
     for idx in range(segments.num):
