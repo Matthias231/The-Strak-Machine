@@ -1394,6 +1394,7 @@ class control_frame():
         params["DXF_filename"] = None
         params["DXF_asOverlay"] = False
         params["DXF_asPlanform"] = False
+        params["DXF_init"] = False
         self.__update_dxf_FileName(planformIdx)
         
         # request update (will be done in the mainloop)
@@ -1428,9 +1429,11 @@ class control_frame():
         if (self.dxf_asOverlay[planformIdx].get() == True):
             params["DXF_asOverlay"] = True
             params["DXF_asPlanform"] = False
+            params["DXF_init"] = False
         else:
             params["DXF_asOverlay"] = False
             params["DXF_asPlanform"] = True
+            params["DXF_init"] = True
 
         self.__update_dxf_FileName(planformIdx)
 
@@ -2298,7 +2301,6 @@ class App(ctk.CTk):
         buttonsColumn = [{"txt": "Add planform",     "cmd" : self.add_planform,     "param" : None},
                          {"txt": "Remove planform",  "cmd" : self.remove_planform,  "param" : None},
                          {"txt": "Export planforms", "cmd" : self.export_planformsDialog, "param" : None},
-                         #{"txt": "Import planform",  "cmd" : self.import_planformDialog, "param" : None}#FIXME function for Jochen
                         ]
         buttons.append(buttonsColumn)
 
@@ -2437,50 +2439,6 @@ class App(ctk.CTk):
         button = ctk.CTkButton(exportWindow, text="Cancel", command=self.cancel_export_planforms)
         button.grid(row=row+1, column=1, pady=10, padx=20, sticky="w")
         center(exportWindow)
-
-    def import_planformDialog(self, dummy):
-        planformName = self.frame_bottom.planformNames[self.planformIdx]
-        filetypes = (('.dxf files', '*.dxf'),
-                     ('All files', '*.*'))
-
-        absFilename = tk.filedialog.askopenfilename(
-                    title='Open a file',
-                    initialdir=self.latestPath_dxf,
-                    filetypes=filetypes)
-        if absFilename == '':
-            return
-
-        # store latest path
-        self.latestPath_dxf = os.path.dirname(absFilename)
-
-        # Compute the relative file path
-        relFilename = os.path.relpath(absFilename)
-        fileName = os.path.basename(absFilename)
-        
-        # import planform from .dxf
-        result = creatorInstances[self.planformIdx].import_planform(relFilename)
-        
-        # check if everything was o.k.
-        if result == 0:
-            # perform_update
-            self.frame_bottom.set_updateNotification()
-            #self.frame_bottom.request_clearUnsavedChangesFlag(self.planformIdx)#FIXME
-
-            # create message text
-            msgText =  "Planform shape for planform\'%s\'\n" % planformName
-            msgText += " has been successfully imported from file\n\'%s\'\n" % fileName
-            messagebox.showinfo(title='Load', message=msgText)
-        else:
-            # create message text
-            msgText =  "Error, import planform shape for planform \'%s\'\n" % planformName
-            msgText += "from file \'%s\'\nfailed, errorcode %d\n" % (fileName, result)
-            messagebox.showerror(title='Load', message=msgText )
-
-
-        # perform_update
-            self.frame_bottom.set_updateNotification()
-            self.frame_bottom.request_clearUnsavedChangesFlag(self.planformIdx)    
-        
 
     def cancel_export_planforms(self):
         # cleaning up
