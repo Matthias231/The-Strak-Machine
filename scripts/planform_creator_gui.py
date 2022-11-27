@@ -70,6 +70,7 @@ bg_color_dark =  "#222222"
 fs_label = 13
 fs_headline = 15
 fs_entry = 11
+fs_caution = 10
 fs_unit = 13
 
 ################################################################################
@@ -369,7 +370,7 @@ class control_frame():
         table = [#{"txt": "Planform name",                "variable" : params.planformName,     "unit" : None, "scaleFactor" : None},
                  #{"txt": "Planform shape",               "variable" : params.planformShape,    "unit" : None, "scaleFactor" : None },
                   {"txt": "Airfoils basic name",          "variable" : 'airfoilBasicName',      "idx": None, "unit" : None, "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
-                  {"txt": "wingspan",                     "variable" : 'wingspan',              "idx": None, "unit" : "mm", "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
+                  {"txt": "Wingspan",                     "variable" : 'wingspan',              "idx": None, "unit" : "mm", "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
                   {"txt": "Width of fuselage",            "variable" : 'fuselageWidth',         "idx": None, "unit" : "mm", "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
                   {"txt": "Root chord",                   "variable" : 'rootchord',             "idx": None, "unit" : "mm", "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
                   {"txt": "Tip chord",                    "variable" : 'tipchord',              "idx": None, "unit" : "mm", "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
@@ -1360,13 +1361,17 @@ class control_frame():
         DXF_configWindow.wm_title("Configure DXF")
 
         row = 1
-        '''label = ctk.CTkLabel(master=DXF_configWindow, text=".dxf as planform",
-        text_font=(main_font, fs_label), pady=10, padx=20, anchor="e")
-        label.grid(row=row, column=0)'''
+        caution_text = "CAUTION: if the switch \'.dxf as overlay' is set to off, then \'choose .dxf file\' might change"
+        caution_text += " the following parameters:\n"
+        caution_text += "Wingspan, Root chord, Hingeline angle @root, Flap depth @root, Flap depth @tip"
+        label = ctk.CTkLabel(master=DXF_configWindow, text=caution_text,
+        text_font=(main_font, fs_caution), pady=10, padx=20, anchor="e")
+        label.grid(row=row, column=0, columnspan = 3)
+        row +=2
         
         switch_var = self.dxf_asOverlay[planformIdx]
         switch = ctk.CTkSwitch(master=self.DXF_configWindow, text=".dxf as overlay", variable = switch_var)
-        switch.grid(row=row, column=0, pady=10, padx=20, sticky="w")
+        switch.grid(row=row, column=0, pady=10, padx=20)
         row += 2
         
         # add buttons

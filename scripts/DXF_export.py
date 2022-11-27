@@ -678,9 +678,9 @@ def __create_planformShape(lines):
     __add_toChordDistribution(chordDistribution, x, LE_y, TE_y)
     __add_toPlanformShape(planformShape, x, LE_y, TE_y, HL_y)
               
-    # get flap depths
-    flapDepthRoot = planformShape[0].flapDepth
-    flapDepthTip = planformShape[-1].flapDepth
+    # get flap depths, convert to percent
+    flapDepthRoot = planformShape[0].flapDepth * 100.0
+    flapDepthTip = (planformShape[-2].flapDepth/ planformShape[-2].chord)* 100.0 # Take second to last value 
     
     # calculate angle of hingeline
     if (hingeline != None):
@@ -690,6 +690,7 @@ def __create_planformShape(lines):
         hingelineAngle = line_angle(p1, p2)
     else: 
         hingelineAngle = 0.0
+        
     NoteMsg("flapDepth @root: %.1f %%, flapDepth @tip: %.1f%%, hingeline angle: %f°" %(flapDepthRoot, flapDepthTip, hingelineAngle))
     
     # return all data

@@ -1052,6 +1052,12 @@ class planform:
         (dxf_rootchord, dxf_halfwingspan, dxf_hingelineAngle, dxf_flapDepthRoot, dxf_flapDepthTip) = dxf_params
         self.grid = planformShape #FIXME Denormalize grid points (rootchord, halfwingspan)
         self.num_gridPoints = len(self.grid)
+
+        # set basic planformdata from dxf
+        params.rootchord = dxf_rootchord
+        params.halfwingspan = dxf_halfwingspan
+        params.wingspan = 2*dxf_halfwingspan + params.fuselageWidth
+
         self.__denormalize(params.rootchord, params.halfwingspan)
        
         # check points of hingeline
@@ -1067,7 +1073,12 @@ class planform:
             self.hingeInnerPoint = self.grid[0].hingeLine
             self.hingeOuterPoint = self.grid[-1].hingeLine
             self.hingeLineAngle = dxf_hingelineAngle
-                
+            
+            # set hingeline parameters from dxf
+            params.flapDepthRoot = dxf_flapDepthRoot
+            params.flapDepthTip = dxf_flapDepthTip
+            params.hingelineAngle = dxf_hingelineAngle
+
         # set dihedral
         self.dihedral = params.dihedral
           
