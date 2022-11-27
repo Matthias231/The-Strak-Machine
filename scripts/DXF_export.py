@@ -654,7 +654,9 @@ def __create_planformShape(lines):
     
     # calculate angle of hingeline
     if (hingeline != None):
-        p1, p2 = hingeline
+        # get first and last point of hingeline
+        p1 = hingeline[0]
+        p2 = hingeline[-1]
         hingelineAngle = line_angle(p1, p2)
     else: 
         hingelineAngle = 0.0
