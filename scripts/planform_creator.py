@@ -2022,7 +2022,7 @@ class wing:
             ax.plot(OL_xValues, OL_leadingEdge, color=cl_overlay,
                 linewidth = lw_planform, solid_capstyle="round")
             ax.plot(OL_xValues, OL_trailingeEge, color=cl_overlay,
-                linewidth = lw_planform, solid_capstyle="round")
+                linewidth = lw_planform, solid_capstyle="round", label = "planform shape from .dxf")
 
 
         x_min = params.fuselageWidth/2
