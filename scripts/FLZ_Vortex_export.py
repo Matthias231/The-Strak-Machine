@@ -27,6 +27,9 @@ import numpy as np
 # Scale from mm --> m
 scaleFactor = (1.0/1000.0)
 
+# Minimum chord in case chord is exactly 0.0
+min_chord = 2.0 * scaleFactor
+
 xPanels_Tag = "ANZAHL PANELS X"
 endOfHeader_Tag = "GESAMTPOLARBERECHNUNG_SCHRITTZAHL"
 startOfWing_Tag = "[FLAECHE0]"
@@ -126,7 +129,11 @@ class segmentData:
 
         for idx in range(1, numSections):
             # calculate flapDepth
-            flapDepth = (wingData.sections[idx].flapDepth / wingData.sections[idx].chord)*100.0
+            chord = wingData.sections[idx].chord
+            if (chord > 0.0):
+                flapDepth = (wingData.sections[idx].flapDepth / chord)*100.0
+            else:
+                flapDepth = 0.0
             flapDepthsLeftHalfWing.append(flapDepth)
             flapDepthsRightHalfWing.append(flapDepth)
 
@@ -245,11 +252,14 @@ def write_segmentData(wingData, segments, idx, file, yPanels):
     klappentiefeLinks = segments.flapDepths[idx]
     klappentiefeRechts = segments.flapDepths[idx+1]
     Bezugspunkt = 100.0 - klappentiefeLinks
-
+    
+    #limit chord to a minimal value > 0.0
+    chord = max(min_chord, segments.chords[idx])
+    
     # insert start of segment
     file.write("[SEGMENT%d]\n" % idx)
     file.write("SEGMENTBREITE=%.5f\n" % segments.widths[idx])
-    file.write("PROFILTIEFE=%.5f\n" % segments.chords[idx])
+    file.write("PROFILTIEFE=%.5f\n" % chord)
     file.write("BEZUGSPUNKT_PROFILTIEFE=%.5f\n" % Bezugspunkt)
     file.write("VERWINDUNGSWINKEL=0.00000\n")
     file.write("V-FORM_WINKEL=%.5f\n" % segments.dihedrals[idx])
