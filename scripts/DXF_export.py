@@ -550,11 +550,7 @@ def __add_toPlanformShape(planformShape, x, LE_y, TE_y, HL_y):
         grid.centerLine = grid.leadingEdge - (grid.chord/2)
         grid.quarterChordLine = grid.leadingEdge - (grid.chord/4)
         grid.hingeLine = HL_y
-
-        if grid.chord > 0.0:
-            grid.flapDepth = (HL_y / grid.chord) * 100.0
-        else:
-            grid.flapDepth = 0.0
+        grid.flapDepth = HL_y - TE_y 
         
         planformShape.append(grid)
 

@@ -1014,8 +1014,8 @@ class planform:
             element.centerLine *= rootchord
             element.hingeLine *= rootchord
             element.trailingEdge *= rootchord
-            # flapDepth is already o.k.
-
+            element.flapDepth *= rootchord
+           
     def __get_hingelineFromFlapDepth(self, grid, flapDepth):
         trailingEdge = grid.trailingEdge
         chord = grid.chord 
