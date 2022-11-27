@@ -484,6 +484,17 @@ def __split_contour(contour):
     # revert LE
     LE = LE[::-1]
 
+    # join the two lines in the middle
+    (x_LE_last, y_LE_last) = LE[-1]
+    (x_TE_last, y_TE_last) = TE[-1]
+    
+    y_join = (y_LE_last + y_TE_last)/2
+    x_join = max(x_LE_last, x_TE_last)
+    p_join = (x_join, y_join)
+   
+    LE[-1] = p_join
+    TE[-1] = p_join
+   
     return LE, TE  
 
 
@@ -520,6 +531,32 @@ def __remove_duplicate_lines(lines):
     return lines
 
     return lines
+
+def __add_toChordDistribution(chordDistribution, x, LE_y, TE_y):
+        # setup normalized chord distribution
+        norm_grid = normalizedGrid()
+        norm_grid.y = x
+        norm_grid.chord = LE_y - TE_y
+        norm_grid.referenceChord = np.sqrt(1.0-(x*x))
+        chordDistribution.append(norm_grid)
+
+def __add_toPlanformShape(planformShape, x, LE_y, TE_y, HL_y):
+        # setup normalized planformshape
+        grid = wingGrid()
+        grid.y = x
+        grid.leadingEdge = LE_y
+        grid.trailingEdge = TE_y
+        grid.chord = grid.leadingEdge - grid.trailingEdge 
+        grid.centerLine = grid.leadingEdge - (grid.chord/2)
+        grid.quarterChordLine = grid.leadingEdge - (grid.chord/4)
+        grid.hingeLine = HL_y
+
+        if grid.chord > 0.0:
+            grid.flapDepth = (HL_y / grid.chord) * 100.0
+        else:
+            grid.flapDepth = 0.0
+        
+        planformShape.append(grid)
 
 def __create_planformShape(lines):
     global num_gridPoints
@@ -614,40 +651,37 @@ def __create_planformShape(lines):
         LE_y = __get_yFromX(LE_norm, x)
         TE_y = __get_yFromX(TE_norm, x)
         
+        if (LE_y == None) or (TE_y == None):
+            ErrorMsg("y-coordinate not found, planform could not be created")
+            return None
+        
         # get normalize hingeline, if any
         if HL_norm != None:
             HL_y = __get_yFromX(HL_norm, x)
         else:
             # no flap, set hingeline to TE
             HL_y = TE_y
-        
-        if (LE_y == None) or (TE_y == None):
-            ErrorMsg("y-coordinate not found, planform could not be created")
-            return None
-
-        # setup normalized chord distribution
-        norm_grid = normalizedGrid()
-        norm_grid.y = x
-        norm_grid.chord = LE_y-TE_y
-        norm_grid.referenceChord = np.sqrt(1.0-(x*x))
-        chordDistribution.append(norm_grid)
-
-        # setup normalized planformshape
-        grid = wingGrid()
-        grid.y = x
-        grid.leadingEdge = LE_y
-        grid.trailingEdge = TE_y
-        grid.chord = grid.leadingEdge - grid.trailingEdge 
-        grid.centerLine = grid.leadingEdge - (grid.chord/2)
-        grid.quarterChordLine = grid.leadingEdge - (grid.chord/4)
-        grid.hingeLine = HL_y
-        grid.flapDepth = (HL_y / grid.chord) * 100.0
-        
-        planformShape.append(grid)
-        
+             
+        __add_toChordDistribution(chordDistribution, x, LE_y, TE_y)
+        __add_toPlanformShape(planformShape, x, LE_y, TE_y, HL_y)
+                
         # increment y coordinate
         x += delta_x
     
+    # Make sure to add last point of LE and TE
+    x = 1.0
+    (dummy, LE_y) = LE_norm[-1]
+    (dummy, TE_y) = TE_norm[-1]
+    
+    if HL_norm != None:
+        (dummy, HL_y) = HL_norm[-1]
+    else:
+        # no flap, set hingeline to TE
+        HL_y = TE_y
+
+    __add_toChordDistribution(chordDistribution, x, LE_y, TE_y)
+    __add_toPlanformShape(planformShape, x, LE_y, TE_y, HL_y)
+              
     # get flap depths
     flapDepthRoot = planformShape[0].flapDepth
     flapDepthTip = planformShape[-1].flapDepth
@@ -666,7 +700,7 @@ def __create_planformShape(lines):
     return (planformShape, chordDistribution, rootchord, halfwingspan, hingelineAngle, flapDepthRoot, flapDepthTip)
 
 def __convert_toPlanform(msp):
-    num_segments = 100
+    num_segments = 500
 
     # empty list of lines
     myLines = []
