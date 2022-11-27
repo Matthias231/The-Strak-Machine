@@ -296,6 +296,7 @@ class params:
         # dependend parameters bool
         self.DXF_asPlanform = False
         self.DXF_asOverlay = False
+        self.DXF_init = False
 
     ################################################################################
     # function that gets a single boolean parameter from dictionary and returns a
@@ -488,6 +489,7 @@ class params:
         self.isFin = self.__get_booleanParameterFromDict(dictData, "isFin", self.isFin)
         self.DXF_asPlanform = self.__get_booleanParameterFromDict(dictData, "DXF_asPlanform", self.DXF_asPlanform)
         self.DXF_asOverlay = self.__get_booleanParameterFromDict(dictData, "DXF_asOverlay", self.DXF_asOverlay)
+        self.DXF_init = self.__get_booleanParameterFromDict(dictData, "DXF_init", self.DXF_init)
 
         self.smoothUserAirfoils = self.__get_booleanParameterFromDict(dictData,
                                   "smoothUserAirfoils", self.smoothUserAirfoils)
@@ -536,6 +538,14 @@ class params:
         dictData["isFin"] = self.isFin
         dictData["DXF_asOverlay"] = self.DXF_asOverlay
         dictData["DXF_asPlanform"] = self.DXF_asPlanform
+        dictData["DXF_init"] = False
+
+    def write_DXF_paramsToDict(self, dictData):
+        dictData["rootchord"] = self.rootchord
+        dictData["wingspan"] = self.wingspan
+        dictData["hingeLineAngle"] = self.hingeLineAngle
+        dictData["flapDepthRoot"] = self.flapDepthRoot
+        dictData["flapDepthTip"] = self.flapDepthTip 
 
     def calculate_dependendValues(self):
         # calculate dependent parameters
@@ -1048,15 +1058,16 @@ class planform:
         self.hingeOuterPoint = self.hingeInnerPoint + GK'''
         return 0.0 #FIXMe implement
     
-    def set_fromDXF(self, planformShape, params, dxf_params):
+    def set_fromDXF(self, planformShape, params, dxf_params, DXF_init):
         (dxf_rootchord, dxf_halfwingspan, dxf_hingelineAngle, dxf_flapDepthRoot, dxf_flapDepthTip) = dxf_params
-        self.grid = planformShape #FIXME Denormalize grid points (rootchord, halfwingspan)
+        self.grid = planformShape 
         self.num_gridPoints = len(self.grid)
-
-        # set basic planformdata from dxf
-        params.rootchord = dxf_rootchord
-        params.halfwingspan = dxf_halfwingspan
-        params.wingspan = 2*dxf_halfwingspan + params.fuselageWidth
+            
+        if DXF_init:
+            # set basic planformdata from dxf
+            params.rootchord = dxf_rootchord
+            params.halfwingspan = dxf_halfwingspan
+            params.wingspan = 2*dxf_halfwingspan + params.fuselageWidth
 
         self.__denormalize(params.rootchord, params.halfwingspan)
        
@@ -1074,11 +1085,12 @@ class planform:
             self.hingeOuterPoint = self.grid[-1].hingeLine
             self.hingeLineAngle = dxf_hingelineAngle
             
-            # set hingeline parameters from dxf
-            params.flapDepthRoot = dxf_flapDepthRoot
-            params.flapDepthTip = dxf_flapDepthTip
-            params.hingelineAngle = dxf_hingelineAngle
-
+            if DXF_init:
+                # set hingeline parameters from dxf
+                params.flapDepthRoot = dxf_flapDepthRoot
+                params.flapDepthTip = dxf_flapDepthTip
+                params.hingelineAngle = dxf_hingelineAngle
+        
         # set dihedral
         self.dihedral = params.dihedral
           
@@ -1312,7 +1324,7 @@ class wing:
 
         return num
     
-    def import_dxf(self, filepath):
+    def import_dxf(self, filepath, DXF_init):
         params = self.params
         planformData = import_fromDXF(filepath)
         
@@ -1326,12 +1338,16 @@ class wing:
             # create instance of planform
             dxf_planform = planform()
             dxf_params = (rootchord, halfwingspan, hingelineAngle, flapDepthRoot, flapDepthTip)
-            dxf_planform.set_fromDXF(planformShape, params, dxf_params)
+            dxf_planform.set_fromDXF(planformShape, params, dxf_params, DXF_init)
             dxf_planform.flip_LE_TE()
             
             # assign to new wing
             self.dxf_chordDistribution = dxf_chordDistribution
             self.dxf_planform = dxf_planform
+            
+            # writeback params to dictionary that came from dxf
+            if DXF_init:
+                params.write_DXF_paramsToDict(self.paramsDict)
             return 0
         else:
             return -1
@@ -1398,17 +1414,19 @@ class wing:
 
         # read initial parameters from dictionary
         params.read_fromDict(dictData)
-
+        DXF_init = params.DXF_init
+        params.DXF_init = False
+            
         # export initial params to dictionary
         params.write_toDict(self.paramsDict)
-        
+
         # start modifying and applying params now
         params.calculate_dependendValues()
 
         # check if planform shape shall be imported from dxf
         if params.DXF_filename != None:
-            self.import_dxf(params.DXF_filename)
-
+            self.import_dxf(params.DXF_filename, DXF_init)
+                
         # now apply params which will modify the content of params
         self.apply_params()
 
@@ -3343,10 +3361,6 @@ class planform_creator:
         '''exports planform to given filepath'''
         return self.__export_planform(filePath, steps, xPanels, yPanels,
                       num_points, append)
-
-    def import_planform(self, filePath):
-        '''imports planform from given filepath (.dxf file)'''
-        return self.newWing.import_dxf(filePath)
 
     def get_params(self):
         '''gets parameters as a dictionary'''
