@@ -1517,7 +1517,18 @@ class wing:
             airfoilPositions.append(self.sections[idx].y)
 
         return airfoilPositions
+    
+    def get_airfoilPositionsNoFuselage(self):
+        airfoilPositionsWithFuselage = self.get_airfoilPositions()
+        offset = self.params.fuselageWidth/2
+        airfoilPositions = []
+        
+        for element in airfoilPositionsWithFuselage:
+            element -= offset
+            airfoilPositions.append(element)
 
+        return airfoilPositions
+    
     def get_flapPositions(self):
         flapPos_x = []
         flapPos_y = []
@@ -3254,10 +3265,14 @@ class planform_creator:
 
         try:
             planform = interpolatedWing.get_planform()
-        
+            
+            # get airfoil positions, but do not get interpolated airfoil positions, so use "newWing"
+            airfoilPositions = self.newWing.get_airfoilPositions()
+            airfoilNames = self.newWing.get_airfoilNames()
+            
             # change orientation of LE, TE for export--> TE @ coordinate 0, 0    
             planform.flip_LE_TE()
-            result = export_toDXF(params, planform, DXF_FileName, num_points)
+            result = export_toDXF(params, planform, airfoilPositions, airfoilNames, DXF_FileName, num_points)
         except:
             ErrorMsg("export_toDXF failed")
             return (-4, exportedFiles)

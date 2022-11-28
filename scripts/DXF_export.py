@@ -154,12 +154,30 @@ def __get_yFromX(points, x):
     ErrorMsg("__get_yFromX, xcoordinate %f not found" % x)
     return None
 
+
+def determine_airfoilLines(planform, params, airfoilPositions):
+    airfoilLines = []
+    offset = params.fuselageWidth/2
+
+    for position in airfoilPositions:
+        grid = planform.get_gridDataFromPosition(position)
+        x = position - offset
+        
+        if grid != None:
+            p1 = (x, grid.leadingEdge)
+            p2 = (x, grid.trailingEdge)
+            airfoilLines.append((p1, p2))
+        else:
+            ErrorMsg("unable to find grid for position %f" % position)
+    
+    return airfoilLines
+
 ################################################################################
 #
 # main function, export
 #
 ################################################################################
-def export_toDXF(params, planform, FileName, num_points):
+def export_toDXF(params, planform, airfoilPositions, airfoilNames, FileName, num_points):
 
     # create new dxf
     doc = ezdxf.new('R2010')
@@ -168,15 +186,7 @@ def export_toDXF(params, planform, FileName, num_points):
     # get grid from wingData
     grid = planform.grid
     
-    # setup root line (trailing edge --> leading edge)
-    rootline = []
-    LE_start = (0.0, grid[0].leadingEdge * scaleFactor)
-    TE_start = (0.0, grid[0].trailingEdge * scaleFactor)
-    rootline.append(LE_start)
-    rootline.append(TE_start)
-
     num = len(grid)
-
     LE_norm = []
     # add points of leading edge from root --> tip
     for idx in range(num):
@@ -233,18 +243,31 @@ def export_toDXF(params, planform, FileName, num_points):
     hingeline.append(denorm_xy(xy, params))
     xy = norm_xy((grid[-1].y, grid[-1].hingeLine), params)
     hingeline.append(denorm_xy(xy, params))
-
-    airfoilLines = []
-    # FIXME determine lines for airfoil positions
-
+        
     # add leightweight polylines to modelspace
-    msp.add_lwpolyline(rootline)
     msp.add_lwpolyline(LE)
     msp.add_lwpolyline(TE)
     msp.add_lwpolyline(hingeline)
-    
+        
     # add lines for airfoil positions
-    for airfoilLine in airfoilLines:
+    airfoilLines = determine_airfoilLines(planform, params, airfoilPositions)
+
+    # determine fontsize depending on rootchord
+    p1, p2 = airfoilLines[0]
+    x1, y1 = p1
+    x2, y2 = p2
+    rootchord = abs(y1-y2)
+    fontsize = (rootchord / 230.0) * 7.0
+
+    num = len(airfoilLines)
+
+    for idx in range(num):
+        airfoilLine = airfoilLines[idx]
+        airfoilName = airfoilNames[idx]
+        p1, p2 = airfoilLine
+        x, y = p1
+        y += 10
+        msp.add_text(airfoilName, dxfattribs={'style': 'LiberationSerif', 'height': fontsize}).set_pos((x, y), align='LEFT')
         msp.add_lwpolyline(airfoilLine)
 
     # save to file
