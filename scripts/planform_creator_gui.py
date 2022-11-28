@@ -1511,12 +1511,14 @@ class control_frame():
     def __start_strakMachine(self, dummy):
         planformIdx = self.master.planformIdx
         creatorInst = self.creatorInstances[planformIdx]
-        #planformName = self.planformNames[planformIdx]#FIXME remove
-
+    
         # export / update the parameters of 'opt' airfoils
         fileName = ressourcesPath + bs + 'strakdata_%d.txt' % planformIdx
         creatorInst.update_strakdata(fileName)
-
+        
+        # export existing airfoils
+        creatorInst.export_airfoils()
+        
         # now start the Strak machine in a separate background thread
         os.system("start python .\scripts\strak_machine_gui.py -s %s &" % fileName)
 
