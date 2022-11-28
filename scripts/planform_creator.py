@@ -1507,16 +1507,14 @@ class wing:
         num = len(self.sections) - 1
 
         if self.fuselageIsPresent():
-             # remove root airfoil
+             # skip root airfoil
             startIdx = 1
-            num -= 1
         else:
             startIdx = 0
 
         for idx in range(startIdx, num):
-            # get position, scale from m to mm
-            position = self.sections[idx].y# * 1000.0 FIXME
-            airfoilPositions.append(position)
+            # append position to list
+            airfoilPositions.append(self.sections[idx].y)
 
         return airfoilPositions
 
