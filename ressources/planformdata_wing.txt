@@ -1,17 +1,17 @@
 {
   "planformName":"main wing",
-  "rootchord":233,
+  "rootchord":230.0,
   "rootReynolds":150000,
-  "wingspan":2930,
+  "wingspan":2935.0,
   "fuselageWidth":35,
   "planformShape":"elliptical",
-  "tipSharpness":1.3,
-  "leadingEdgeCorrection":7.5,
-  "ellipseCorrection":0.004,
-  "tipchord":41,
+  "tipSharpness":0.7,
+  "leadingEdgeCorrection":6.999999999999999,
+  "ellipseCorrection":-0.012,
+  "tipchord":29,
   "hingeLineAngle":-0.6,
-  "flapDepthRoot":26.0,
-  "flapDepthTip":17.3,
+  "flapDepthRoot":26.812642173913048,
+  "flapDepthTip":18.278158316247755,
   "dihedral":3.0,
   "airfoilTypes":[
     "user",
@@ -20,17 +20,15 @@
     "blend",
     "user",
     "blend",
-    "user",
-    "opt"
+    "user"
   ],
   "airfoilPositions":[
     null,
-    0.22075419997354354,
-    0.4386047961902604,
-    0.6090604153674624,
+    0.2157652550220156,
+    0.4394362870155149,
+    0.6431515392029027,
     null,
-    0.8791018998272884,
-    null,
+    0.8844827586206897,
     null
   ],
   "airfoilReynolds":[
@@ -40,13 +38,11 @@
     null,
     100000,
     null,
-    50000,
-    37000
+    50000
   ],
   "flapGroup":[
     1,
     1,
-    2,
     2,
     2,
     2,
@@ -60,8 +56,7 @@
     null,
     "airfoil_library\\F3B_F3F\\JX\\JX-GT\\JX-GT-10.dat",
     null,
-    "airfoil_library\\F3B_F3F\\JX\\JX-GT\\JX-GT-05.dat",
-    null
+    "airfoil_library\\F3B_F3F\\JX\\JX-GT\\JX-GT-05.dat"
   ],
   "leadingEdgeOrientation":"up",
   "interpolationSegments":5,
@@ -82,9 +77,10 @@
     1000000
   ],
   "polar_Ncrit":7.0,
-  "DXF_filename":"planform_library\\VJX.dxf",
+  "DXF_filename":"planform_library\\testwing.dxf",
   "smoothUserAirfoils":false,
   "isFin":false,
   "DXF_asOverlay":true,
-  "DXF_asPlanform":false
+  "DXF_asPlanform":false,
+  "DXF_init":false
 }
