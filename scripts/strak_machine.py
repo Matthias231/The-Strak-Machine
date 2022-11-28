@@ -250,17 +250,17 @@ class inputFile:
         if (num_op_mode != num):
             valid = False
             ErrorMsg("number of op_mode elements differs from number of oppoints")
-            ErrorMsg("op_point: %d, op_mode: %d" (num, num_op_mode))
+            ErrorMsg("op_point: %d, op_mode: %d" % (num, num_op_mode))
 
         if (num_target_value != num):
             valid = False
             ErrorMsg("number of target_value elements differs from number of oppoints")
-            ErrorMsg("op_point: %d, target_value: %d" (num, num_target_value))
+            ErrorMsg("op_point: %d, target_value: %d" % (num, num_target_value))
 
         if (num_weighting != num):
             valid = False
             ErrorMsg("number of weighting elements differs from number of oppoints")
-            ErrorMsg("op_point: %d, weighting: %d" (num, num_weighting))
+            ErrorMsg("op_point: %d, weighting: %d" % (num, num_weighting))
 
         return valid
 
