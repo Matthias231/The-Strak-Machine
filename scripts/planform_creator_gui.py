@@ -1371,9 +1371,9 @@ class control_frame():
         DXF_configWindow.wm_title("Configure DXF")
 
         row = 1
-        caution_text = "CAUTION: if the switch \'.dxf as overlay' is set to off, then \'choose .dxf file\' might change"
-        caution_text += " the following parameters:\n"
-        caution_text += "Wingspan, Root chord, Hingeline angle @root, Flap depth @root, Flap depth @tip"
+        caution_text = "CAUTION:\n If the switch \'.dxf as overlay' is set to \'off\', then \'choose .dxf file\' will change"
+        caution_text += " at least the parameters \'Wingspan\' and \'Root chord\'.\n"
+        caution_text += "If the .dxf file contains a hingeline, then also the parameters \'Hingeline angle @root\', \'Flap depth @root\', \'Flap depth @tip\' will be changed."
         label = ctk.CTkLabel(master=DXF_configWindow, text=caution_text,
         text_font=(main_font, fs_caution), pady=10, padx=20, anchor="e")
         label.grid(row=row, column=0, columnspan = 3)
