@@ -162,3 +162,10 @@ Strakmachine/planform_creator_gui.bat
 Strakmachine/scripts/DXF_export.py
 Strakmachine/scripts/planform_creator_gui.py
 Strakmachine/scripts/XFLR5_export.py
+ressources/planformdata.txt
+ressources/strakdata_0.txt
+Strakmachine/planform_library/testwing.dxf
+Strakmachine/ressources/planformdata.txt
+Strakmachine/ressources/strakdata_0.txt
+Strakmachine/scripts/Strakmachine_export.py
+Strakmachine_PR4.zip
