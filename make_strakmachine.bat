@@ -24,6 +24,7 @@ copy .\scripts\show_status.py .\Strakmachine\scripts\
 copy .\scripts\FLZ_Vortex_export.py .\Strakmachine\scripts\
 copy .\scripts\XFLR5_export.py .\Strakmachine\scripts\
 copy .\scripts\DXF_export.py .\Strakmachine\scripts\
+copy .\scripts\Strakmachine_export.py .\Strakmachine\scripts\
 
 rem copy xoptfoil and xfoil-worker to bin-folder
 copy .\bin\*.exe .\Strakmachine\bin\
@@ -45,6 +46,9 @@ xcopy .\ressources\*.* .\Strakmachine\ressources\ /Y /E /H /C /I
 
 rem copy airfoil-library
 xcopy .\airfoil_library\*.* .\Strakmachine\airfoil_library\ /Y /E /H /C /I
+
+rem copy planform-library
+xcopy .\planform_library\*.* .\Strakmachine\planform_library\ /Y /E /H /C /I
 
 rem delete all batch files
 del .\Strakmachine\*.bat
