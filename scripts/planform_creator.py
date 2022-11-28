@@ -2454,8 +2454,7 @@ class wing:
         grid = planform.get_grid()
         for element in grid:
             proj_y = (element.y- (params.fuselageWidth/2)) * proj_fact
-            xVal = proj_y#-(self.fuselageWidth/2)
-            #xValues.append(xVal)
+            xVal = proj_y
             xValuesLeft.append(xVal)
 
         # offset for beginning of right half-wing
@@ -2476,9 +2475,10 @@ class wing:
 
         # adapt coordinates of geometrical center
         (center_x, center_y) = planform.get_geometrical_center()
+        center_x -= (params.fuselageWidth/2)
         center_x *= proj_fact
-        center_right_x = center_x +xOffset
-        center_left_x = (self.params.wingspan/2)*proj_fact - center_x
+        center_right_x = center_x + proj_halfwingSpan + params.fuselageWidth
+        center_left_x = center_right_x - (2*center_x) - params.fuselageWidth
         center_right = (center_right_x, center_y)
         center_left = (center_left_x, center_y)
 
