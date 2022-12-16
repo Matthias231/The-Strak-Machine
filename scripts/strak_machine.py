@@ -4429,11 +4429,6 @@ class strak_machine:
         (self.params.xfoilWorkerCall, thickPos, rootfoilName, seedfoilPrefix))
         system(systemString)
 
-        # set thickness
-        systemString = ("%s -w set t=%.2f -a %s -o %s\n\n" %\
-        (self.params.xfoilWorkerCall, thick, seedfoilName, seedfoilPrefix))
-        system(systemString)
-
         # set camber
         systemString = ("%s -w set c=%.2f -a %s -o %s\n\n" %\
         (self.params.xfoilWorkerCall, camb, seedfoilName, seedfoilPrefix))
@@ -4442,6 +4437,11 @@ class strak_machine:
         # set camber position
         systemString = ("%s -w set xc=%.2f -a %s -o %s\n\n" %\
         (self.params.xfoilWorkerCall, cambPos, seedfoilName, seedfoilPrefix))
+        system(systemString)
+
+        # set thickness
+        systemString = ("%s -w set t=%.2f -a %s -o %s\n\n" %\
+        (self.params.xfoilWorkerCall, thick, seedfoilName, seedfoilPrefix))
         system(systemString)
 
         NoteMsg("seedfoil %s was successfully generated" % seedfoilName)
