@@ -376,6 +376,7 @@ class control_frame():
                   {"txt": "Tip chord",                    "variable" : 'tipchord',              "idx": None, "unit" : "mm", "scaleFactor" : None,   "decimals": 0, "f_read" : None,   "f_write" :None},
                   {"txt": "Tip sharpness",                "variable" : 'tipSharpness',          "idx": None, "unit" : None, "scaleFactor" : None,   "decimals": 1, "f_read" : None,   "f_write" :None},
                   {"txt": "Ellipse correction",           "variable" : 'ellipseCorrection',     "idx": None, "unit" : None, "scaleFactor" : 100.0,  "decimals": 1, "f_read" : None,   "f_write" :None},
+                  {"txt": "Ellipse correction shift",     "variable" : 'ellipseCorrectionShift',"idx": None, "unit" : None, "scaleFactor" : None,   "decimals": 1, "f_read" : None,   "f_write" :None},
                   {"txt": "Leading edge correction",      "variable" : 'leadingEdgeCorrection', "idx": None, "unit" : None, "scaleFactor" : 0.1,    "decimals": 1, "f_read" : None,   "f_write" :None},
                   {"txt": "Dihedral",                     "variable" : 'dihedral',              "idx": None, "unit" : "°",  "scaleFactor" : None,   "decimals": 1, "f_read" : None,   "f_write" :None},
                   {"txt": "Hingeline angle @root",        "variable" : 'hingeLineAngle',        "idx": None, "unit" : "°",  "scaleFactor" : None,   "decimals": 1, "f_read" : None,   "f_write" :None},

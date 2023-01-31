@@ -8,6 +8,7 @@
   "tipSharpness":0.17,
   "leadingEdgeCorrection":2.0,
   "ellipseCorrection":-0.029,
+  "ellipseCorrectionShift":0.0,
   "tipchord":6,
   "hingeLineAngle":-1.5,
   "flapDepthRoot":30.0,

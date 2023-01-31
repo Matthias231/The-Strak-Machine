@@ -262,6 +262,7 @@ class params:
         self.fuselageWidth = 0.0
         self.leadingEdgeCorrection = 0.0
         self.ellipseCorrection = 0.0
+        self.ellipseCorrectionShift = 0.0
         self.hingeLineAngle = 0.0
         self.flapDepthRoot = 0.0
         self.flapDepthTip = 0.0
@@ -347,9 +348,11 @@ class params:
             self.leadingEdgeCorrection = self.__get_MandatoryParameterFromDict(dictData, "leadingEdgeCorrection")
             self.tipSharpness =  self.__get_MandatoryParameterFromDict(dictData, "tipSharpness")
             self.ellipseCorrection = self.__get_MandatoryParameterFromDict(dictData, "ellipseCorrection")
+            self.ellipseCorrectionShift = self.__get_MandatoryParameterFromDict(dictData, "ellipseCorrectionShift")
         else:
             self.leadingEdgeCorrection = 0.0
             self.ellipseCorrection = 0.0
+            self.ellipseCorrectionShift = 0.0
             self.tipSharpness = 0.0
 
         if (self.planformShape == 'elliptical') or\
@@ -512,6 +515,7 @@ class params:
         dictData["tipSharpness"] = self.tipSharpness
         dictData["leadingEdgeCorrection"] = self.leadingEdgeCorrection
         dictData["ellipseCorrection"] = self.ellipseCorrection
+        dictData["ellipseCorrectionShift"] = self.ellipseCorrectionShift
         dictData["tipchord"] = self.tipchord
         dictData["hingeLineAngle"] = self.hingeLineAngle
         dictData["flapDepthRoot"] = self.flapDepthRoot
@@ -603,7 +607,7 @@ class params:
     def get_shapeParams(self):
         normalizedTipChord = self.tipDepthPercent / 100
         shapeParams = (normalizedTipChord, self.tipSharpness,
-                       self.ellipseCorrection)
+                       self.ellipseCorrection, self.ellipseCorrectionShift)
         return (self.planformShape, shapeParams)
 
 
@@ -631,7 +635,7 @@ class chordDistribution:
         self.normalizedGrid = []
 
     def __elliptical_shape(self, x, shapeParams):
-        (normalizedTipChord, tipSharpness, ellipseCorrection) = shapeParams
+        (normalizedTipChord, tipSharpness, ellipseCorrection, ellipseCorrectionShift) = shapeParams
 
         # calculate distance to tip, where rounding starts
         tipRoundingDistance = normalizedTipChord * tipSharpness
@@ -660,7 +664,8 @@ class chordDistribution:
         chord = (1.0-delta) * np.sqrt(1.0-(x*x)) + delta
 
         # correct chord with ellipseCorrection
-        chord = chord + ellipseCorrection * sin(interpolate(0.0, 1.0, 0.0, pi, x))
+        correctionShift = sin(interpolate(0.0, 1.0, 0.0, pi, x)) * ellipseCorrectionShift
+        chord = chord + ellipseCorrection * sin(interpolate(0.0, 1.0, 0.0, pi, x) - correctionShift)
         
         # limit to 1.0
         chord = min(1.0, chord)
@@ -1547,7 +1552,7 @@ class wing:
     def get_distributionParams(self):
         distributionParams = (self.params.planformShape,
         self.params.tipDepthPercent, self.params.tipSharpness,
-        self.params.ellipseCorrection)
+        self.params.ellipseCorrection, self.params.ellipseCorrectionShift)
         return distributionParams
 
 
